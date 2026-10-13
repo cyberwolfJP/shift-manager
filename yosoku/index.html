@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+<meta name="googlebot" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data:; worker-src 'self' blob:; font-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="翌月予測">
+<meta name="theme-color" content="#0f766e">
+<title>翌月予測マネージャー</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#1f2430;--sub:#6b7280;--line:#e5e7eb;--soft:#f8fafc;--acc:#0f766e;--acc2:#14b8a6;--accbg:#e6f4f2;--red:#d6455d;--org:#e98a2e;--grn:#3a9a6a;--idle:#8a96a8;--blue:#3b6fd8;--warnbg:#fff7ed;--warn:#b45309;--redbg:#fdecef}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1f26;--ink:#e8eaed;--sub:#9aa3af;--line:#2c333d;--soft:#20262e;--accbg:#12332f;--warnbg:#33261a;--warn:#f0b26b;--redbg:#3a1d24}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 10px) 16px 0}
+.hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:1240px;margin:0 auto}
+.brand{font-size:18px;font-weight:500;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.logo{display:inline-block;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--acc),var(--acc2))}
+.msw{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:3px}
+.msw button{border:0;background:transparent;color:var(--ink);font-size:16px;width:34px;height:32px;border-radius:8px;cursor:pointer}
+.msw span{min-width:120px;text-align:center;font-variant-numeric:tabular-nums}
+.lockb{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;height:40px;padding:0 12px;font:inherit;cursor:pointer}
+nav{display:flex;gap:2px;overflow-x:auto;max-width:1240px;margin:8px auto 0;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{border:0;background:none;color:var(--sub);font:inherit;padding:10px 13px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;position:relative}
+nav button.on{color:var(--acc);border-bottom-color:var(--acc)}
+nav button .dot{position:absolute;top:8px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--org)}
+main{max-width:1240px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:17px;font-weight:500;margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h2 .r{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+h3{font-size:14px;font-weight:500;color:var(--sub);margin:14px 0 8px}
+.sub{color:var(--sub);font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.kpi .l{font-size:12px;color:var(--sub)}
+.kpi .v{font-size:25px;font-weight:500;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font-size:12px;color:var(--sub);margin-top:2px}
+.up{color:var(--grn)}.dn{color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.tw{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px}
+.tw.tall{max-height:70vh}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-weight:500;color:var(--sub);font-size:12px;background:var(--soft);position:sticky;top:0;z-index:1}
+td.l,th.l{text-align:left}
+tbody tr:last-child td{border-bottom:0}
+tfoot td{background:var(--soft);font-weight:500}
+.wd0,.hol{color:var(--red)}.wd6{color:var(--blue)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc2);outline-offset:-1px}
+td input{width:104px;text-align:right;padding:5px 7px}
+td input.w{width:150px;text-align:left}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc);vertical-align:-3px}
+input[type=range]{width:100%;accent-color:var(--acc);padding:0}
+textarea{width:100%;min-height:120px;font-size:14px}
+textarea.mono{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.btn:active{transform:translateY(1px)}
+.btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.lg{padding:12px 20px;font-size:16px;border-radius:12px}
+.btn.s{padding:5px 10px;font-size:13px}
+.btn.d{color:var(--red)}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{font:inherit;border:0;background:var(--card);color:var(--sub);padding:7px 14px;cursor:pointer}
+.seg button.on{background:var(--acc);color:#fff}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row+.row{margin-top:10px}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--sub)}
+.fld input,.fld select{color:var(--ink)}
+.lv{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;color:#fff;white-space:nowrap}
+.lv3{background:var(--red)}.lv2{background:var(--org)}.lv1{background:var(--grn)}.lv0{background:var(--idle)}
+.lvs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--accbg);color:var(--acc);margin-right:3px}
+.note{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.ok{background:var(--accbg);color:var(--acc);border-radius:10px;padding:10px 12px;font-size:13px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .h{text-align:center;font-size:12px;color:var(--sub)}
+.cal .c{border:1px solid var(--line);border-radius:10px;padding:6px 7px;min-height:74px;position:relative;background:var(--card);overflow:hidden}
+.cal .c.e{border:0;background:none}
+.cal .c .d{font-size:12px}
+.cal .c .m{font-size:15px;font-variant-numeric:tabular-nums;margin-top:4px}
+.cal .c .g{font-size:11px;color:var(--sub)}
+.cal .c .bar{position:absolute;left:0;right:0;bottom:0;height:5px}
+.cal .c.lv3x .bar{background:var(--red)}.cal .c.lv2x .bar{background:var(--org)}.cal .c.lv1x .bar{background:var(--grn)}.cal .c.lv0x .bar{background:var(--idle)}
+@media (max-width:600px){.cal .c{min-height:58px;padding:4px}.cal .c .m{font-size:12px}.cal .c .g{display:none}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-bottom:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart .grid{stroke:var(--line);stroke-width:1}
+svg.chart .ax{fill:var(--sub);font-size:11px}
+.rbar{height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}
+.rbar i{display:block;height:100%}
+.routes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:600px){.routes{grid-template-columns:1fr}}
+.emps{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.emp{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+.emp.off{opacity:.55}
+.emp .top{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.emp .top input[type=text]{flex:1;min-width:0}
+.emp .ins{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.emp .ins input{width:100%}
+.emp .res{margin-top:10px;font-size:13px;display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-variant-numeric:tabular-nums}
+.emp .res b{font-weight:500}
+pre.rep{white-space:pre-wrap;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;max-height:420px;overflow:auto;font-family:inherit}
+.drop{border:1.5px dashed var(--acc2);border-radius:14px;padding:22px;text-align:center;color:var(--sub);cursor:pointer;display:block;background:var(--accbg)}
+.drop b{display:block;color:var(--acc);font-weight:500;font-size:17px;margin-bottom:4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 12px;cursor:pointer}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip small{opacity:.7;margin-left:4px}
+.chip.ok{border-color:var(--grn);color:var(--grn)}
+.chip.part{border-color:var(--org);color:var(--org)}
+.chip.miss{border-color:var(--red);color:var(--red);background:var(--redbg)}
+.num{font-variant-numeric:tabular-nums}
+details summary{cursor:pointer;color:var(--acc);padding:6px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1f2430;color:#fff;padding:9px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:90;max-width:90vw}
+.toast.on{opacity:.95}
+.hidden{display:none!important}
+/* チェックリスト */
+.ck{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:14px 0;border-bottom:1px solid var(--line)}
+.ck:last-child{border-bottom:0}
+.ck .ic{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;background:var(--idle)}
+.ck.done .ic{background:var(--grn)}.ck.part .ic{background:var(--org)}.ck.miss .ic{background:var(--red)}
+.ck .t{font-size:15px}
+.ck .h{font-size:13px;color:var(--sub);margin:2px 0 8px}
+.ck .opt{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:6px}
+@media (max-width:600px){.ck{grid-template-columns:30px 1fr}.ck>.btn{grid-column:2}}
+.pbar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
+.pbar i{display:block;height:100%;background:var(--acc2);transition:width .3s}
+/* キュー */
+.q{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.q:last-child{border-bottom:0}
+.q img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.q .st{font-size:14px}
+.q .ms{font-size:12px;color:var(--sub);margin-top:2px}
+.q .ac{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.badge{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;margin-right:6px}
+.b-ok{background:var(--accbg);color:var(--acc)}.b-wait{background:var(--soft);color:var(--sub);border:1px solid var(--line)}.b-chk{background:var(--warnbg);color:var(--warn)}.b-err{background:var(--redbg);color:var(--red)}.b-undo{background:var(--soft);color:var(--sub)}
+.next{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--accbg);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.next .tx{flex:1;min-width:220px}
+.next .tx div:first-child{color:var(--acc)}
+ul.pts{margin:0;padding-left:20px}
+ul.pts li{margin:4px 0}
+/* ゲート */
+#gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+.gbox{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px 24px;text-align:center}
+.gbox .logo{width:44px;height:44px;border-radius:12px;margin-bottom:10px}
+.gbox h1{font-size:20px;font-weight:500;margin:0 0 4px}
+.gbox input{width:100%;margin-top:10px;padding:12px;font-size:17px;text-align:center;letter-spacing:.1em}
+.gbox .btn{width:100%;justify-content:center;margin-top:14px}
+.gbox .err{color:var(--red);font-size:13px;min-height:20px;margin-top:8px}
+.gbox .sub{margin-top:14px;text-align:left}
+/* モーダル */
+#modal{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.mbox{background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:960px;max-height:90vh;overflow:auto}
+.mbox.sm{max-width:380px}
+/* レポート */
+.report{background:#fff;color:#1f2430;border-radius:14px;border:1px solid var(--line);padding:28px;max-width:900px;margin:0 auto;--line:#e5e7eb;--sub:#6b7280;--soft:#f8fafc;--card:#fff;--ink:#1f2430}
+.report .rh{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f766e;padding-bottom:10px;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.report .rh .tt{font-size:22px;font-weight:500}
+.report .conf{font-size:12px;border:1px solid #d6455d;color:#d6455d;border-radius:5px;padding:1px 7px;margin-left:8px;vertical-align:3px}
+.report .sec{margin-top:18px;break-inside:avoid}
+.report .sec>.ttl{font-size:15px;font-weight:500;color:#0f766e;border-left:4px solid #0f766e;padding-left:8px;margin-bottom:8px}
+.report .kpis{grid-template-columns:repeat(3,1fr)}
+.report .kpi{padding:10px 12px;background:#f8fafc}
+.report .kpi .v{font-size:20px}
+.report .cmt{white-space:pre-wrap;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:14px}
+.report .tw{max-height:none;overflow:visible}
+.report th{position:static}
+.report table{font-size:12.5px}
+.report th,.report td{padding:5px 7px}
+.report .cal .c{min-height:56px;padding:4px 6px}
+.report .cal .c .m{font-size:13px}
+.report .foot{margin-top:20px;font-size:11px;color:#6b7280;text-align:right}
+.todo .ti{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+.todo .ti:last-child{border-bottom:0}
+.todo .tc input{width:28px;height:28px;margin:2px 0 0}
+.todo .tn{font-size:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.todo .ti.dn .tn{color:var(--sub);text-decoration:line-through}
+.todo .tm{width:100%;margin-top:6px;font-size:13px;padding:6px 9px}
+.todo .ta{display:flex;gap:4px}
+.opt{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+@media (max-width:600px){.todo .ti{grid-template-columns:38px 1fr}.todo .ta{grid-column:2}}
+@media print{
+  @page{size:A4;margin:11mm}
+  :root{--bg:#fff;--card:#fff;--ink:#1f2430;--sub:#6b7280;--line:#e5e7eb;--soft:#f8fafc}
+  html,body{background:#fff!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  header,nav,.noprint,#gate,#modal,.toast{display:none!important}
+  main{padding:0;max-width:none}
+  body.printing main>*:not(.report){display:none!important}
+  .report{border:0;padding:0;max-width:none;border-radius:0}
+  .pb{break-before:page}
+}
+</style>
+</head>
+<body>
+<div id="gate"></div>
+<header id="hdr" class="hidden">
+  <div class="hrow">
+    <div class="brand"><span class="logo"></span>翌月予測マネージャー</div>
+    <div class="msw" title="予測する対象月">
+      <button onclick="shiftTarget(-1)" aria-label="前月">‹</button>
+      <span id="tlabel"></span>
+      <button onclick="shiftTarget(1)" aria-label="翌月">›</button>
+    </div>
+    <button class="lockb" onclick="lockNow()" title="ロック">🔒 ロック</button>
+  </div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+<input type="file" id="fileIn" accept="image/*" multiple class="hidden">
+<div id="modal" class="hidden"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ================= 定数・ユーティリティ ================= */
+const ENC_KEY='yosoku-manager-enc',LEGACY_KEY='yosoku-manager-v1',FAIL_KEY='yosoku-manager-fail';
+const WD=['日','月','火','水','木','金','土'];
+const ORDER=[1,2,3,4,5,6,0];
+const TABS=[['dash','ダッシュボード'],['up','写真アップロード'],['todo','月末ToDo'],['sales','売上予測'],['labor','人件費'],['pur','仕入れ'],['att','勤怠手当'],['report','レポート・PDF'],['data','実績データ'],['set','設定']];
+const COLS=[{k:'sales',n:'売上'},{k:'guests',n:'客数'},{k:'pa',n:'PA人件費'},{k:'labor',n:'人件費合計'},{k:'r1',n:'仕入れ1'},{k:'r2',n:'仕入れ2'},{k:'r3',n:'仕入れ3'}];
+const KINDS={sales:{n:'売上・客数',cols:['sales','guests']},labor:{n:'人件費',cols:['pa','labor']},pur:{n:'仕入れ',cols:['r1','r2','r3']},att:{n:'勤怠実績',cols:['work','night']}};
+const KW={
+  sales:{inc:/売上|売り上げ|純売|総売/,exc:/前年|昨年|年売|年度|予算|目標|比|累計|率|単価/},
+  guests:{inc:/客数|来客|人数|来店/,exc:/前年|昨年|年客|予算|比|単価|累計|目標/},
+  pa:{inc:/PA|ＰＡ|パート|アルバイト|ﾊﾟｰﾄ/i,exc:/率|予算|時間/},
+  labor:{inc:/人件費/,exc:/率|PA|ＰＡ|パート|アルバイト|予算|比|目標/},
+  r1:{inc:/(?!)/,exc:/^$/},r2:{inc:/(?!)/,exc:/^$/},r3:{inc:/(?!)/,exc:/^$/},
+  work:{inc:/総労働|労働時間|実働|勤務時間|労働/,exc:/深夜|残業|所定|手当/},
+  night:{inc:/深夜/,exc:/手当|割増|率/}
+};
+const KIND_SCORE={sales:/売上|客数|客単価|組数|来客/g,labor:/人件費|ＰＡ|PA|人時/g,pur:/仕入|発注|備品|消耗/gi,att:/深夜|残業|勤怠|出勤|退勤|労働時間|所定/g};
+const TODO_DEFAULT=[];
+const LV=[{n:'アイドル注意'},{n:'通常稼働'},{n:'高稼働'},{n:'超高稼働'}];
+const LVC=['#8a96a8','#3a9a6a','#e98a2e','#d6455d'];
+const PAL=['#0f766e','#3b6fd8','#e98a2e','#a855f7','#d6455d','#64748b'];
+const ROUTES=[{k:'r1',n:'仕入れ1',c:'#0f766e'},{k:'r2',n:'仕入れ2',c:'#3b6fd8'},{k:'r3',n:'仕入れ3',c:'#e98a2e'}];
+const reEsc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function syncNames(){if(!state)return;const R=state.settings.routes;const all=[];
+  ROUTES.forEach((r,i)=>{const o=R[i]||{};r.n=o.name||('仕入れ'+(i+1));const c=COLS.find(x=>x.k===r.k);c.n=r.n;
+    const words=[o.name,...String(o.alias||'').split(/[,、，\s]+/)].map(x=>(x||'').trim()).filter(x=>x.length>=2);all.push(...words);
+    KW[r.k]={inc:words.length?new RegExp(words.map(w=>reEsc(w).replace(/\\?\s+/g,'\\s*')).join('|'),'i'):/(?!)/,exc:/^$/}});
+  KIND_SCORE.pur=new RegExp(['仕入','発注','備品','消耗',...all.map(reEsc)].join('|'),'gi')}
+const DEFAULT_HOL=['2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24','2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06','2025-07-21','2025-08-11','2025-09-15','2025-09-23','2025-10-13','2025-11-03','2025-11-23','2025-11-24','2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23','2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11','2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23'];
+
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const ymAdd=(ym,k)=>{let[y,m]=ym.split('-').map(Number);m+=k;while(m>12){m-=12;y++}while(m<1){m+=12;y--}return y+'-'+pad(m)};
+const dim=ym=>{const[y,m]=ym.split('-').map(Number);return new Date(y,m,0).getDate()};
+const ds=(ym,d)=>ym+'-'+pad(d);
+const wdOf=(ym,d)=>{const[y,m]=ym.split('-').map(Number);return new Date(y,m-1,d).getDay()};
+const fmtDate=dt=>dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
+const ymLabel=ym=>{const[y,m]=ym.split('-');return y+'年'+(+m)+'月'};
+const mLabel=ym=>(+ym.split('-')[1])+'月';
+const yen=n=>(n==null||!isFinite(n))?'—':(n<0?'-':'')+'¥'+Math.abs(Math.round(n)).toLocaleString('ja-JP');
+const int=n=>(n==null||!isFinite(n))?'—':Math.round(n).toLocaleString('ja-JP');
+const man=n=>(n==null||!isFinite(n))?'—':(n/10000).toFixed(1)+'万';
+const pct=(n,d=1)=>(n==null||!isFinite(n))?'—':(n*100).toFixed(d)+'%';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sum=a=>a.reduce((s,x)=>s+(x||0),0);
+const nowYM=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)};
+const z2h=s=>String(s).replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+const toNum=v=>{if(v==null)return null;v=z2h(v).replace(/[,，¥￥円\s]/g,'');if(v==='')return null;const n=Number(v);return isFinite(n)?n:null};
+const R0=n=>n==null||!isFinite(n)?'':Math.round(n);
+const dateJP=d=>`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;
+
+function defaultState(){
+  const t=nowYM();
+  return {v:2,
+    settings:{target:ymAdd(t,1),window:3,growthMode:'auto',growthManual:110,salesAdj:0,targetLaborRate:24,lockMin:10,routes:[{name:'',alias:''},{name:'',alias:''},{name:'',alias:''}],holidays:DEFAULT_HOL.slice(),
+      levels:{s1:700000,g1:240,s2:580000,g2:200,s3:450000},
+      cal:{fri:{on:false,sales:25},eve:{on:true,sales:25},sat:{on:false,unit:-17},sun:{on:false,sales:-8},hol:{on:true,sales:10,unit:-5},pay:{on:true,sales:7}}},
+    data:{},salesOverride:{},
+    labor:{window:3,holAs:'6',pct:{},yen:{},dateAdj:{}},
+    purchase:{window:3,slider:0,override:{}},
+    att:{month:t,outDate:fmtDate(new Date()),outTime:'',
+      emps:[],rules:{d31:{h:'',r:''},d30:{h:'',r:''},feb:{h:'',r:''}}},
+    learn:{},
+    todo:{month:'',onlyOpen:false,tpl:TODO_DEFAULT.map((n,i)=>({id:'t'+i,name:n,due:''})),m:{}},
+    report:{title:'',store:'',author:'',to:'',comment:'',sec:{kpi:true,points:true,comment:true,cal:true,chart:true,week:true,labor:true,pur:true,att:false}},
+    ui:{tab:'up',dataMonth:''}};
+}
+function migrate(st){if(st.att&&st.att.feb)delete st.att.feb;return st}
+function deepMerge(a,b){if(Array.isArray(b))return b;if(b&&typeof b==='object'){const o={...(a&&typeof a==='object'?a:{})};for(const k in b){o[k]=(a&&a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k]))?deepMerge(a[k],b[k]):b[k]}return o}return b}
+
+/* ================= 暗号化ストレージ ================= */
+let state=null,cryptoKey=null,encSalt=null;
+let holSet=new Set();
+const te=new TextEncoder(),td=new TextDecoder();
+function b64(u8){let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s)}
+function ub64(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+async function deriveKey(pw,salt){const base=await crypto.subtle.importKey('raw',te.encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function encWith(key,salt,obj){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,te.encode(JSON.stringify(obj))));return{app:'yosoku-manager',v:2,salt:b64(salt),iv:b64(iv),ct:b64(ct)}}
+async function decWith(key,blob){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(blob.iv)},key,ub64(blob.ct));return JSON.parse(td.decode(pt))}
+let saveTimer=null,saving=Promise.resolve();
+function save(){if(!state||!cryptoKey)return;clearTimeout(saveTimer);saveTimer=setTimeout(flushSave,300)}
+function flushSave(){clearTimeout(saveTimer);if(!state||!cryptoKey)return saving;const snap=JSON.parse(JSON.stringify(state)),key=cryptoKey,salt=encSalt;
+  saving=saving.then(()=>encWith(key,salt,snap)).then(b=>{localStorage.setItem(ENC_KEY,JSON.stringify(b))}).catch(e=>toast('保存できませんでした（容量不足の可能性）'));return saving}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSave()});
+window.addEventListener('pagehide',()=>flushSave());
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200)}
+
+/* ================= ログイン ================= */
+function failInfo(){try{return JSON.parse(localStorage.getItem(FAIL_KEY))||{n:0,until:0}}catch(e){return{n:0,until:0}}}
+function gateShow(html){$('gate').innerHTML=`<div class="gbox"><div class="logo"></div><h1>翌月予測マネージャー</h1>${html}</div>`;$('gate').classList.remove('hidden');$('hdr').classList.add('hidden');$('main').innerHTML='';const i=$('gate').querySelector('input');if(i)setTimeout(()=>i.focus(),50)}
+function showSetup(){gateShow(`<div class="sub" style="text-align:center;margin-top:0">はじめにパスワードを決めてください</div>
+  <input type="password" id="pw1" placeholder="パスワード（8文字以上）" autocomplete="new-password">
+  <input type="password" id="pw2" placeholder="もう一度入力" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSetup()">
+  <button class="btn p lg" onclick="doSetup()">設定してはじめる</button><div class="err" id="gerr"></div>
+  <div class="sub">・データはこのパスワードで暗号化して、この端末の中だけに保存します。サーバーには送りません。<br>・パスワードを忘れるとデータは元に戻せません。紙などに控えてください。</div>`)}
+function showLogin(msg){const f=failInfo();gateShow(`<div class="sub" style="text-align:center;margin-top:0">パスワードを入力してください</div>
+  <input type="password" id="pw" placeholder="パスワード" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+  <button class="btn p lg" id="lgb" onclick="doLogin()">ログイン</button><div class="err" id="gerr">${esc(msg||'')}</div>
+  <div class="sub" style="text-align:center"><a href="#" onclick="forgot();return false" style="color:var(--sub)">パスワードを忘れた場合</a></div>`);
+  if(f.until>Date.now())lockout(f.until)}
+function lockout(until){const b=$('lgb'),e=$('gerr');if(!b)return;b.disabled=true;const tick=()=>{const s=Math.ceil((until-Date.now())/1000);if(s<=0){b.disabled=false;e.textContent='';return}e.textContent=`入力ミスが続いたため ${s}秒 お待ちください`;setTimeout(tick,500)};tick()}
+async function doSetup(){const a=$('pw1').value,b=$('pw2').value,e=$('gerr');
+  if(a.length<8){e.textContent='8文字以上にしてください';return}if(a!==b){e.textContent='2回の入力が一致しません';return}
+  e.textContent='設定中…';encSalt=crypto.getRandomValues(new Uint8Array(16));cryptoKey=await deriveKey(a,encSalt);
+  let legacy=null;try{legacy=JSON.parse(localStorage.getItem(LEGACY_KEY))}catch(x){}
+  state=legacy?migrate(deepMerge(defaultState(),legacy)):defaultState();
+  await flushSave();localStorage.removeItem(LEGACY_KEY);enterApp()}
+async function doLogin(){const f=failInfo();if(f.until>Date.now())return;const pw=$('pw').value,e=$('gerr');if(!pw)return;e.textContent='確認中…';
+  try{const blob=JSON.parse(localStorage.getItem(ENC_KEY));const salt=ub64(blob.salt);const key=await deriveKey(pw,salt);const s=await decWith(key,blob);
+    cryptoKey=key;encSalt=salt;state=migrate(deepMerge(defaultState(),s));localStorage.removeItem(FAIL_KEY);enterApp()}
+  catch(x){const n=f.n+1;const until=n>=5?Date.now()+Math.min(300,30*2**(n-5))*1000:0;localStorage.setItem(FAIL_KEY,JSON.stringify({n,until}));showLogin('パスワードが違います')}}
+function forgot(){const ok=prompt('パスワードを忘れた場合、この端末のデータをすべて消去して初期化するしかありません。\n（バックアップファイルがあれば、新しいパスワード設定後に元のパスワードで読み込めます）\n\n初期化する場合は「消去」と入力してください');
+  if(ok==='消去'){localStorage.removeItem(ENC_KEY);localStorage.removeItem(FAIL_KEY);showSetup()}}
+function enterApp(){$('gate').classList.add('hidden');$('gate').innerHTML='';$('hdr').classList.remove('hidden');resetIdle();render()}
+function lockNow(){flushSave().finally(()=>{state=null;cryptoKey=null;queue.forEach(q=>URL.revokeObjectURL(q.url));queue=[];closeModal();showLogin()})}
+let idleT=null;
+function resetIdle(){clearTimeout(idleT);if(!state)return;const m=+state.settings.lockMin;if(m>0)idleT=setTimeout(()=>{if(busy){resetIdle();return}lockNow();},m*60000)}
+['pointerdown','keydown','scroll'].forEach(ev=>document.addEventListener(ev,()=>{if(state)resetIdle()},{passive:true}));
+
+/* ================= モーダル ================= */
+function openModal(html,sm){const m=$('modal');m.innerHTML=`<div class="mbox ${sm?'sm':''}">${html}</div>`;m.classList.remove('hidden')}
+function closeModal(){const m=$('modal');m.classList.add('hidden');m.innerHTML=''}
+function askPassword(msg){return new Promise(res=>{window._pwres=v=>{closeModal();res(v)};openModal(`<h2>${esc(msg)}</h2><input type="password" id="mpw" style="width:100%" onkeydown="if(event.key==='Enter')_pwres(this.value)"><div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn" onclick="_pwres(null)">キャンセル</button><button class="btn p" onclick="_pwres($('mpw').value)">OK</button></div>`,true);setTimeout(()=>$('mpw')?.focus(),50)})}
+
+/* ================= データ ================= */
+const mdata=ym=>state.data[ym]?.d||{};
+const rec=(ym,d)=>mdata(ym)[d];
+const val=(r,k)=>{const v=r?.[k];return(v===''||v==null||!isFinite(v))?null:+v};
+function purTotal(r){const a=['r1','r2','r3'].map(k=>val(r,k));if(a.every(x=>x==null))return null;return sum(a)}
+function kindVal(r,kind){return kind==='pur'?purTotal(r):val(r,kind)}
+function hasKind(ym,kind){return Object.values(mdata(ym)).some(r=>kindVal(r,kind)!=null)}
+function daysWith(ym,kind){return Object.entries(mdata(ym)).filter(([d,r])=>+d<=dim(ym)&&kindVal(r,kind)!=null).length}
+function monthsWith(kind,before){return Object.keys(state.data).filter(ym=>ym<before&&hasKind(ym,kind)).sort()}
+function windowMonths(kind,n){return monthsWith(kind,state.settings.target).slice(-n)}
+const isHol=date=>holSet.has(date);
+function isEve(ym,d){const[y,m]=ym.split('-').map(Number);const dt=new Date(y,m-1,d+1);return holSet.has(fmtDate(dt))&&!holSet.has(ds(ym,d))}
+function dayInfo(ym,d){const w=wdOf(ym,d),date=ds(ym,d),hol=isHol(date);return{d,w,date,hol,eve:isEve(ym,d),pay:d>=25&&!hol&&w>=1&&w<=5}}
+const wdCls=i=>i.hol||i.w===0?'wd0':i.w===6?'wd6':'';
+
+/* ================= 売上予測 ================= */
+function salesModel(){
+  const S=state.settings,t=S.target,ly=ymAdd(t,-12),C=S.cal;
+  const win=windowMonths('sales',S.window);
+  const lyCount=daysWith(ly,'sales');const useLY=lyCount>=7;const src=useLY?[ly]:win;
+  const groups={};
+  for(const ym of src)for(const[d,r]of Object.entries(mdata(ym))){const s=val(r,'sales');if(s==null||+d>dim(ym))continue;const i=dayInfo(ym,+d);(groups[i.hol?'hol':i.w]??=[]).push({s,g:val(r,'guests'),eve:i.eve,pay:i.pay})}
+  const allRows=Object.values(groups).flat();
+  const avgOf=arr=>{const s=arr.map(x=>x.s),g=arr.filter(x=>x.g>0).map(x=>x.g);return{sales:s.length?sum(s)/s.length:null,guests:g.length?sum(g)/g.length:null,n:arr.length}};
+  const base={};
+  for(let w=0;w<7;w++){const arr=groups[w]||[];let p=arr.filter(x=>!x.eve&&!x.pay);if(!p.length)p=arr.filter(x=>!x.eve);if(!p.length)p=arr;
+    base[w]=p.length?avgOf(p):(allRows.length?{...avgOf(allRows),n:0,fallback:true}:{sales:0,guests:0,n:0})}
+  const ug={};let us=0,ugt=0;
+  for(const ym of win)for(const[d,r]of Object.entries(mdata(ym))){const s=val(r,'sales'),g=val(r,'guests');if(s==null||!g||+d>dim(ym))continue;const i=dayInfo(ym,+d);const k=i.hol?'hol':i.w;(ug[k]??={s:0,g:0});ug[k].s+=s;ug[k].g+=g;us+=s;ugt+=g}
+  let unitAll=ugt?us/ugt:null;
+  if(unitAll==null){let a=0,b=0;for(const r of allRows){if(r.g){a+=r.s;b+=r.g}}unitAll=b?a/b:3000}
+  const unit={};for(let w=0;w<7;w++)unit[w]=ug[w]?ug[w].s/ug[w].g:unitAll;unit.hol=ug.hol?ug.hol.s/ug.hol.g:unit[6];
+  const gd=[];let ga=0,gb=0;
+  for(const ym of win){const lym=ymAdd(ym,-12);let a=0,b=0,n=0;for(const[d,r]of Object.entries(mdata(ym))){const s=val(r,'sales'),l=val(rec(lym,d),'sales');if(s!=null&&l!=null&&l>0){a+=s;b+=l;n++}}gd.push({ym,a,b,n,rate:b?a/b:null});ga+=a;gb+=b}
+  const autoGrowth=gb?ga/gb:null;
+  let growth=1,growthSrc='直近実績ベースのため成長率は掛けません';
+  if(useLY){if(S.growthMode==='manual'||autoGrowth==null){growth=S.growthManual/100;growthSrc=autoGrowth==null?'前年比を出せるデータがないため手動値':'手動設定'}else{growth=autoGrowth;growthSrc='直近'+win.length+'ヶ月の前年比（自動）'}}
+  const days=[];
+  for(let d=1;d<=dim(t);d++){
+    const i=dayInfo(t,d);const b=base[i.hol?6:i.w];let fS=1,fU=1;const tags=[];
+    if(i.eve&&C.eve.on){fS*=1+C.eve.sales/100;tags.push('祝前')}else if(i.w===5&&C.fri.on){fS*=1+C.fri.sales/100;tags.push('金')}
+    if(i.w===6&&!i.hol&&C.sat.on){fU*=1+C.sat.unit/100;tags.push('土')}
+    if(i.w===0&&!i.hol&&C.sun.on){fS*=1+C.sun.sales/100;tags.push('日')}
+    if(i.hol&&C.hol.on){fS*=1+C.hol.sales/100;fU*=1+C.hol.unit/100;tags.push('祝日')}
+    if(i.pay&&C.pay.on){fS*=1+C.pay.sales/100;tags.push('給与')}
+    fS*=1+(+S.salesAdj||0)/100;
+    let sales=(b.sales||0)*growth*fS;const calc=sales;
+    const ov=state.salesOverride[i.date];const manual=ov&&ov.sales!=null&&ov.sales!=='';if(manual)sales=+ov.sales;
+    const up=(i.hol?unit.hol:unit[i.w])*fU;const guests=up>0?sales/up:0;
+    const[y,m]=t.split('-').map(Number);const lyd=fmtDate(new Date(y,m-1,d-364));const lyr=rec(lyd.slice(0,7),String(+lyd.slice(8)));
+    days.push({...i,base:b.sales,fS,fU,tags,calc,sales,manual,memo:ov?.memo||'',unit:up,guests,level:levelOf(sales,guests),ly:val(lyr,'sales')});
+  }
+  const total=sum(days.map(x=>x.sales)),gTotal=sum(days.map(x=>x.guests));
+  const lyTotal=sum(Object.values(mdata(ly)).map(r=>val(r,'sales')));
+  return{t,ly,useLY,lyCount,win,base,unit,unitAll,growth,growthSrc,autoGrowth,gd,days,total,gTotal,avgUnit:gTotal?total/gTotal:null,lyTotal:useLY?lyTotal:null};
+}
+function levelOf(s,g){const L=state.settings.levels;if(s>=L.s1||g>=L.g1)return 3;if(s>=L.s2||g>=L.g2)return 2;if(s>=L.s3)return 1;return 0}
+
+/* ================= 人件費・仕入れ ================= */
+function wdStats(months,kind){
+  const per={};const pool={};for(let w=0;w<7;w++)pool[w]={n:0,s:0};
+  for(const ym of months){per[ym]={};for(let w=0;w<7;w++)per[ym][w]={n:0,s:0};
+    for(const[d,r]of Object.entries(mdata(ym))){const v=kindVal(r,kind);if(v==null||+d>dim(ym))continue;const w=wdOf(ym,+d);per[ym][w].n++;per[ym][w].s+=v;pool[w].n++;pool[w].s+=v}}
+  const avg={};for(let w=0;w<7;w++)avg[w]=pool[w].n?pool[w].s/pool[w].n:null;
+  const allN=sum(Object.values(pool).map(p=>p.n)),allS=sum(Object.values(pool).map(p=>p.s));
+  for(let w=0;w<7;w++)if(avg[w]==null)avg[w]=allN?allS/allN:0;
+  return{per,pool,avg};
+}
+function laborModel(sm){
+  const L=state.labor,t=state.settings.target;const win=windowMonths('labor',L.window);
+  const st=wdStats(win,'labor'),stp=wdStats(win,'pa');const counts={};for(let w=0;w<7;w++)counts[w]=0;
+  const days=[];
+  for(let d=1;d<=dim(t);d++){const i=dayInfo(t,d);const type=(i.hol&&L.holAs!=='none')?+L.holAs:i.w;counts[type]++;
+    const p=+(L.pct[type]||0),y=+(L.yen[type]||0);const adj=+(L.dateAdj[i.date]||0);
+    days.push({...i,type,base:st.avg[type],cost:st.avg[type]*(1+p/100)+y+adj,pa:stp.avg[type]*(1+p/100),adj,sales:sm?.days[d-1]?.sales})}
+  const byType={};for(let w=0;w<7;w++){const x=days.filter(q=>q.type===w);byType[w]={n:x.length,total:sum(x.map(q=>q.cost))}}
+  const total=sum(days.map(x=>x.cost)),paTotal=sum(days.map(x=>x.pa));
+  return{win,st,stp,counts,days,byType,total,paTotal,rate:sm&&sm.total?total/sm.total:null,target:state.settings.targetLaborRate/100,targetCost:sm?sm.total*state.settings.targetLaborRate/100:null};
+}
+function purModel(sm){
+  const P=state.purchase,t=state.settings.target;const win=windowMonths('pur',P.window);const st=wdStats(win,'pur');
+  const rt={r1:0,r2:0,r3:0};for(const ym of win)for(const r of Object.values(mdata(ym)))for(const k in rt)rt[k]+=val(r,k)||0;
+  const rtT=sum(Object.values(rt));const ratio={};for(const k in rt)ratio[k]=rtT?rt[k]/rtT:({r1:.75,r2:.2,r3:.05})[k];
+  const days=[];
+  for(let d=1;d<=dim(t);d++){const i=dayInfo(t,d);const base=st.avg[i.w];const adj=base*(1+(+P.slider||0)/100);const ov=P.override[i.date];const manual=ov!=null&&ov!=='';days.push({...i,base,adj,amt:manual?+ov:adj,manual})}
+  const total=sum(days.map(x=>x.amt));const routes={};for(const k in ratio)routes[k]=total*ratio[k];
+  const monthTotals=win.map(ym=>({ym,total:sum(Object.values(mdata(ym)).map(purTotal)),n:daysWith(ym,'pur')}));
+  const full=monthTotals.filter(m=>m.n>=dim(m.ym)*.8);const last=full[full.length-1]||monthTotals[monthTotals.length-1];
+  const lyT=sum(Object.values(mdata(ymAdd(t,-12))).map(purTotal));
+  return{win,st,ratio,days,total,routes,monthTotals,last,lyTotal:lyT||null,rate:sm&&sm.total?total/sm.total:null};
+}
+function weeks(sm,lm,pm){
+  const out=[];let cur=null;
+  sm.days.forEach((d,i)=>{if(!cur||d.w===1){cur={from:d.d,to:d.d,sales:0,guests:0,labor:0,pur:0,hi:0,idle:0};out.push(cur)}
+    cur.to=d.d;cur.sales+=d.sales;cur.guests+=d.guests;cur.labor+=lm.days[i].cost;cur.pur+=pm.days[i].amt;if(d.level>=2)cur.hi++;if(d.level===0)cur.idle++});
+  const m=+sm.t.split('-')[1];out.forEach(w=>w.label=`${m}/${w.from}〜${m}/${w.to}`);return out;
+}
+function insights(sm,lm,pm){
+  const o=[];const dl=d=>`${d.d}日(${WD[d.w]})`;
+  o.push(`${mLabel(sm.t)}の売上予測は${yen(sm.total)}${sm.lyTotal?`（前年同月比 ${pct(sm.total/sm.lyTotal)}）`:''}、客数${int(sm.gTotal)}人、平均客単価${yen(sm.avgUnit)}。成長率補正は${pct(sm.growth)}（${sm.growthSrc}）。`);
+  const top=sm.days.filter(d=>d.level===3),hi=sm.days.filter(d=>d.level===2),idle=sm.days.filter(d=>d.level===0);
+  if(top.length)o.push(`超高稼働の見込み${top.length}日：${top.map(dl).join('・')}。満席想定で最重要日。`);
+  if(hi.length)o.push(`高稼働の見込み${hi.length}日：${hi.map(dl).join('・')}。ピーク帯の人員を厚めに。`);
+  if(idle.length)o.push(`アイドル注意${idle.length}日：${idle.slice(0,12).map(dl).join('・')}${idle.length>12?'ほか':''}。人員を絞る・集客施策の候補日。`);
+  const wa={};sm.days.forEach(d=>{const k=d.hol?7:d.w;(wa[k]??=[]).push(d.sales)});const wl=Object.entries(wa).map(([k,a])=>({k:+k,v:sum(a)/a.length})).sort((a,b)=>b.v-a.v);
+  if(wl.length>2){const nm=k=>k===7?'祝日':WD[k]+'曜';o.push(`曜日別では${nm(wl[0].k)}が最も高く（平均${man(wl[0].v)}）、${nm(wl[wl.length-1].k)}が最も低い（平均${man(wl[wl.length-1].v)}）。`)}
+  const hols=sm.days.filter(d=>d.hol),eves=sm.days.filter(d=>d.eve);
+  if(hols.length)o.push(`祝日${hols.map(dl).join('・')}は14時開店想定、祝前日${eves.map(dl).join('・')||'なし'}は上振れを見込む。`);
+  if(lm.rate!=null){const diff=lm.rate-lm.target;o.push(`人件費見込みは${yen(lm.total)}（人件費率${pct(lm.rate)}）。目標${pct(lm.target,0)}に対し${diff>0?'+':''}${(diff*100).toFixed(1)}pt`+(diff>0?`、目標内に収めるには約${yen(lm.total-lm.targetCost)}の調整が必要。`:'で目標内。'))}
+  if(pm.total)o.push(`仕入れ予測は${yen(pm.total)}（売上比${pct(pm.rate)}）`+(pm.last&&pm.last.total?`、${mLabel(pm.last.ym)}実績比${pct(pm.total/pm.last.total)}。`:'。'));
+  return o;
+}
+
+/* ================= アップロード案内 ================= */
+function checklist(){
+  const t=state.settings.target,cur=nowYM(),today=new Date().getDate();
+  const need=ym=>ym>cur?0:ym===cur?Math.max(1,today-3):Math.ceil(dim(ym)*.8);
+  const recent=k=>Array.from({length:k},(_,i)=>ymAdd(t,-(k-i))).filter(ym=>ym<=cur);
+  const st=(ym,kind)=>{const n=daysWith(ym,kind),nd=need(ym);return{ym,n,need:nd,ok:n>=nd&&nd>0,part:n>0&&n<nd}};
+  const mk=(id,kind,title,hint,months,req)=>{const ms=months.map(m=>st(m,kind));const done=ms.length&&ms.every(x=>x.ok);const some=ms.some(x=>x.n>0);return{id,kind,title,hint,months:ms,req,status:done?'done':some?'part':'miss'}};
+  const items=[
+    mk('ly','sales',`前年同月（${ymLabel(ymAdd(t,-12))}）の売上・客数`,'POSなどの日別実績画面。予測の土台になります。',[ymAdd(t,-12)],true),
+    mk('recent','sales',`直近${state.settings.window}ヶ月の売上・客数`,'日別の売上・客数が並んだ画面。客単価と伸び率の計算に使います。',recent(state.settings.window),true),
+    mk('lyr','sales','直近月の前年同月の売上（伸び率用）','前年の同じ月の日別売上。なければ手動の伸び率で計算します。',recent(state.settings.window).map(m=>ymAdd(m,-12)),false),
+    mk('labor','labor',`直近${state.labor.window}ヶ月の人件費`,'日別の人件費表（日付・PA人件費・人件費合計の列）。',recent(state.labor.window),true),
+    mk('pur','pur',`直近${state.purchase.window}ヶ月の仕入れ`,`日報・仕入れ表（日付・${ROUTES.map(r=>r.n).join('・')}の列）。`,recent(state.purchase.window),true)];
+  const on=state.att.emps.filter(e=>e.on),filled=on.filter(e=>e.actWork!=='').length;
+  items.push({id:'att',kind:'att',title:`${mLabel(state.att.month)}の勤怠実績表（最新）`,hint:'社員の労働時間・深夜時間が載った月次勤怠実績表。週1回（日曜）の更新がおすすめ。',months:[],req:false,status:filled===on.length&&on.length?'done':filled?'part':'miss',extra:`${filled}/${on.length}人 入力済み`});
+  const req=items.filter(i=>i.req);return{items,done:req.filter(i=>i.status==='done').length,total:req.length,next:items.find(i=>i.req&&i.status!=='done')};
+}
+
+/* ================= チャート ================= */
+function niceStep(x){if(x<=0)return 1;const p=10**Math.floor(Math.log10(x));const f=x/p;return(f<=1?1:f<=2?2:f<=5?5:10)*p}
+function chart({labels,bars=[],lines=[],h=240,fmt=man,labelEvery}){
+  const W=760,H=h,L=54,R=10,T=12,B=26,iw=W-L-R,ih=H-T-B;
+  const all=[...bars.flatMap(s=>s.values),...lines.flatMap(s=>s.values)].filter(v=>v!=null&&isFinite(v));
+  let mx=Math.max(1,...all)*1.06;const step=niceStep(mx/4);mx=Math.ceil(mx/step)*step;
+  const n=labels.length,gw=iw/Math.max(1,n);
+  let s=`<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">`;
+  for(let v=0;v<=mx+1e-6;v+=step){const y=T+ih-ih*v/mx;s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" class="grid"/><text x="${L-6}" y="${y+4}" class="ax" text-anchor="end">${fmt(v)}</text>`}
+  const nb=bars.length,bw=Math.max(2,Math.min(30,gw*.78/Math.max(1,nb)));
+  bars.forEach((sr,si)=>sr.values.forEach((v,i)=>{if(v==null||!isFinite(v))return;const x=L+gw*i+gw/2-bw*nb/2+bw*si;const hh=ih*v/mx;const col=sr.colors?sr.colors[i]:sr.color;
+    s+=`<rect x="${x.toFixed(1)}" y="${(T+ih-hh).toFixed(1)}" width="${Math.max(1,bw-1.5).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${col}"><title>${esc(labels[i])} ${esc(sr.name)}：${fmt(v)}</title></rect>`}));
+  lines.forEach(sr=>{let d='',pen=false;sr.values.forEach((v,i)=>{if(v==null||!isFinite(v)){pen=false;return}const x=L+gw*i+gw/2,y=T+ih-ih*v/mx;d+=(pen?'L':'M')+x.toFixed(1)+','+y.toFixed(1);pen=true});
+    s+=`<path d="${d}" fill="none" stroke="${sr.color}" stroke-width="2" ${sr.dash?'stroke-dasharray="5 4"':''} stroke-linejoin="round"/>`;
+    sr.values.forEach((v,i)=>{if(v==null||!isFinite(v))return;s+=`<circle cx="${(L+gw*i+gw/2).toFixed(1)}" cy="${(T+ih-ih*v/mx).toFixed(1)}" r="2.6" fill="${sr.color}"><title>${esc(labels[i])} ${esc(sr.name)}：${fmt(v)}</title></circle>`})});
+  const ev=labelEvery||Math.ceil(n/16);labels.forEach((lb,i)=>{if(i%ev)return;s+=`<text x="${(L+gw*i+gw/2).toFixed(1)}" y="${H-8}" class="ax" text-anchor="middle">${esc(lb)}</text>`});
+  s+='</svg>';
+  const lg=[...bars.filter(b=>b.name).map(b=>`<span><i style="background:${b.color||b.colors?.[0]}"></i>${esc(b.name)}</span>`),...lines.map(l=>`<span><i style="background:${l.color}"></i>${esc(l.name)}</span>`)].join('');
+  return(lg?`<div class="legend">${lg}</div>`:'')+s;
+}
+function salesChart(sm,h){return chart({h,labels:sm.days.map(d=>d.d+''),bars:[{name:'予測売上（色＝稼働レベル）',colors:sm.days.map(d=>LVC[d.level]),color:LVC[1],values:sm.days.map(d=>d.sales)}],lines:[{name:'前年同曜日',color:'#64748b',dash:true,values:sm.days.map(d=>d.ly)}]})}
+function calendar(days,cell){const first=days[0].w;let h=ORDER.map(w=>`<div class="h ${w===0?'wd0':w===6?'wd6':''}">${WD[w]}</div>`).join('');for(let i=0;i<(first+6)%7;i++)h+='<div class="c e"></div>';for(const d of days)h+=cell(d);return`<div class="cal">${h}</div>`}
+const levelCal=sm=>calendar(sm.days,d=>`<div class="c lv${d.level}x" title="${LV[d.level].n}"><div class="d ${wdCls(d)}">${d.d}${d.hol?' 祝':''}</div><div class="m">${man(d.sales)}</div><div class="g">${int(d.guests)}人</div><div class="bar"></div></div>`)+`<div class="legend" style="margin-top:8px">${[3,2,1,0].map(l=>`<span><i style="background:${LVC[l]}"></i>${LV[l].n}</span>`).join('')}</div>`;
+function weekTable(ws){return`<div class="tw"><table><thead><tr><th class="l">週</th><th>売上予測</th><th>客数</th><th>人件費見込</th><th>人件費率</th><th>仕入れ予測</th><th>高稼働日</th><th>アイドル日</th></tr></thead><tbody>
+  ${ws.map(w=>`<tr><td class="l">${w.label}</td><td>${yen(w.sales)}</td><td>${int(w.guests)}</td><td>${yen(w.labor)}</td><td>${w.sales?pct(w.labor/w.sales):'—'}</td><td>${yen(w.pur)}</td><td>${w.hi}</td><td>${w.idle}</td></tr>`).join('')}</tbody></table></div>`}
+
+/* ================= CSV ================= */
+function dl(name,rows){const csv='﻿'+rows.map(r=>r.map(c=>{c=c==null?'':String(c);return/[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(',')).join('\r\n');dlBlob(name,new Blob([csv],{type:'text/csv;charset=utf-8'}))}
+function dlBlob(name,b){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+
+/* ================= 描画 ================= */
+function render(){
+  if(!state)return;holSet=new Set(state.settings.holidays);syncNames();
+  $('tlabel').textContent='対象 '+ymLabel(state.settings.target);
+  const ck=checklist();
+  $('nav').innerHTML=TABS.map(([k,n])=>`<button class="${state.ui.tab===k?'on':''}" onclick="go('${k}')">${n}${(k==='up'&&ck.done<ck.total)||(k==='todo'&&todoAlert())?'<span class="dot"></span>':''}</button>`).join('');
+  const f={dash:rDash,up:rUp,todo:rTodo,sales:rSales,labor:rLabor,pur:rPur,att:rAtt,report:rReport,data:rData,set:rSet}[state.ui.tab]||rDash;
+  $('main').innerHTML=f();
+  if(state.ui.tab==='up')bindDrop();
+}
+function go(k){state.ui.tab=k;save();render();window.scrollTo(0,0)}
+function shiftTarget(k){state.settings.target=ymAdd(state.settings.target,k);save();render()}
+function seg(opts,cur,fn){return`<div class="seg">${opts.map(([v,n])=>`<button class="${String(cur)===String(v)?'on':''}" onclick="${fn}('${v}')">${n}</button>`).join('')}</div>`}
+const lvBadge=l=>`<span class="lv lv${l}">${LV[l].n}</span>`;
+
+function nextBanner(ck){if(!ck.next)return'';return`<div class="next noprint"><div class="tx"><div>次にアップロードする写真（準備 ${ck.done}/${ck.total}）</div><div class="sub">${esc(ck.next.title)} ─ ${esc(ck.next.hint)}</div></div><button class="btn p" onclick="go('up')">写真をアップロード</button></div>`}
+
+function rDash(){
+  const sm=salesModel(),lm=laborModel(sm),pm=purModel(sm),t=state.settings.target,ck=checklist();
+  const lvCnt=[0,0,0,0];sm.days.forEach(d=>lvCnt[d.level]++);const tr=lm.target;
+  let h=nextBanner(ck)+todoBanner();
+  h+=`<div class="kpis">
+   <div class="kpi"><div class="l">${mLabel(t)} 売上予測</div><div class="v">${yen(sm.total)}</div><div class="s">${sm.lyTotal?'前年同月比 '+pct(sm.total/sm.lyTotal):'日平均 '+yen(sm.total/sm.days.length)}</div></div>
+   <div class="kpi"><div class="l">客数予測</div><div class="v">${int(sm.gTotal)}人</div><div class="s">日平均 ${int(sm.gTotal/sm.days.length)}人</div></div>
+   <div class="kpi"><div class="l">平均客単価</div><div class="v">${yen(sm.avgUnit)}</div><div class="s">成長率 ${pct(sm.growth)}</div></div>
+   <div class="kpi"><div class="l">人件費見込み</div><div class="v">${yen(lm.total)}</div><div class="s ${lm.rate!=null&&lm.rate>tr?'dn':'up'}">人件費率 ${pct(lm.rate)}（目標 ${pct(tr,0)}）</div></div>
+   <div class="kpi"><div class="l">仕入れ予測</div><div class="v">${yen(pm.total)}</div><div class="s">売上比 ${pct(pm.rate)}</div></div>
+   <div class="kpi"><div class="l">稼働レベル（日数）</div><div class="lvs">${[3,2,1,0].map(l=>`<span class="lv lv${l}">${LV[l].n} ${lvCnt[l]}</span>`).join('')}</div></div>
+  </div>`;
+  h+=`<div class="card"><h2>分析のポイント<span class="r"><button class="btn s" onclick="go('report')">レポート・PDFへ</button></span></h2><ul class="pts">${insights(sm,lm,pm).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  h+=`<div class="card"><h2>${ymLabel(t)} 稼働カレンダー<span class="r"><button class="btn s" onclick="csvAll()">まとめCSV</button></span></h2>${levelCal(sm)}</div>`;
+  h+=`<div class="card"><h2>週別サマリー</h2>${weekTable(weeks(sm,lm,pm))}</div>`;
+  h+=`<div class="grid2"><div class="card"><h2>日別売上予測</h2>${salesChart(sm)}</div>
+   <div class="card"><h2>日別コスト見込み</h2>${chart({labels:sm.days.map(d=>d.d+''),lines:[{name:'人件費',color:'#3b6fd8',values:lm.days.map(d=>d.cost)},{name:'仕入れ',color:'#e98a2e',values:pm.days.map(d=>d.amt)}]})}</div></div>`;
+  return h;
+}
+function csvAll(){const sm=salesModel(),lm=laborModel(sm),pm=purModel(sm);
+  const rows=[['日付','曜日','祝日','予測売上','予測客数','予測客単価','稼働レベル','人件費見込','仕入れ予測','人件費率','仕入率']];
+  sm.days.forEach((d,i)=>rows.push([d.date,WD[d.w],d.hol?'祝':'',R0(d.sales),R0(d.guests),R0(d.unit),LV[d.level].n,R0(lm.days[i].cost),R0(pm.days[i].amt),d.sales?(lm.days[i].cost/d.sales*100).toFixed(1):'',d.sales?(pm.days[i].amt/d.sales*100).toFixed(1):'']));
+  rows.push(['合計','','',R0(sm.total),R0(sm.gTotal),R0(sm.avgUnit),'',R0(lm.total),R0(pm.total),lm.rate!=null?(lm.rate*100).toFixed(1):'',pm.rate!=null?(pm.rate*100).toFixed(1):'']);
+  dl(`翌月予測まとめ_${state.settings.target}.csv`,rows)}
+
+/* ---------- 写真アップロード ---------- */
+let queue=[],busy=false,worker=null;
+function rUp(){
+  const ck=checklist();
+  let h=`<div class="card"><h2>${ymLabel(state.settings.target)}の予測に必要な写真<span class="r sub">準備 ${ck.done}/${ck.total}</span></h2>
+   <div class="pbar"><i style="width:${ck.total?ck.done/ck.total*100:0}%"></i></div>
+   <label class="drop" id="drop" style="margin-top:14px" onclick="pickFiles(null);return false"><b>写真をまとめて選ぶ</b>種類と月は自動で見分けて反映します。何枚でも一度に選べます。</label>
+   ${queueHtml()}
+   <div style="margin-top:6px">${ck.items.map(ckRow).join('')}</div></div>`;
+  h+=`<div class="card"><h2>きれいに読み取るための撮り方</h2><ul class="pts sub">
+   <li>列の見出し（日付・売上・客数・人件費 など）が必ず写るように撮る。見出しで列を見分けます。</li>
+   <li>画面に対して真上・まっすぐ。斜めや影、画面の反射を避ける。スクリーンショットが一番確実です。</li>
+   <li>1ヶ月が1画面に収まらないときは、上半分・下半分の2枚に分けてOK（見出しは両方に入れる）。</li>
+   <li>年月（例：2025年11月）が画面に写っていると、どの月のデータかを自動で判断できます。写っていなければ、上の一覧の月ボタンから撮ってください。</li></ul></div>`;
+  h+=`<div class="card"><h2>情報の取り扱い</h2><div class="sub">写真の文字読み取りはこの端末の中だけで行い、写真もデータも外部には送りません。読み取った数値はパスワードで暗号化してこの端末に保存します。写真そのものは保存しません。</div></div>`;
+  return h;
+}
+function ckRow(it){
+  const ic={done:'✓',part:'…',miss:'！'}[it.status];
+  const chips=it.months.map(m=>`<button class="chip ${m.ok?'ok':m.part?'part':'miss'}" onclick="pickFiles({kind:'${it.kind}',ym:'${m.ym}'})">${ymLabel(m.ym)}<small>${m.ok?'✓ '+m.n+'日':m.n?m.n+'/'+m.need+'日':'未'}</small></button>`).join('');
+  return`<div class="ck ${it.status}"><div class="ic">${ic}</div><div><div class="t">${esc(it.title)}${it.req?'':'<span class="opt">任意</span>'}</div><div class="h">${esc(it.hint)}</div>${chips?`<div class="chips">${chips}</div>`:`<div class="sub">${esc(it.extra||'')}</div>`}</div>
+   <button class="btn ${it.status==='done'?'':'p'}" onclick="pickFiles({kind:'${it.kind}',ym:${it.kind==='att'?`'${state.att.month}'`:'null'},months:${JSON.stringify(it.months.map(m=>m.ym))}})">📷 ${it.status==='done'?'追加・差し替え':'撮る・選ぶ'}</button></div>`;
+}
+function queueHtml(){
+  if(!queue.length)return'';
+  return`<h3>読み取り結果</h3><div>${queue.map(q=>{
+    const b={wait:['b-wait','待機中'],ocr:['b-wait','読み取り中…'],done:['b-ok','反映済み'],check:['b-chk','確認が必要'],error:['b-err','読み取り失敗'],undone:['b-undo','取り消し済み']}[q.status];
+    return`<div class="q"><img src="${q.url}" alt=""><div><div class="st"><span class="badge ${b[0]}">${b[1]}</span>${q.kind?KINDS[q.kind].n:''}${q.ym?'　'+ymLabel(q.ym):''}</div>
+     <div class="ms">${esc(q.msg||'')}${q.status==='ocr'?`<div class="pbar"><i id="qp${q.id}" style="width:${q.prog||0}%"></i></div>`:''}</div>
+     ${q.warn?.length?`<div class="ms" style="color:var(--warn)">${q.warn.map(esc).join('<br>')}</div>`:''}
+     <div class="ac">${q.status==='done'?`<button class="btn s" onclick="reviewQ(${q.id})">内容を確認・修正</button><button class="btn s" onclick="undoQ(${q.id})">取り消す</button>`:''}${q.status==='check'?`<button class="btn s p" onclick="reviewQ(${q.id})">確認して反映</button>`:''}${['done','check','error','undone'].includes(q.status)?`<button class="btn s" onclick="removeQ(${q.id})">一覧から消す</button>`:''}</div></div></div>`}).join('')}</div>`;
+}
+function pickFiles(preset){const fi=$('fileIn');fi.value='';fi.onchange=()=>{addFiles([...fi.files],preset)};fi.click()}
+function bindDrop(){const d=$('drop');if(!d)return;d.ondragover=e=>{e.preventDefault()};d.ondrop=e=>{e.preventDefault();addFiles([...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')),null)}}
+let qid=1;
+function addFiles(files,preset){if(!files.length)return;for(const f of files)queue.push({id:qid++,file:f,url:URL.createObjectURL(f),status:'wait',preset,msg:''});if(state.ui.tab!=='up'&&state.ui.tab!=='att')go('up');else render();processQueue()}
+function rerenderQueue(){if(state&&(state.ui.tab==='up'||state.ui.tab==='att'))render()}
+async function processQueue(){
+  if(busy)return;busy=true;
+  try{
+    while(true){const q=queue.find(x=>x.status==='wait');if(!q)break;q.status='ocr';q.msg='準備中…';rerenderQueue();
+      try{const lines=await ocrImage(q.file,p=>{q.prog=p;const el=$('qp'+q.id);if(el)el.style.width=p+'%'},m=>{q.msg=m;const el=document.querySelector('#qp'+q.id);if(!el)rerenderQueue()});
+        q.lines=lines;q.msg='';analyzeAndApply(q)}
+      catch(e){console.error(e);q.status='error';q.msg=e.message==='noengine'?'読み取りエンジンが見つかりません。GitHubの設置手順（Actions）が完了しているか確認してください。':'読み取りに失敗しました。もう一度お試しください。'}
+      if(!state)return;save();rerenderQueue()}
+  }finally{busy=false;if(worker){try{await worker.terminate()}catch(e){}worker=null}}
+}
+function removeQ(id){const q=queue.find(x=>x.id===id);if(q)URL.revokeObjectURL(q.url);queue=queue.filter(x=>x.id!==id);render()}
+
+/* ---------- OCR ---------- */
+function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ng(new Error('load'));document.head.appendChild(s)})}
+async function getWorker(onProg){
+  if(!window.Tesseract){try{await loadScript('./ocr/tesseract.min.js')}catch(e){throw new Error('noengine')}}
+  if(!worker){const abs=p=>new URL(p,location.href).href;
+    worker=await Tesseract.createWorker('jpn+eng',1,{workerPath:abs('./ocr/worker.min.js'),corePath:abs('./ocr/core'),langPath:abs('./ocr/lang'),workerBlobURL:false,logger:m=>{if(m.status==='recognizing text'&&window._ocrProg)window._ocrProg(Math.round(m.progress*100))}});
+    await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'11'})}
+  return worker;
+}
+function prep(file){return new Promise((ok,ng)=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(u);let w=img.naturalWidth,h=img.naturalHeight;const target=Math.min(2600,Math.max(1800,w));const sc=target/w;w=Math.round(w*sc);h=Math.round(h*sc);
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,w,h);const d=x.getImageData(0,0,w,h),p=d.data;
+  let s=0;for(let i=0;i<p.length;i+=4)s+=.299*p[i]+.587*p[i+1]+.114*p[i+2];const mean=s/(p.length/4);const inv=mean<110;
+  for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];if(inv)g=255-g;g=g>170?255:g<85?0:(g-85)*3;p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);ok(c)};img.onerror=ng;img.src=u})}
+async function ocrImage(file,onProg,onMsg){
+  onMsg('読み取りエンジンを準備中…（初回は少し時間がかかります）');const w=await getWorker();
+  onMsg('文字を読み取り中…');window._ocrProg=onProg;const c=await prep(file);
+  const r=await w.recognize(c,{},{blocks:true,text:true});window._ocrProg=null;
+  const words=[];for(const b of r.data.blocks||[])for(const p of b.paragraphs||[])for(const l of p.lines||[])for(const wd of l.words||[])if(wd.text.trim())words.push({t:wd.text.trim(),x0:wd.bbox.x0,x1:wd.bbox.x1,y0:wd.bbox.y0,y1:wd.bbox.y1});
+  return words.length?wordsToLines(words):textToLines(r.data.text||'');
+}
+function wordsToLines(words){
+  const hs=words.map(w=>w.y1-w.y0).sort((a,b)=>a-b);const mh=hs[Math.floor(hs.length/2)]||20;
+  const ws=words.map(w=>({...w,yc:(w.y0+w.y1)/2,x:(w.x0+w.x1)/2})).sort((a,b)=>a.yc-b.yc);
+  const lines=[];for(const w of ws){const L=lines[lines.length-1];if(L&&Math.abs(w.yc-L.yc)<mh*.55){L.words.push(w);L.yc=(L.yc*(L.words.length-1)+w.yc)/L.words.length}else lines.push({yc:w.yc,words:[w]})}
+  lines.forEach(l=>l.words.sort((a,b)=>a.x0-b.x0));return lines.map(l=>({words:l.words.map(w=>({t:w.t,x:w.x,x0:w.x0,x1:w.x1}))}));
+}
+function textToLines(text){return text.split(/\r?\n/).map(l=>{const tab=l.includes('\t');const cells=tab?l.split('\t'):l.trim().split(/\s{1,}/);return{cells:true,words:cells.map((t,i)=>({t:t.trim(),x:i,x0:i-.4,x1:i+.4})).filter(w=>w.t!=='')}}).filter(l=>l.words.length)}
+
+/* ---------- 解析 ---------- */
+const normW=s=>z2h(s).replace(/[，、]/g,',').replace(/[．]/g,'.').replace(/[／]/g,'/').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/[：]/g,':').replace(/[¥￥]/g,'');
+function lineText(l){let t='',off=[];l.words.forEach(w=>{const s=t.length;t+=(t?' ':'')+normW(w.t);off.push([t.length-normW(w.t).length,t.length])});return{t,off}}
+function findDay(l){const{t,off}=lineText(l);
+  let m=t.match(/(?<![\d,.])(?:(20\d{2})\s*[\/\-年.]\s*)?(\d{1,2})\s*[\/月]\s*(\d{1,2})(?!\d)\s*日?/),day=null,span=null,ym=null;
+  if(m&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31){day=+m[3];span=[m.index,m.index+m[0].length];if(m[1])ym=m[1]+'-'+pad(+m[2])}
+  else{m=t.match(/^[^\d]{0,3}?(\d{1,2})(?=\s*日|\s*\(|\s*[月火水木金土日祝](?![\d,])|\s|$)/);if(m&&+m[1]>=1&&+m[1]<=31&&!/[,.]/.test(t.slice(m.index+m[0].length,m.index+m[0].length+1))){day=+m[1];span=[m.index,m.index+m[0].length]}}
+  if(day==null)return null;const ex=new Set();off.forEach(([a,b],i)=>{if(a<span[1]&&b>span[0])ex.add(i)});
+  l.words.forEach((w,i)=>{if(/^[\(]?[月火水木金土日祝][\)]?$/.test(normW(w.t)))ex.add(i)});return{day,ex,ym}}
+function numsOf(l,ex){
+  const out=[];const ws=l.words.map((w,i)=>({...w,n:normW(w.t),i})).filter(w=>!ex.has(w.i));
+  for(let i=0;i<ws.length;i++){let w=ws[i];
+    while(i+1<ws.length&&(/,$/.test(w.n)&&/^\d{3}/.test(ws[i+1].n)||/^\d{1,3}$/.test(w.n)&&/^,\d{3}/.test(ws[i+1].n))){const nx=ws[++i];w={...w,n:w.n+nx.n,x:(w.x0+nx.x1)/2,x1:nx.x1}}
+    let s=w.n.replace(/円|人|名|件/g,'');if(/%/.test(s))continue;
+    if(/^-?\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
+    if(!/^-?\d[\d,]*(\.\d+)?$/.test(s))continue;const v=parseFloat(s.replace(/,/g,''));if(isFinite(v))out.push({v,x:w.x,raw:w.n})}
+  return out}
+function detectMonth(lines){const cnt={};for(const l of lines){const t=lineText(l).t;for(const m of t.matchAll(/(20\d{2})\s*[年\/\-.]\s*(\d{1,2})(?!\d)/g)){const mo=+m[2];if(mo>=1&&mo<=12){const k=m[1]+'-'+pad(mo);cnt[k]=(cnt[k]||0)+1}}}
+  const e=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);return e.length?e[0][0]:null}
+function detectKind(lines){const t=lines.map(l=>lineText(l).t).join('\n');let best=null,bs=0;for(const k in KIND_SCORE){const s=(t.match(KIND_SCORE[k])||[]).length;if(s>bs){bs=s;best=k}}return best}
+function cellText(l,ws,a,b){const W=l.words,ch=Math.max(4,...W.slice(a,b+1).map(w=>(w.x1-w.x0)/Math.max(1,ws[W.indexOf(w)].length)));let L=a,R=b;while(L>0&&b-L<6&&W[L].x0-W[L-1].x1<ch*1.5)L--;while(R<W.length-1&&R-a<6&&W[R+1].x0-W[R].x1<ch*1.5)R++;return ws.slice(L,R+1).join('')}
+function findHeaders(lines,cols){
+  const per=[];
+  lines.forEach((l,li)=>{const hit={};const ws=l.words.map(w=>normW(w.t));
+    for(const c of cols){const K=KW[c];for(let i=0;i<ws.length;i++){for(const span of[1,2,3,4,5,6]){if(i+span>ws.length)break;const s=ws.slice(i,i+span).join('');if(span>1&&(ws[i].length>3||ws.slice(i,i+span).some(x=>K.inc.test(x))))break;if(span>1&&K.inc.test(ws.slice(i+1,i+span).join('')))continue;const ctx=l.cells?s:cellText(l,ws,i,i+span-1);if(K.inc.test(s)&&!K.exc.test(ctx)){hit[c]=(l.words[i].x0+l.words[i+span-1].x1)/2;break}}if(hit[c]!=null)break}}
+    if(Object.keys(hit).length)per.push({li,hit,n:Object.keys(hit).length})});
+  if(!per.length)return{};per.sort((a,b)=>b.n-a.n||a.li-b.li);const H={...per[0].hit};
+  for(const p of per)for(const c in p.hit)if(H[c]==null)H[c]=p.hit[c];return H}
+function assignByHeader(nums,H){
+  const cols=Object.keys(H);const xs=cols.map(c=>H[c]).sort((a,b)=>a-b);let gap=Infinity;for(let i=1;i<xs.length;i++)gap=Math.min(gap,xs[i]-xs[i-1]);const tol=isFinite(gap)?gap*.7:Infinity;
+  const out={},used=new Set();
+  const pairs=[];cols.forEach(c=>nums.forEach((n,i)=>pairs.push({c,i,d:Math.abs(n.x-H[c])})));pairs.sort((a,b)=>a.d-b.d);
+  for(const p of pairs){if(out[p.c]!=null||used.has(p.i)||p.d>tol)continue;out[p.c]=nums[p.i].v;used.add(p.i)}return out}
+function analyze(lines,preset){
+  const res={rows:[],warn:[],headers:{},ym:null,kind:null,mode:''};
+  const dm=detectMonth(lines);
+  res.kind=preset?.kind||detectKind(lines);
+  if(!res.kind){res.warn.push('写真の種類（売上・人件費・仕入れ・勤怠）を見分けられませんでした');return res}
+  if(res.kind==='att')return res;
+  const cols=KINDS[res.kind].cols;
+  const H=findHeaders(lines.filter(l=>!findDay(l)),cols);res.headers=H;
+  const learned=state.learn[res.kind];
+  const dayYm={};
+  for(const l of lines){const f=findDay(l);if(!f)continue;const nums=numsOf(l,f.ex);if(!nums.length)continue;if(f.ym)dayYm[f.ym]=(dayYm[f.ym]||0)+1;
+    let vals;if(Object.keys(H).length>=Math.min(2,cols.length)){vals=assignByHeader(nums,H);res.mode='header'}
+    else{const map=learned||Object.fromEntries(cols.map((c,i)=>[c,i+1]));vals={};for(const c of cols){const k=map[c];if(k&&nums[k-1])vals[c]=nums[k-1].v}res.mode=learned?'learned':'order'}
+    if(res.rows.find(r=>r.day===f.day))continue;res.rows.push({day:f.day,vals,nums:nums.map(n=>n.v)})}
+  res.rows.sort((a,b)=>a.day-b.day);
+  const rowYm=Object.entries(dayYm).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  res.ym=preset?.ym||rowYm||dm||null;
+  if(preset?.months&&!preset.ym){const m=rowYm||dm;res.ym=m&&/^\d{4}-\d{2}$/.test(m)?m:null;if(!res.ym){const ck=checklist().items.find(i=>i.kind===preset.kind&&JSON.stringify(i.months.map(x=>x.ym))===JSON.stringify(preset.months));const miss=ck?.months.find(x=>!x.ok)||ck?.months[0];if(miss){res.ym=miss.ym;res.warn.push(`写真から年月が読めなかったため ${ymLabel(miss.ym)} として反映しました`)}}}
+  postCheck(res);return res}
+function postCheck(res){
+  if(res.kind==='sales'){let sw=0;res.rows.forEach(r=>{const s=r.vals.sales,g=r.vals.guests;if(s!=null&&g!=null&&g>s){r.vals.sales=g;r.vals.guests=s;sw++}});
+    const ss=res.rows.map(r=>r.vals.sales).filter(v=>v!=null).sort((a,b)=>a-b);const med=ss[Math.floor(ss.length/2)];
+    if(med>=50&&med<3000){res.rows.forEach(r=>{if(r.vals.sales!=null)r.vals.sales*=1000});res.warn.push('売上が千円単位と判断し、円に直しました')}
+    const bad=res.rows.filter(r=>r.vals.sales&&r.vals.guests&&(r.vals.sales/r.vals.guests<800||r.vals.sales/r.vals.guests>12000)).length;if(bad)res.warn.push(`客単価が不自然な日が${bad}日あります（確認してください）`)}
+  if(res.kind==='labor'){res.rows.forEach(r=>{const a=r.vals.pa,b=r.vals.labor;if(a!=null&&b!=null&&a>b){r.vals.pa=b;r.vals.labor=a}})}
+  const miss=KINDS[res.kind].cols.filter(c=>!res.rows.some(r=>r.vals[c]!=null));if(miss.length&&res.rows.length)res.warn.push(`${miss.map(c=>COLS.find(x=>x.k===c).n).join('・')}の列が見つかりませんでした`);
+  if(res.mode==='order'&&res.rows.length)res.warn.push('列の見出しが読めなかったため、並び順で割り当てました。内容を確認してください');
+}
+function analyzeAndApply(q){
+  const r=analyze(q.lines,q.preset);q.kind=r.kind;q.ym=r.ym;q.res=r;q.warn=r.warn;
+  if(r.kind==='att'){const a=applyAttLines(q.lines);q.attUndo=a.undo;if(a.hit.length){q.status='done';q.msg=a.hit.join('　')+(a.miss.length?`／見つからない：${a.miss.join('・')}`:'')}else{q.status='check';q.msg='社員名と時間を見つけられませんでした。勤怠手当タブで直接入力してください'}return}
+  if(!r.kind){q.status='check';q.msg='種類を選んで反映してください';return}
+  if(!r.ym){q.status='check';q.msg='どの月のデータか選んでください';return}
+  if(r.rows.length<3){q.status='check';q.msg=`日付の行が${r.rows.length}行しか見つかりませんでした`;return}
+  {const have=new Set(r.rows.map(x=>x.day)),lo=r.rows[0].day,hi=r.rows[r.rows.length-1].day;const miss=[];for(let d=lo;d<=hi;d++)if(!have.has(d))miss.push(d);if(miss.length)q.warn=[...(q.warn||[]),`${miss.join('・')}日が読み取れませんでした。「実績データ」で入力するか、その部分を撮り直してください`]}
+  q.undo=applyRows(r.ym,r.rows,KINDS[r.kind].cols);q.status='done';
+  q.msg=`${r.rows.length}日分を反映（${r.rows[0].day}日〜${r.rows[r.rows.length-1].day}日）`+(r.mode==='header'?'・見出しから列を判別':'');
+}
+function applyRows(ym,rows,cols){const undo=[];state.data[ym]??={d:{}};const D=state.data[ym].d;
+  for(const r of rows){if(r.day>dim(ym))continue;const o=D[r.day]??={};for(const c of cols){const v=r.vals[c];if(v==null)continue;undo.push({ym,d:r.day,c,prev:o[c]});o[c]=v}}save();return undo}
+function undoApply(undo){for(const u of[...undo].reverse()){const o=state.data[u.ym]?.d[u.d];if(!o)continue;if(u.prev==null)delete o[u.c];else o[u.c]=u.prev;if(!Object.keys(o).length)delete state.data[u.ym].d[u.d]}save()}
+function undoQ(id){const q=queue.find(x=>x.id===id);if(!q)return;if(q.undo)undoApply(q.undo);if(q.attUndo)q.attUndo.forEach(u=>{const e=state.att.emps.find(x=>x.id===u.id);if(e){e.actWork=u.w;e.actNight=u.n}});q.undo=null;q.attUndo=null;q.status='undone';q.msg='反映を取り消しました';save();render()}
+function reviewQ(id){
+  const q=queue.find(x=>x.id===id);if(!q)return;const r=q.res;if(!r)return;window._rv={q,kind:r.kind||'sales',ym:r.ym||ymAdd(state.settings.target,-1),rows:JSON.parse(JSON.stringify(r.rows))};drawReview()}
+function drawReview(){
+  const R=window._rv,cols=KINDS[R.kind].cols;const mx=Math.min(12,Math.max(1,...R.rows.map(r=>r.nums.length)));
+  openModal(`<h2>読み取り内容の確認<span class="r"><button class="btn s" onclick="closeModal()">閉じる</button></span></h2>
+   <div class="row"><img src="${R.q.url}" style="max-height:140px;border-radius:8px;border:1px solid var(--line)">
+   <div><div class="row"><label class="fld">種類<select onchange="_rv.kind=this.value;remapRv(null);drawReview()">${['sales','labor','pur'].map(k=>`<option value="${k}" ${R.kind===k?'selected':''}>${KINDS[k].n}</option>`).join('')}</select></label>
+   <label class="fld">対象の月<input type="month" value="${R.ym}" onchange="_rv.ym=this.value"></label></div>
+   <div class="row">${cols.map(c=>`<label class="fld">${COLS.find(x=>x.k===c).n}の列<select onchange="remapRv('${c}',+this.value)"><option value="">そのまま</option>${Array.from({length:mx},(_,i)=>`<option value="${i+1}">${i+1}番目の数値</option>`).join('')}<option value="0">使わない</option></select></label>`).join('')}</div>
+   <div class="sub" style="margin-top:6px">列を番号で選び直すと、次回から同じ種類の写真はその並びで読み取ります。数値は表で直接直せます。</div></div></div>
+   <div class="tw" style="margin-top:12px;max-height:45vh"><table><thead><tr><th class="l">日</th>${cols.map(c=>`<th style="color:var(--acc)">${COLS.find(x=>x.k===c).n}</th>`).join('')}${Array.from({length:mx},(_,i)=>`<th>${i+1}</th>`).join('')}<th></th></tr></thead><tbody>
+   ${R.rows.map((r,ri)=>`<tr><td class="l"><input type="number" value="${r.day}" style="width:60px" onchange="_rv.rows[${ri}].day=+this.value"></td>${cols.map(c=>`<td><input inputmode="numeric" value="${r.vals[c]??''}" onchange="_rv.rows[${ri}].vals['${c}']=toNum(this.value)"></td>`).join('')}${Array.from({length:mx},(_,i)=>`<td class="sub">${r.nums[i]==null?'':r.nums[i].toLocaleString()}</td>`).join('')}<td><button class="btn s d" onclick="_rv.rows.splice(${ri},1);drawReview()">×</button></td></tr>`).join('')}
+   </tbody></table></div>
+   <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn" onclick="_rv.rows.push({day:(_rv.rows.at(-1)?.day||0)+1,vals:{},nums:[]});drawReview()">＋ 行を追加</button><button class="btn p" onclick="applyRv()">この内容で反映</button></div>`)}
+function remapRv(c,k){const R=window._rv;const cols=KINDS[R.kind].cols;
+  if(c==null){R.rows.forEach(r=>{r.vals={};cols.forEach((cc,i)=>{if(r.nums[i]!=null)r.vals[cc]=r.nums[i]})});return}
+  R.rows.forEach(r=>{if(k)r.vals[c]=r.nums[k-1]??null;else delete r.vals[c]});
+  const L=state.learn[R.kind]||Object.fromEntries(cols.map((cc,i)=>[cc,i+1]));L[c]=k;state.learn[R.kind]=L;save();drawReview()}
+function applyRv(){const R=window._rv,q=R.q;if(!/^\d{4}-\d{2}$/.test(R.ym)){alert('対象の月を選んでください');return}
+  if(q.undo)undoApply(q.undo);q.undo=applyRows(R.ym,R.rows,KINDS[R.kind].cols);q.kind=R.kind;q.ym=R.ym;q.res={...q.res,kind:R.kind,ym:R.ym,rows:R.rows};q.status='done';q.warn=[];q.msg=`${R.rows.length}日分を反映（確認済み）`;closeModal();render();toast('反映しました')}
+
+/* 勤怠の写真 */
+const normName=s=>z2h(String(s)).replace(/[\s　・.]/g,'').toLowerCase();
+function applyAttLines(lines){
+  const H=findHeaders(lines,['work','night']);const hit=[],miss=[],undo=[];
+  for(const e of state.att.emps){if(!e.on)continue;const full=normName(e.name),sur=normName(e.name.split(/[\s　]/)[0]);
+    const l=lines.find(l=>{const t=normName(l.words.map(w=>w.t).join(''));return t.includes(full)||(sur.length>=2&&t.includes(sur))});
+    if(!l){miss.push(e.name);continue}
+    const tk=[];l.words.forEach(w=>{const s=normW(w.t);if(/^\d{1,3}:\d{2}$/.test(s)||/^\d{1,3}\.\d{1,2}$/.test(s))tk.push({s,x:w.x,v:parseH(s)})});
+    if(!tk.length){miss.push(e.name);continue}
+    let work=null,night=null;
+    if(H.work!=null||H.night!=null){const a=assignByHeader(tk.map((t,i)=>({v:i,x:t.x})),Object.fromEntries(Object.entries(H)));if(a.work!=null)work=tk[a.work].s;if(a.night!=null)night=tk[a.night].s}
+    if(work==null){const mx=tk.reduce((a,b)=>b.v>a.v?b:a);work=mx.s}
+    undo.push({id:e.id,w:e.actWork,n:e.actNight});e.actWork=work;if(night!=null)e.actNight=night;
+    hit.push(`${e.name}：労働 ${work}${night!=null?' / 深夜 '+night:''}`)}
+  save();return{hit,miss,undo}}
+
+
+/* ---------- 月末ToDo ---------- */
+const todoYM=()=>state.todo.month||nowYM();
+function todoRec(ym){const T=state.todo;if(!T.m[ym])T.m[ym]={list:T.tpl.map(t=>({id:t.id,name:t.name,due:t.due,every:true})),done:{},memo:{}};return T.m[ym]}
+function todoStat(ym){const r=state.todo.m[ym];if(!r)return{n:state.todo.tpl.length,d:0};return{n:r.list.length,d:r.list.filter(i=>r.done[i.id]).length}}
+function todoAlert(){const ym=nowYM(),st=todoStat(ym);return new Date().getDate()>=20&&st.d<st.n}
+function todoBanner(){if(!todoAlert())return'';const ym=nowYM(),st=todoStat(ym),last=dim(ym)-new Date().getDate();
+  return`<div class="next noprint"><div class="tx"><div>${mLabel(ym)}の月末ToDo 残り${st.n-st.d}件</div><div class="sub">月末まであと${last}日（完了 ${st.d}/${st.n}）</div></div><button class="btn p" onclick="state.todo.month='';go('todo')">ToDoを開く</button></div>`}
+const fmtDone=iso=>{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+function rTodo(){
+  const T=state.todo,ym=todoYM(),r=todoRec(ym),st=todoStat(ym);
+  const prev=ymAdd(ym,-1),pr=T.m[prev],carry=pr?pr.list.filter(i=>!pr.done[i.id]&&!r.list.some(x=>x.carry===i.id)):[];
+  const list=T.onlyOpen?r.list.filter(i=>!r.done[i.id]):r.list;
+  let h=`<div class="card"><h2><span class="msw" style="margin:0"><button onclick="todoMove(-1)" aria-label="前月">‹</button><span>${ymLabel(ym)}</span><button onclick="todoMove(1)" aria-label="翌月">›</button></span>
+   <span class="r"><label class="sub"><input type="checkbox" ${T.onlyOpen?'checked':''} onchange="state.todo.onlyOpen=this.checked;save();render()"> 未完了だけ表示</label><button class="btn s" onclick="printTodo()">印刷</button></span></h2>
+   <div class="row" style="justify-content:space-between"><span>完了 ${st.d} / ${st.n}</span><span class="sub">${st.d===st.n&&st.n?'✓ 今月の月末作業はすべて完了':'月末まで '+Math.max(0,dim(ym)-(ym===nowYM()?new Date().getDate():0))+'日'}</span></div>
+   <div class="pbar"><i style="width:${st.n?st.d/st.n*100:0}%"></i></div></div>`;
+  if(carry.length)h+=`<div class="note">${ymLabel(prev)}の未完了が${carry.length}件あります：${carry.map(i=>esc(i.name)).join('・')}　<button class="btn s" onclick="todoCarry()">今月に持ち越す</button></div>`;
+  h+=`<div class="card"><div class="todo">${list.length?list.map(i=>{const ix=r.list.indexOf(i),dn=r.done[i.id];return`<div class="ti ${dn?'dn':''}">
+    <label class="tc"><input type="checkbox" ${dn?'checked':''} onchange="todoCheck('${i.id}',this.checked)"></label>
+    <div class="tb"><div class="tn">${esc(i.name)}${i.due?`<span class="tag">${esc(i.due)}</span>`:''}${i.every?'':'<span class="opt">今月だけ</span>'}</div>
+     ${dn?`<div class="sub">${fmtDone(dn)} 完了</div>`:''}
+     <input class="tm" value="${esc(r.memo[i.id]||'')}" placeholder="メモ（金額・提出先・気づいたことなど）" onchange="todoMemo('${i.id}',this.value)"></div>
+    <div class="ta"><button class="btn s" onclick="todoOrder(${ix},-1)" aria-label="上へ">↑</button><button class="btn s" onclick="todoOrder(${ix},1)" aria-label="下へ">↓</button><button class="btn s d" onclick="todoDel('${i.id}')" aria-label="削除">×</button></div></div>`}).join(''):'<div class="sub" style="padding:12px 0">未完了のタスクはありません</div>'}</div></div>`;
+  h+=`<div class="card"><h2>タスクを追加</h2><div class="row"><input id="tdn" placeholder="例）消耗品の発注" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')todoAdd()"><input id="tdd" placeholder="期限メモ（例：月末、翌月3日）" style="width:200px">
+   <select id="tde"><option value="1">毎月のタスク</option><option value="0">今月だけ</option></select><button class="btn p" onclick="todoAdd()">追加</button></div>
+   <p class="sub" style="margin:8px 0 0">「毎月のタスク」は翌月以降のリストにも自動で入ります。「今月だけ」はこの月のリストだけに入ります。</p>
+   <details${T.tpl.length?'':' open'}><summary>まとめて追加（1行に1タスク）</summary><textarea id="tdbulk" placeholder="1行に1つずつタスクを書いて「まとめて追加」を押してください"></textarea><div class="row" style="margin-top:8px"><button class="btn p" onclick="todoBulk()">毎月のタスクとしてまとめて追加</button></div></details></div>`;
+  h+=`<div class="card"><details><summary>毎月のタスクを編集（${T.tpl.length}件）</summary><div class="tw" style="margin-top:8px"><table><thead><tr><th class="l">タスク名</th><th class="l">期限メモ</th><th></th></tr></thead><tbody>
+   ${T.tpl.map((t,i)=>`<tr><td class="l"><input class="w" style="width:100%;min-width:220px" value="${esc(t.name)}" onchange="tplSet(${i},'name',this.value)"></td><td class="l"><input class="w" value="${esc(t.due)}" placeholder="—" onchange="tplSet(${i},'due',this.value)"></td>
+   <td><button class="btn s" onclick="tplOrder(${i},-1)">↑</button> <button class="btn s" onclick="tplOrder(${i},1)">↓</button> <button class="btn s d" onclick="tplDel(${i})">×</button></td></tr>`).join('')}
+   </tbody></table></div><p class="sub" style="margin:8px 0 0">変更は表示中の月（未完了のタスク）と、これからの月に反映されます。過去の月の記録はそのまま残ります。</p>
+</details></div>`;
+  return h;
+}
+function todoBulk(){const L=$('tdbulk').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!L.length)return;const r=todoRec(todoYM());L.forEach((n,i)=>{const id='t'+Date.now().toString(36)+i;state.todo.tpl.push({id,name:n,due:''});r.list.push({id,name:n,due:'',every:true})});save();render();toast(L.length+'件を毎月のタスクに追加しました')}
+function todoMove(k){state.todo.month=ymAdd(todoYM(),k);save();render()}
+function todoCheck(id,on){const r=todoRec(todoYM());if(on)r.done[id]=new Date().toISOString();else delete r.done[id];save();render();const st=todoStat(todoYM());if(on&&st.d===st.n)toast('🎉 月末作業がすべて完了しました')}
+function todoMemo(id,v){todoRec(todoYM()).memo[id]=v;save()}
+function todoOrder(i,k){const L=todoRec(todoYM()).list,j=i+k;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];save();render()}
+function todoDel(id){const r=todoRec(todoYM()),it=r.list.find(x=>x.id===id);if(!it)return;
+  if(it.every&&state.todo.tpl.some(t=>t.id===id)){if(!confirm(`「${it.name}」をこの月のリストから外しますか？\n（毎月のタスクから消す場合は「毎月のタスクを編集」から）`))return}else if(!confirm(`「${it.name}」を削除しますか？`))return;
+  r.list=r.list.filter(x=>x.id!==id);delete r.done[id];delete r.memo[id];save();render()}
+function todoAdd(){const n=$('tdn').value.trim();if(!n)return;const due=$('tdd').value.trim(),every=$('tde').value==='1',id='t'+Date.now().toString(36);
+  if(every)state.todo.tpl.push({id,name:n,due});todoRec(todoYM()).list.push({id,name:n,due,every});save();render();toast(every?'毎月のタスクに追加しました':'今月のリストに追加しました')}
+function todoCarry(){const ym=todoYM(),r=todoRec(ym),pr=state.todo.m[ymAdd(ym,-1)];if(!pr)return;
+  pr.list.filter(i=>!pr.done[i.id]&&!r.list.some(x=>x.carry===i.id)).forEach(i=>{const ex=r.list.find(x=>x.id===i.id);if(ex&&!r.done[i.id]){ex.carry=i.id;return}r.list.push({id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:i.name+'（'+mLabel(ymAdd(ym,-1))+'分）',due:i.due,every:false,carry:i.id})});save();render()}
+function syncTpl(fn){const r=todoRec(todoYM());fn(r);for(const ym in state.todo.m)if(ym>todoYM())delete state.todo.m[ym]}
+function tplSet(i,k,v){const t=state.todo.tpl[i];t[k]=v;syncTpl(r=>{const it=r.list.find(x=>x.id===t.id);if(it&&!r.done[t.id])it[k]=v});save();render()}
+function tplOrder(i,k){const L=state.todo.tpl,j=i+k;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];save();render()}
+function tplDel(i){const t=state.todo.tpl[i];if(!confirm(`「${t.name}」を毎月のタスクから削除しますか？`))return;state.todo.tpl.splice(i,1);syncTpl(r=>{if(!r.done[t.id])r.list=r.list.filter(x=>x.id!==t.id)});save();render()}
+function printTodo(){const ym=todoYM(),r=todoRec(ym);const w=$('main');const keep=w.innerHTML;
+  w.innerHTML=`<div class="report"><div class="rh"><div class="tt">${ymLabel(ym)} 月末ToDo</div><div class="sub">印刷 ${fmtDone(new Date().toISOString())}</div></div><table><thead><tr><th class="l" style="width:40px">済</th><th class="l">タスク</th><th class="l">期限</th><th class="l">完了日時</th><th class="l">メモ</th></tr></thead><tbody>
+   ${r.list.map(i=>`<tr><td class="l">${r.done[i.id]?'☑':'☐'}</td><td class="l">${esc(i.name)}</td><td class="l">${esc(i.due||'')}</td><td class="l">${r.done[i.id]?fmtDone(r.done[i.id]):''}</td><td class="l" style="white-space:normal">${esc(r.memo[i.id]||'')}</td></tr>`).join('')}</tbody></table></div>`;
+  document.body.classList.add('printing');setTimeout(()=>{window.print();setTimeout(()=>{document.body.classList.remove('printing');render()},500)},50)}
+
+/* ---------- 売上予測タブ ---------- */
+function rSales(){
+  const sm=salesModel(),S=state.settings;
+  let h=`<div class="card"><h2>予測の条件</h2>
+   <div class="row">
+    <div class="fld">直近の集計期間${seg([[3,'直近3ヶ月'],[5,'直近5ヶ月']],S.window,'setWindow')}</div>
+    <div class="fld">成長率${seg([['auto','自動（前年比）'],['manual','手動']],S.growthMode,'setGrowthMode')}</div>
+    <div class="fld">手動成長率（%）<input type="number" step="0.5" value="${S.growthManual}" onchange="setS('growthManual',this.value)" style="width:110px"></div>
+   </div>
+   <div class="row" style="margin-top:14px"><div class="fld" style="flex:1;min-width:240px">全体補正 <span id="adjv" class="num">${S.salesAdj>0?'+':''}${S.salesAdj}%</span>
+    <input type="range" min="-20" max="30" step="1" value="${S.salesAdj}" oninput="$('adjv').textContent=(this.value>0?'+':'')+this.value+'%'" onchange="setS('salesAdj',this.value)"></div></div></div>`;
+  if(!sm.useLY)h+=`<div class="note">前年同月（${ymLabel(sm.ly)}）の売上が7日分未満のため、直近${sm.win.length}ヶ月の曜日平均をベースにしています。<a href="#" onclick="go('up');return false">写真アップロード</a>で前年同月を入れると仕様どおりの計算になります。</div>`;
+  h+=`<div class="kpis">
+   <div class="kpi"><div class="l">売上予測合計</div><div class="v">${yen(sm.total)}</div><div class="s">${sm.lyTotal?'前年同月比 '+pct(sm.total/sm.lyTotal):'—'}</div></div>
+   <div class="kpi"><div class="l">客数予測合計</div><div class="v">${int(sm.gTotal)}人</div></div>
+   <div class="kpi"><div class="l">直近平均客単価</div><div class="v">${yen(sm.unitAll)}</div><div class="s">${sm.win.map(mLabel).join('・')||'データなし'}</div></div>
+   <div class="kpi"><div class="l">成長率補正</div><div class="v">${pct(sm.growth)}</div><div class="s">${esc(sm.growthSrc)}</div></div></div>`;
+  h+=`<div class="grid2"><div class="card"><h2>曜日別ベースライン</h2><div class="tw"><table><thead><tr><th class="l">曜日</th><th>${sm.useLY?'前年':'直近'}売上平均</th><th>客数平均</th><th>直近客単価</th><th>日数</th></tr></thead><tbody>
+   ${ORDER.map(w=>`<tr><td class="l ${w===0?'wd0':w===6?'wd6':''}">${WD[w]}</td><td>${yen(sm.base[w].sales)}</td><td>${int(sm.base[w].guests)}</td><td>${yen(sm.unit[w])}</td><td>${sm.base[w].n}${sm.base[w].fallback?'※':''}</td></tr>`).join('')}
+   <tr><td class="l hol">祝日</td><td colspan="2" class="sub">土曜ベース＋祝日補正</td><td>${yen(sm.unit.hol)}</td><td></td></tr></tbody></table></div>
+   <p class="sub" style="margin:8px 0 0">ベースラインは祝前日と給与日（25日以降の平日）を除いた通常日の平均です。</p></div>
+   <div class="card"><h2>直近の前年比（成長率の根拠）</h2><div class="tw"><table><thead><tr><th class="l">月</th><th>実績</th><th>前年同日</th><th>比較日数</th><th>前年比</th></tr></thead><tbody>
+   ${sm.gd.length?sm.gd.map(g=>`<tr><td class="l">${ymLabel(g.ym)}</td><td>${yen(g.a)}</td><td>${yen(g.b)}</td><td>${g.n}</td><td>${pct(g.rate)}</td></tr>`).join(''):'<tr><td colspan="5" class="l sub">直近データがありません</td></tr>'}
+   </tbody><tfoot><tr><td class="l">合計</td><td></td><td></td><td></td><td>${pct(sm.autoGrowth)}</td></tr></tfoot></table></div></div></div>`;
+  h+=`<div class="card"><h2>日別トレンド</h2>${salesChart(sm)}${chart({labels:sm.days.map(d=>d.d+''),h:170,fmt:v=>Math.round(v)+'人',lines:[{name:'予測客数',color:'#3b6fd8',values:sm.days.map(d=>d.guests)}]})}</div>`;
+  h+=`<div class="card"><h2>${ymLabel(sm.t)} 日別予測<span class="r"><button class="btn s" onclick="csvSales()">CSV</button></span></h2>
+   <p class="sub" style="margin:0 0 8px">予測売上の欄に金額を入れるとその日だけ手入力の値になります（空欄で自動に戻ります）。</p>
+   <div class="tw tall"><table><thead><tr><th class="l">日付</th><th class="l">補正</th><th>ベース</th><th>補正率</th><th>予測売上</th><th>客単価</th><th>客数</th><th class="l">稼働</th><th>前年同曜日</th><th class="l">メモ</th></tr></thead><tbody>
+   ${sm.days.map(d=>`<tr><td class="l ${wdCls(d)}">${d.d}日（${WD[d.w]}）${d.hol?'祝':''}</td><td class="l">${d.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</td><td>${yen(d.base*sm.growth)}</td><td>${pct(d.fS,0)}</td>
+    <td><input inputmode="numeric" value="${d.manual?Math.round(d.sales):''}" placeholder="${int(d.calc)}" onchange="setSalesOv('${d.date}',this.value)"></td>
+    <td>${yen(d.unit)}</td><td>${int(d.guests)}</td><td class="l">${lvBadge(d.level)}</td><td>${yen(d.ly)}</td><td class="l"><input class="w" value="${esc(d.memo)}" placeholder="イベントなど" onchange="setSalesMemo('${d.date}',this.value)"></td></tr>`).join('')}
+   </tbody><tfoot><tr><td class="l">合計</td><td></td><td></td><td></td><td>${yen(sm.total)}</td><td>${yen(sm.avgUnit)}</td><td>${int(sm.gTotal)}</td><td></td><td>${yen(sum(sm.days.map(d=>d.ly)))}</td><td></td></tr></tfoot></table></div></div>`;
+  return h;
+}
+function setWindow(v){state.settings.window=+v;save();render()}
+function setGrowthMode(v){state.settings.growthMode=v;save();render()}
+function setS(k,v){state.settings[k]=+v;save();render()}
+function setSalesOv(date,v){const o=state.salesOverride[date]||{};o.sales=toNum(v);if(o.sales==null)delete o.sales;state.salesOverride[date]=o;save();render()}
+function setSalesMemo(date,v){const o=state.salesOverride[date]||{};o.memo=v;state.salesOverride[date]=o;save()}
+function csvSales(){const sm=salesModel();const rows=[['日付','曜日','祝日','補正','ベースライン×成長率','補正率','予測売上','手入力','予測客単価','予測客数','稼働レベル','前年同曜日','メモ']];
+  sm.days.forEach(d=>rows.push([d.date,WD[d.w],d.hol?'祝':'',d.tags.join('/'),R0(d.base*sm.growth),(d.fS*100).toFixed(1)+'%',R0(d.sales),d.manual?'○':'',R0(d.unit),R0(d.guests),LV[d.level].n,R0(d.ly),d.memo]));
+  rows.push(['合計','','','','','',R0(sm.total),'',R0(sm.avgUnit),R0(sm.gTotal),'','','']);dl(`売上予測_${sm.t}.csv`,rows)}
+
+/* ---------- 人件費タブ ---------- */
+function rLabor(){
+  const sm=salesModel(),lm=laborModel(sm),L=state.labor,t=state.settings.target;
+  const tr=lm.target,diff=lm.targetCost!=null?lm.total-lm.targetCost:null;
+  const chartMonths=monthsWith('labor',t).slice(-5);const cst=wdStats(chartMonths,'labor');
+  let h=`<div class="kpis">
+   <div class="kpi"><div class="l">${mLabel(t)} 人件費見込み</div><div class="v">${yen(lm.total)}</div><div class="s">うちPA ${yen(lm.paTotal)}</div></div>
+   <div class="kpi"><div class="l">売上予測</div><div class="v">${yen(sm.total)}</div><div class="s">売上予測タブの値</div></div>
+   <div class="kpi"><div class="l">人件費率</div><div class="v ${lm.rate!=null&&lm.rate>tr?'dn':''}">${pct(lm.rate)}</div><div class="s">目標 <input type="number" step="0.5" value="${state.settings.targetLaborRate}" style="width:70px;padding:2px 6px" onchange="setS('targetLaborRate',this.value)">%</div></div>
+   <div class="kpi"><div class="l">目標との差</div><div class="v ${diff>0?'dn':'up'}">${diff==null?'—':(diff>0?'+':'')+yen(diff)}</div><div class="s">目標人件費 ${yen(lm.targetCost)}</div></div></div>`;
+  h+=`<div class="card"><h2>直近の曜日別平均（人件費合計）<span class="r">${seg([[3,'直近3ヶ月'],[5,'直近5ヶ月']],L.window,'setLaborWin')}</span></h2>
+   ${lm.win.length?`<div class="tw"><table><thead><tr><th class="l">曜日</th>${lm.win.map(ym=>`<th>${mLabel(ym)}平均</th><th>回数</th>`).join('')}<th>${lm.win.length}ヶ月平均</th><th>PA平均</th></tr></thead><tbody>
+   ${ORDER.map(w=>`<tr><td class="l ${w===0?'wd0':w===6?'wd6':''}">${WD[w]}</td>${lm.win.map(ym=>{const p=lm.st.per[ym][w];return`<td>${p.n?yen(p.s/p.n):'—'}</td><td class="sub">${p.n}</td>`}).join('')}<td>${yen(lm.st.avg[w])}</td><td class="sub">${yen(lm.stp.avg[w])}</td></tr>`).join('')}
+   </tbody><tfoot><tr><td class="l">月合計</td>${lm.win.map(ym=>`<td>${yen(sum(Object.values(lm.st.per[ym]).map(p=>p.s)))}</td><td></td>`).join('')}<td></td><td></td></tr></tfoot></table></div>`:'<div class="note">人件費の実績がまだありません。<a href="#" onclick="go(\'up\');return false">写真アップロード</a>から入れてください。</div>'}</div>`;
+  if(chartMonths.length)h+=`<div class="card"><h2>月別の曜日平均の推移</h2>${chart({labels:ORDER.map(w=>WD[w]),labelEvery:1,bars:chartMonths.map((ym,i)=>({name:mLabel(ym),color:PAL[i%PAL.length],values:ORDER.map(w=>{const p=cst.per[ym][w];return p.n?p.s/p.n:null})}))})}</div>`;
+  h+=`<div class="card"><h2>${ymLabel(t)} 見込み・曜日別調整<span class="r"><label class="sub">祝日の扱い <select onchange="setHolAs(this.value)">${[['none','曜日どおり'],['6','土曜扱い'],['0','日曜扱い']].map(([v,n])=>`<option value="${v}" ${L.holAs===v?'selected':''}>${n}</option>`).join('')}</select></label><button class="btn s" onclick="csvLabor()">CSV</button></span></h2>
+   <div class="tw"><table><thead><tr><th class="l">曜日</th><th>回数</th><th>直近平均</th><th>調整 ±%</th><th>調整 ±円/日</th><th>調整後/日</th><th>小計</th></tr></thead><tbody>
+   ${ORDER.map(w=>{const p=+(L.pct[w]||0),y=+(L.yen[w]||0);return`<tr><td class="l ${w===0?'wd0':w===6?'wd6':''}">${WD[w]}</td><td>${lm.counts[w]}</td><td>${yen(lm.st.avg[w])}</td>
+    <td><input type="number" step="1" value="${p||''}" placeholder="0" style="width:80px" onchange="setLabor('pct',${w},this.value)"></td><td><input inputmode="numeric" value="${y||''}" placeholder="0" style="width:100px" onchange="setLabor('yen',${w},this.value)"></td>
+    <td>${yen(lm.st.avg[w]*(1+p/100)+y)}</td><td>${yen(lm.byType[w].total)}</td></tr>`}).join('')}
+   </tbody><tfoot><tr><td class="l">合計</td><td>${dim(t)}</td><td></td><td></td><td></td><td></td><td>${yen(lm.total)}</td></tr></tfoot></table></div>
+   <p class="sub" style="margin:8px 0 0">見込み人件費 ＝ Σ（直近平均 × 調整 × 翌月の曜日回数）＋ 日別調整。${L.holAs!=='none'?'祝日は'+WD[+L.holAs]+'曜として数えています。':''}</p>
+   <details><summary>日別の内訳・イベント日の調整</summary>
+   <div class="tw tall"><table><thead><tr><th class="l">日付</th><th class="l">扱い</th><th>曜日基準</th><th>日別調整 ±円</th><th>見込み</th><th>予測売上</th><th>人件費率</th></tr></thead><tbody>
+   ${lm.days.map(d=>`<tr><td class="l ${wdCls(d)}">${d.d}日（${WD[d.w]}）${d.hol?'祝':''}</td><td class="l">${WD[d.type]}</td><td>${yen(d.cost-d.adj)}</td><td><input inputmode="numeric" value="${d.adj||''}" placeholder="0" onchange="setLaborDate('${d.date}',this.value)"></td><td>${yen(d.cost)}</td><td>${yen(d.sales)}</td><td>${d.sales?pct(d.cost/d.sales):'—'}</td></tr>`).join('')}
+   </tbody></table></div></details></div>`;
+  return h;
+}
+function setLaborWin(v){state.labor.window=+v;save();render()}
+function setHolAs(v){state.labor.holAs=v;save();render()}
+function setLabor(k,w,v){const n=toNum(v);if(n==null)delete state.labor[k][w];else state.labor[k][w]=n;save();render()}
+function setLaborDate(date,v){const n=toNum(v);if(n==null)delete state.labor.dateAdj[date];else state.labor.dateAdj[date]=n;save();render()}
+function csvLabor(){const sm=salesModel(),lm=laborModel(sm);const rows=[['■直近曜日別平均',lm.win.map(ymLabel).join('・')],['曜日',...lm.win.flatMap(ym=>[mLabel(ym)+'平均',mLabel(ym)+'回数']),'期間平均','PA平均']];
+  ORDER.forEach(w=>rows.push([WD[w],...lm.win.flatMap(ym=>{const p=lm.st.per[ym][w];return[p.n?R0(p.s/p.n):'',p.n]}),R0(lm.st.avg[w]),R0(lm.stp.avg[w])]));
+  rows.push([],['■翌月見込み',ymLabel(state.settings.target)],['曜日','回数','直近平均','調整%','調整円','小計']);
+  ORDER.forEach(w=>rows.push([WD[w],lm.counts[w],R0(lm.st.avg[w]),state.labor.pct[w]||0,state.labor.yen[w]||0,R0(lm.byType[w].total)]));
+  rows.push(['合計','','','','',R0(lm.total)],['売上予測',R0(sm.total)],['人件費率',lm.rate!=null?(lm.rate*100).toFixed(1)+'%':''],['目標人件費率',state.settings.targetLaborRate+'%'],['目標人件費',R0(lm.targetCost)],[],['■日別'],['日付','曜日','扱い','見込み','日別調整','予測売上','人件費率']);
+  lm.days.forEach(d=>rows.push([d.date,WD[d.w],WD[d.type],R0(d.cost),d.adj||'',R0(d.sales),d.sales?(d.cost/d.sales*100).toFixed(1)+'%':'']));
+  dl(`人件費見込み_${state.settings.target}.csv`,rows)}
+
+/* ---------- 仕入れタブ ---------- */
+function rPur(){
+  const sm=salesModel(),pm=purModel(sm),P=state.purchase,t=state.settings.target,last=pm.last;
+  const chartMonths=monthsWith('pur',t).slice(-5);const cst=wdStats(chartMonths,'pur');
+  let h=`<div class="kpis">
+   <div class="kpi"><div class="l">${mLabel(t)} 仕入れ予測合計</div><div class="v">${yen(pm.total)}</div><div class="s">売上予測比 ${pct(pm.rate)}</div></div>
+   <div class="kpi"><div class="l">日平均</div><div class="v">${yen(pm.total/pm.days.length)}</div><div class="s">${dim(t)}日間</div></div>
+   <div class="kpi"><div class="l">前月比${last?'（'+mLabel(last.ym)+'）':''}</div><div class="v">${last&&last.total?pct(pm.total/last.total):'—'}</div><div class="s">${last?mLabel(last.ym)+'実績 '+yen(last.total)+'（'+last.n+'日分）':''}</div></div>
+   <div class="kpi"><div class="l">全体補正</div><div class="v"><span id="pslv">${P.slider>0?'+':''}${P.slider}%</span></div>
+    <input type="range" min="-20" max="30" step="1" value="${P.slider}" oninput="$('pslv').textContent=(this.value>0?'+':'')+this.value+'%'" onchange="setPur('slider',this.value)"></div></div>`;
+  h+=`<div class="card"><h2>仕入れルート別予測<span class="r">${seg([[3,'直近3ヶ月'],[5,'直近5ヶ月']],P.window,'setPurWin')}</span></h2><div class="routes">
+   ${ROUTES.map(r=>`<div><div class="sub">${r.n}（${pct(pm.ratio[r.k])}）</div><div class="num" style="font-size:22px">${yen(pm.routes[r.k])}</div><div class="rbar"><i style="width:${(pm.ratio[r.k]*100).toFixed(1)}%;background:${r.c}"></i></div></div>`).join('')}
+   </div><p class="sub" style="margin:10px 0 0">構成比は ${pm.win.map(mLabel).join('・')||'（データなし・初期値）'} の実績から計算しています。</p></div>`;
+  h+=`<div class="grid2"><div class="card"><h2>着地比較</h2><div class="tw"><table><thead><tr><th class="l">月</th><th>仕入れ合計</th><th>日数</th><th>${mLabel(t)}予測との差</th></tr></thead><tbody>
+   ${pm.monthTotals.map(m=>`<tr><td class="l">${ymLabel(m.ym)} 実績</td><td>${yen(m.total)}</td><td>${m.n}</td><td>${yen(pm.total-m.total)}</td></tr>`).join('')}
+   ${pm.lyTotal?`<tr><td class="l">${ymLabel(ymAdd(t,-12))} 前年</td><td>${yen(pm.lyTotal)}</td><td></td><td>${yen(pm.total-pm.lyTotal)}</td></tr>`:''}
+   <tr><td class="l">${ymLabel(t)} 予測</td><td>${yen(pm.total)}</td><td>${dim(t)}</td><td></td></tr></tbody></table></div></div>
+   <div class="card"><h2>直近の曜日別平均</h2><div class="tw"><table><thead><tr><th class="l">曜日</th><th>平均</th><th>日数</th><th>${mLabel(t)}の回数</th></tr></thead><tbody>
+   ${ORDER.map(w=>`<tr><td class="l ${w===0?'wd0':w===6?'wd6':''}">${WD[w]}</td><td>${yen(pm.st.avg[w])}</td><td>${pm.st.pool[w].n}</td><td>${pm.days.filter(d=>d.w===w).length}</td></tr>`).join('')}</tbody></table></div></div></div>`;
+  if(chartMonths.length)h+=`<div class="card"><h2>月別の曜日平均の推移</h2>${chart({labels:ORDER.map(w=>WD[w]),labelEvery:1,bars:chartMonths.map((ym,i)=>({name:mLabel(ym),color:PAL[i%PAL.length],values:ORDER.map(w=>{const p=cst.per[ym][w];return p.n?p.s/p.n:null})}))})}</div>`;
+  h+=`<div class="card"><h2>${ymLabel(t)} 日別仕入れ予測<span class="r"><button class="btn s" onclick="clearPurOv()">手入力をクリア</button><button class="btn s" onclick="csvPur()">CSV</button></span></h2>
+   <p class="sub" style="margin:0 0 8px">手入力の欄に金額を入れるとその日だけ上書きされます。仕入れなしの日は 0 を入力。</p>
+   <div class="tw tall"><table><thead><tr><th class="l">日付</th><th>曜日基準額</th><th>補正後</th><th>手入力</th><th>決定予測額</th>${ROUTES.map(r=>`<th>${r.n}</th>`).join('')}</tr></thead><tbody>
+   ${pm.days.map(d=>`<tr><td class="l ${wdCls(d)}">${d.d}日（${WD[d.w]}）${d.hol?'祝':''}</td><td>${yen(d.base)}</td><td>${yen(d.adj)}</td><td><input inputmode="numeric" value="${d.manual?d.amt:''}" placeholder="—" onchange="setPurOv('${d.date}',this.value)"></td><td${d.manual?' style="color:var(--acc)"':''}>${yen(d.amt)}</td>${ROUTES.map(r=>`<td class="sub">${yen(d.amt*pm.ratio[r.k])}</td>`).join('')}</tr>`).join('')}
+   </tbody><tfoot><tr><td class="l">合計</td><td>${yen(sum(pm.days.map(d=>d.base)))}</td><td>${yen(sum(pm.days.map(d=>d.adj)))}</td><td></td><td>${yen(pm.total)}</td>${ROUTES.map(r=>`<td>${yen(pm.routes[r.k])}</td>`).join('')}</tr></tfoot></table></div></div>`;
+  return h;
+}
+function setPur(k,v){state.purchase[k]=+v;save();render()}
+function setPurWin(v){state.purchase.window=+v;save();render()}
+function setPurOv(date,v){const n=toNum(v);if(n==null)delete state.purchase.override[date];else state.purchase.override[date]=n;save();render()}
+function clearPurOv(){const t=state.settings.target;for(const k of Object.keys(state.purchase.override))if(k.startsWith(t))delete state.purchase.override[k];save();render()}
+function csvPur(){const sm=salesModel(),pm=purModel(sm);const rows=[['日付','曜日','祝日','曜日基準額','補正後','手入力','決定予測額',...ROUTES.map(r=>r.n)]];
+  pm.days.forEach(d=>rows.push([d.date,WD[d.w],d.hol?'祝':'',R0(d.base),R0(d.adj),d.manual?d.amt:'',R0(d.amt),...ROUTES.map(r=>R0(d.amt*pm.ratio[r.k]))]));
+  rows.push(['合計','','','','','',R0(pm.total),...ROUTES.map(r=>R0(pm.routes[r.k]))],['全体補正',state.purchase.slider+'%'],['売上予測比',pm.rate!=null?(pm.rate*100).toFixed(1)+'%':'']);
+  dl(`仕入れ予測_${state.settings.target}.csv`,rows)}
+
+/* ---------- 勤怠手当タブ ---------- */
+function attBase(ym){const n=dim(ym);const R=state.att.rules[n>=31?'d31':n===30?'d30':'feb']||{};return{h:+R.h||0,r:+R.r||0,n,key:n>=31?'d31':n===30?'d30':'feb'}}
+function parseH(s){if(s==null||s==='')return 0;s=z2h(String(s).trim()).replace(/[：]/g,':');if(s.includes(':')){const[h,m]=s.split(':');return(+h||0)+(+m||0)/60}return +s||0}
+const tmin=s=>{if(!s)return null;const[h,m]=s.split(':').map(Number);return h*60+(m||0)};
+const hm=x=>{const t=Math.round(x*60);return Math.floor(t/60)+':'+pad(t%60)};
+const h2=x=>(Math.round(x*100)/100).toFixed(2);
+function todayCalc(e){const a=tmin(e.start),b0=tmin(e.end);if(a==null||b0==null)return null;let b=b0;if(b<=a)b+=1440;const span=(b-a)/60;
+  const ov=(x,y)=>Math.max(0,Math.min(b,y)-Math.max(a,x));const night=(ov(0,300)+ov(1320,1740)+ov(2760,3180))/60;
+  const brk=e.brk!==''&&e.brk!=null?+e.brk:(span>=6?45:0);return{span,night,work:Math.max(0,span-brk/60),brk}}
+function attCalc(){const A=state.att,B=attBase(A.month);
+  return A.emps.map(e=>{const aw=parseH(e.actWork),an=parseH(e.actNight),td=todayCalc(e);const tw=td?td.work:0,tn=td?td.night:0;
+    const night=an+tn,work=aw+tw,ot=Math.max(0,work-B.h),otPrev=Math.max(0,aw-B.h),otToday=ot-otPrev;
+    const nA=Math.round(B.r*night*.25),oA=Math.round(B.r*ot*.25);
+    let memo='';if(td){if(aw>=B.h)memo=`実績で既に所定${B.h}hを超えているため、本日の労働${h2(tw)}hはすべて残業対象`;else if(work>B.h)memo=`本日の勤務で所定${B.h}hを超え、${h2(otToday)}hが残業対象`;else memo=`所定内（所定${B.h}hまで残り${h2(B.h-work)}h）`}
+    return{...e,aw,an,td,night,work,ot,otPrev,otToday,nA,oA,memo}})}
+function rAtt(){
+  const A=state.att,B=attBase(A.month),rows=attCalc(),on=rows.filter(r=>r.on);
+  const tot={n:sum(on.map(r=>r.nA)),o:sum(on.map(r=>r.oA))};
+  let h=`<div class="next noprint"><div class="tx"><div>勤怠実績表の写真から自動入力</div><div class="sub">社員名の行から労働時間・深夜時間を読み取って、下の実績欄に入れます。</div></div><button class="btn p" onclick="pickFiles({kind:'att',ym:'${A.month}'})">📷 勤怠表を撮る・選ぶ</button></div>${queue.some(q=>q.kind==='att'||q.preset?.kind==='att')?`<div class="card">${queueHtml()}</div>`:''}`;
+  h+=`<div class="card"><h2>対象月と基準</h2><div class="row">
+   <div class="fld">対象月<input type="month" value="${A.month}" onchange="setAtt('month',this.value)"></div>
+   <div class="fld">実績の出力日<input type="date" value="${A.outDate}" onchange="setAtt('outDate',this.value)"></div>
+   <div class="fld">出力時刻<input type="time" value="${A.outTime}" onchange="setAtt('outTime',this.value)"></div>
+   <div class="fld">所定労働時間（${B.n}日の月）<input type="number" step="0.5" value="${state.att.rules[B.key].h}" placeholder="未設定" style="width:110px" onchange="setRule('${B.key}','h',this.value)"></div><div class="fld">基礎時給（円）<input type="number" value="${state.att.rules[B.key].r}" placeholder="未設定" style="width:110px" onchange="setRule('${B.key}','r',this.value)"></div>
+  </div>${!B.h||!B.r?`<div class="note" style="margin:12px 0 0">${B.n}日の月の所定労働時間と基礎時給を入力してください（30日・31日・2月でそれぞれ1回だけ。入力内容は暗号化して保存されます）</div>`:''}<div class="ok" style="margin-top:12px">${mLabel(A.month)}は${B.n}日までの月：所定労働時間 ${B.h}時間 ／ 基礎時給 ${B.r.toLocaleString()}円 ／ 深夜・残業とも×25%</div></div>`;
+  h+=`<div class="card"><h2>対象社員<span class="r"><button class="btn s" onclick="addEmp()">＋ 社員を追加</button><button class="btn s" onclick="clearToday()">本日予定をクリア</button></span></h2>
+  ${rows.length?'':'<div class="note">社員がまだ登録されていません。「＋ 社員を追加」から名前を入れてください（名前は暗号化して保存され、プログラムには残りません）。</div>'}<p class="sub" style="margin:0 0 10px">実績は「123:45」でも「123.75」でも入力できます。休憩は空欄なら6時間以上で45分を自動で引きます。</p><div class="emps">
+  ${rows.map((r,i)=>`<div class="emp ${r.on?'':'off'}"><div class="top"><input type="checkbox" ${r.on?'checked':''} onchange="setEmp(${i},'on',this.checked)" title="計算対象"><input type="text" value="${esc(r.name)}" onchange="setEmp(${i},'name',this.value)">
+   <select onchange="setEmp(${i},'type',this.value)">${['社員','ヘルプ'].map(x=>`<option ${r.type===x?'selected':''}>${x}</option>`).join('')}</select><button class="btn s d" onclick="delEmp(${i})" aria-label="削除">×</button></div>
+   <div class="ins"><label class="fld">実績 労働累計<input inputmode="decimal" value="${esc(r.actWork)}" placeholder="0:00" onchange="setEmp(${i},'actWork',this.value)"></label>
+   <label class="fld">実績 深夜累計<input inputmode="decimal" value="${esc(r.actNight)}" placeholder="0:00" onchange="setEmp(${i},'actNight',this.value)"></label><div></div>
+   <label class="fld">本日 開始<input type="time" value="${r.start}" onchange="setEmp(${i},'start',this.value)"></label>
+   <label class="fld">本日 終了<input type="time" value="${r.end}" onchange="setEmp(${i},'end',this.value)"></label>
+   <label class="fld">休憩（分）<input type="number" value="${r.brk}" placeholder="${r.td?r.td.brk:'自動'}" onchange="setEmp(${i},'brk',this.value)"></label></div>
+   <div class="res"><span class="sub">本日</span><span>${r.td?`深夜 ${h2(r.td.night)}h ／ 労働 ${h2(r.td.work)}h`:'予定なし'}</span>
+   <span class="sub">深夜累計</span><span>${h2(r.night)}h</span><span class="sub">労働累計</span><span>${h2(r.work)}h</span>
+   <span class="sub">残業累計</span><span>${h2(r.ot)}h</span><span class="sub">深夜手当</span><span>${yen(r.nA)}</span><span class="sub">残業手当</span><span>${yen(r.oA)}</span>
+   <span class="sub">合計</span><b>${yen(r.nA+r.oA)}</b></div>${r.memo?`<div class="sub" style="margin-top:6px">${esc(r.memo)}</div>`:''}</div>`).join('')}
+  </div></div>`;
+  h+=`<div class="card"><h2>手当算出結果<span class="r"><button class="btn s" onclick="csvAtt()">CSV</button></span></h2>${attTable(on,tot)}</div>`;
+  h+=`<div class="card"><h2>報告文<span class="r"><button class="btn s p" onclick="copyRep()">コピー</button></span></h2><pre class="rep">${esc(attReport())}</pre></div>`;
+  return h;
+}
+function attTable(on,tot){return`<div class="tw"><table><thead><tr><th class="l">従業員名</th><th>深夜時間</th><th>残業時間</th><th>深夜手当</th><th>残業手当</th><th>合計金額</th></tr></thead><tbody>
+  ${on.map(r=>`<tr><td class="l">${esc(r.name)}</td><td>${h2(r.night)}h</td><td>${h2(r.ot)}h</td><td>${yen(r.nA)}</td><td>${yen(r.oA)}</td><td>${yen(r.nA+r.oA)}</td></tr>`).join('')}
+  </tbody><tfoot><tr><td class="l">合計</td><td></td><td></td><td>${yen(tot.n)}</td><td>${yen(tot.o)}</td><td>${yen(tot.n+tot.o)}</td></tr></tfoot></table></div>`}
+function attReport(){const A=state.att,B=attBase(A.month),rows=attCalc().filter(r=>r.on);
+  const od=A.outDate?new Date(A.outDate+'T00:00'):new Date();const[ay,am]=A.month.split('-').map(Number);
+  const head=`${od.getMonth()+1}月${od.getDate()}日（${WD[od.getDay()]}）${A.outTime?A.outTime.replace(/^0/,''):'[時刻]'}`;const dlabel=`${od.getMonth()+1}/${od.getDate()}`;
+  let s=`${head}出力の最新実績に基づき、本日の勤務予定を含めた対象社員の個人別手当を算出します。\n\n${am}月は${B.n}日までの月のため、所定労働時間は **${B.h}時間**、基礎時給は **${B.r.toLocaleString()}円** です。\n\n### 🗓️ 本日の勤務・深夜予定\n`;
+  const today=rows.filter(r=>r.td);
+  s+=today.length?today.map(r=>`* **${r.name}**：${r.start}〜${r.end}（深夜 **${h2(r.td.night)}h** / 労働 ${h2(r.td.work)}h）\n    * ${r.memo}`).join('\n'):'* 本日の勤務予定なし';
+  s+=`\n\n---\n\n### 📄 ${ay}年${am}月度 労務計算報告書（個人別・${dlabel}見込）\n`;
+  rows.forEach((r,i)=>{const otd=r.ot<=0?'所定内':(r.otPrev>0&&r.otToday>0?`実績 ${h2(r.otPrev)}h ＋ 本日 ${h2(r.otToday)}h`:r.otToday>0?`本日残業分 ${h2(r.otToday)}h`:`実績 ${h2(r.otPrev)}h`);
+    s+=`\n#### ${i+1}. ${r.name}\n* **深夜時間（累計）**: **${h2(r.night)}時間**（実績 ${hm(r.an)} ＋ 本日 ${h2(r.td?r.td.night:0)}h）\n* **残業時間（累計）**: **${h2(r.ot)}時間**（${otd}）\n* **深夜手当**: ${B.r.toLocaleString()}円 × ${h2(r.night)}h × 0.25 = **${r.nA.toLocaleString()}円**\n* **残業手当**: ${B.r.toLocaleString()}円 × ${h2(r.ot)}h × 0.25 = **${r.oA.toLocaleString()}円**\n`});
+  const tn=sum(rows.map(r=>r.nA)),to=sum(rows.map(r=>r.oA));
+  s+=`\n---\n\n### 📋 手当算出結果（対象社員一覧・${dlabel}見込）\n\n| 従業員名 | 深夜手当 | 残業手当 | 合計金額 |\n| :--- | :--- | :--- | :--- |\n`;
+  rows.forEach(r=>s+=`| **${r.name}** | ${r.nA.toLocaleString()}円 | ${r.oA.toLocaleString()}円 | **${(r.nA+r.oA).toLocaleString()}円** |\n`);
+  s+=`| **合計** | **${tn.toLocaleString()}円** | **${to.toLocaleString()}円** | **${(tn+to).toLocaleString()}円** |\n`;return s}
+function setAtt(k,v){state.att[k]=v;save();render()}
+function setRule(p,k,v){state.att.rules[p][k]=v===''?'':+v;save();render()}
+function setEmp(i,k,v){state.att.emps[i][k]=v;save();render()}
+function addEmp(){state.att.emps.push({id:'e'+Date.now(),name:'新しい社員',type:'社員',on:true,actWork:'',actNight:'',start:'',end:'',brk:''});save();render()}
+function delEmp(i){if(!confirm(state.att.emps[i].name+' を削除しますか？'))return;state.att.emps.splice(i,1);save();render()}
+function clearToday(){state.att.emps.forEach(e=>{e.start='';e.end='';e.brk=''});save();render()}
+async function copyRep(){const t=attReport();try{await navigator.clipboard.writeText(t);toast('コピーしました')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('コピーしました')}}
+function csvAtt(){const B=attBase(state.att.month);const rows=[['対象月',state.att.month,'所定時間',B.h,'基礎時給',B.r],['従業員名','区分','実績労働','実績深夜','本日開始','本日終了','本日労働','本日深夜','累計労働','累計深夜','残業時間','深夜手当','残業手当','合計']];
+  attCalc().filter(r=>r.on).forEach(r=>rows.push([r.name,r.type,h2(r.aw),h2(r.an),r.start,r.end,r.td?h2(r.td.work):'',r.td?h2(r.td.night):'',h2(r.work),h2(r.night),h2(r.ot),r.nA,r.oA,r.nA+r.oA]));
+  dl(`手当算出_${state.att.month}.csv`,rows)}
+
+/* ---------- レポート・PDF ---------- */
+const SECS=[['kpi','主要数値'],['points','分析のポイント'],['comment','店長コメント'],['cal','稼働カレンダー'],['chart','日別売上グラフ'],['week','週別サマリー'],['labor','人件費の見込み'],['pur','仕入れの見込み'],['att','社員の深夜・残業手当']];
+function rReport(){
+  const R=state.report;
+  let h=`<div class="card noprint"><h2>共有レポートの設定<span class="r"><button class="btn p lg" onclick="printReport()">📄 PDFで保存・共有</button></span></h2>
+   <div class="row"><label class="fld">店舗名<input value="${esc(R.store)}" placeholder="例）○○店" onchange="setRep('store',this.value)"></label>
+   <label class="fld">宛先<input value="${esc(R.to)}" placeholder="例）エリアマネージャー各位" onchange="setRep('to',this.value)"></label>
+   <label class="fld">作成者<input value="${esc(R.author)}" placeholder="例）店長 ○○" onchange="setRep('author',this.value)"></label></div>
+   <h3>載せる項目</h3><div class="chips">${SECS.map(([k,n])=>`<button class="chip ${R.sec[k]?'on':''}" onclick="togSec('${k}')">${R.sec[k]?'✓ ':''}${n}</button>`).join('')}</div>
+   <h3>店長コメント（レポートに載ります）</h3><textarea placeholder="例）超高稼働の金曜は社員を厚めに配置。アイドル注意の平日は開店直後を最少人数で運営。" onchange="setRep('comment',this.value)">${esc(R.comment)}</textarea>
+   <p class="sub" style="margin:8px 0 0">タブレット・スマホは「PDFで保存・共有」→ 印刷画面のプレビューを2本指で広げる → 共有ボタンからPDFとして送れます。PCは印刷画面で「PDFに保存」を選びます。手当の項目は個人の金額が載るため、社員向けに共有するときは外してください。</p></div>`;
+  h+=reportHtml();return h;
+}
+function reportHtml(){
+  const R=state.report,S=R.sec,sm=salesModel(),lm=laborModel(sm),pm=purModel(sm),t=state.settings.target;const now=new Date();
+  const lvCnt=[0,0,0,0];sm.days.forEach(d=>lvCnt[d.level]++);
+  let h=`<div class="report"><div class="rh"><div><div class="tt">${ymLabel(t)} 翌月予測レポート<span class="conf">社外秘</span></div><div class="sub">${esc(R.store)}${R.to?'　宛先：'+esc(R.to):''}</div></div><div class="sub" style="text-align:right">作成日 ${now.getFullYear()}年${dateJP(now)}<br>${R.author?'作成者 '+esc(R.author):''}</div></div>`;
+  if(S.kpi)h+=`<div class="sec"><div class="ttl">主要数値</div><div class="kpis">
+    <div class="kpi"><div class="l">売上予測</div><div class="v">${yen(sm.total)}</div><div class="s">${sm.lyTotal?'前年同月比 '+pct(sm.total/sm.lyTotal):''}</div></div>
+    <div class="kpi"><div class="l">客数予測 / 客単価</div><div class="v">${int(sm.gTotal)}人</div><div class="s">平均客単価 ${yen(sm.avgUnit)}</div></div>
+    <div class="kpi"><div class="l">稼働レベル（日数）</div><div class="lvs">${[3,2,1,0].map(l=>`<span class="lv lv${l}">${LV[l].n} ${lvCnt[l]}</span>`).join('')}</div></div>
+    <div class="kpi"><div class="l">人件費見込み</div><div class="v">${yen(lm.total)}</div><div class="s">人件費率 ${pct(lm.rate)}（目標 ${pct(lm.target,0)}）</div></div>
+    <div class="kpi"><div class="l">仕入れ予測</div><div class="v">${yen(pm.total)}</div><div class="s">売上比 ${pct(pm.rate)}</div></div>
+    <div class="kpi"><div class="l">成長率補正</div><div class="v">${pct(sm.growth)}</div><div class="s">直近 ${sm.win.map(mLabel).join('・')||'—'}</div></div></div></div>`;
+  if(S.points)h+=`<div class="sec"><div class="ttl">分析のポイント</div><ul class="pts">${insights(sm,lm,pm).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  if(S.comment&&R.comment)h+=`<div class="sec"><div class="ttl">店長コメント</div><div class="cmt">${esc(R.comment)}</div></div>`;
+  if(S.cal)h+=`<div class="sec"><div class="ttl">稼働カレンダー（売上予測・客数）</div>${levelCal(sm)}</div>`;
+  if(S.chart)h+=`<div class="sec"><div class="ttl">日別売上予測と前年同曜日</div>${salesChart(sm,220)}</div>`;
+  if(S.week)h+=`<div class="sec"><div class="ttl">週別サマリー</div>${weekTable(weeks(sm,lm,pm))}</div>`;
+  if(S.labor)h+=`<div class="sec"><div class="ttl">人件費の見込み（直近${lm.win.length}ヶ月の曜日平均 × ${mLabel(t)}の曜日回数）</div><div class="tw"><table><thead><tr><th class="l">曜日</th><th>回数</th><th>直近平均/日</th><th>調整</th><th>小計</th></tr></thead><tbody>
+    ${ORDER.map(w=>`<tr><td class="l">${WD[w]}</td><td>${lm.counts[w]}</td><td>${yen(lm.st.avg[w])}</td><td>${(state.labor.pct[w]?(state.labor.pct[w]>0?'+':'')+state.labor.pct[w]+'% ':'')+(state.labor.yen[w]?yen(state.labor.yen[w]):'')||'—'}</td><td>${yen(lm.byType[w].total)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td class="l">合計</td><td>${dim(t)}</td><td></td><td></td><td>${yen(lm.total)}</td></tr></tfoot></table></div>
+    <div class="sub" style="margin-top:6px">売上予測 ${yen(sm.total)} に対し人件費率 ${pct(lm.rate)}／目標人件費 ${yen(lm.targetCost)}（差 ${lm.targetCost!=null?yen(lm.total-lm.targetCost):'—'}）</div></div>`;
+  if(S.pur)h+=`<div class="sec"><div class="ttl">仕入れの見込み</div><div class="tw"><table><thead><tr><th class="l">区分</th><th>金額</th><th>構成比</th></tr></thead><tbody>
+    ${ROUTES.map(r=>`<tr><td class="l">${r.n}</td><td>${yen(pm.routes[r.k])}</td><td>${pct(pm.ratio[r.k])}</td></tr>`).join('')}
+    ${pm.monthTotals.map(m=>`<tr><td class="l sub">参考：${ymLabel(m.ym)}実績（${m.n}日分）</td><td class="sub">${yen(m.total)}</td><td></td></tr>`).join('')}
+    </tbody><tfoot><tr><td class="l">${mLabel(t)}予測 合計</td><td>${yen(pm.total)}</td><td>売上比 ${pct(pm.rate)}</td></tr></tfoot></table></div></div>`;
+  if(S.att){const rows=attCalc().filter(r=>r.on);const tot={n:sum(rows.map(r=>r.nA)),o:sum(rows.map(r=>r.oA))};const B=attBase(state.att.month);
+    h+=`<div class="sec"><div class="ttl">社員の深夜・残業手当（${mLabel(state.att.month)}・所定${B.h}h／基礎時給${B.r.toLocaleString()}円）</div>${attTable(rows,tot)}</div>`}
+  h+=`<div class="foot">翌月予測マネージャーで作成／前年同月・直近実績からの自動予測値です</div></div>`;
+  return h;
+}
+function setRep(k,v){state.report[k]=v;save()}
+function togSec(k){state.report.sec[k]=!state.report.sec[k];save();render()}
+function printReport(){document.body.classList.add('printing');const t=document.title;document.title=`翌月予測レポート_${state.settings.target}`;setTimeout(()=>{window.print();setTimeout(()=>{document.body.classList.remove('printing');document.title=t},500)},50)}
+window.addEventListener('afterprint',()=>document.body.classList.remove('printing'));
+
+/* ---------- 実績データタブ ---------- */
+function rData(){
+  const months=Object.keys(state.data).sort();
+  let ym=state.ui.dataMonth||months[months.length-1]||ymAdd(state.settings.target,-1);state.ui.dataMonth=ym;
+  let h=`<div class="card"><h2>月を選ぶ</h2><div class="chips">${months.map(m=>`<button class="chip ${m===ym?'on':''}" onclick="selMonth('${m}')">${ymLabel(m)}<small>${Object.keys(mdata(m)).length}日</small></button>`).join('')||'<span class="sub">まだ登録された月はありません</span>'}</div>
+   <div class="row" style="margin-top:10px"><input type="month" id="newm" value="${ym}"><button class="btn" onclick="selMonth($('newm').value)">この月を開く</button></div></div>`;
+  h+=`<div class="card"><h2>スプレッドシートから貼り付けて取り込む</h2><p class="sub" style="margin:0 0 8px">見出し行（日付・売上・客数 など）ごとコピーして貼り付けると、列を自動で見分けて ${ymLabel(ym)} に反映します。</p>
+   <textarea class="mono" id="pastet" placeholder="日付	売上	客数&#10;1	523400	186&#10;2	412000	150"></textarea>
+   <div class="row" style="margin-top:8px"><select id="pastek"><option value="">種類を自動判別</option>${['sales','labor','pur'].map(k=>`<option value="${k}">${KINDS[k].n}</option>`).join('')}</select><button class="btn p" onclick="pasteImport('${ym}')">取り込む</button></div></div>`;
+  h+=dataTable(ym);return h;
+}
+function pasteImport(ym){const txt=$('pastet').value;if(!txt.trim())return;const kind=$('pastek').value||null;const lines=textToLines(txt);
+  const r=analyze(lines,{kind,ym});if(!r.kind){alert('種類を選んでください');return}if(!r.rows.length){alert('日付のある行が見つかりませんでした');return}
+  const undo=applyRows(ym,r.rows,KINDS[r.kind].cols);window._lastPaste=undo;render();toast(`${KINDS[r.kind].n} ${r.rows.length}日分を反映しました`+(r.warn.length?'（'+r.warn[0]+'）':''))}
+function dataTable(ym){
+  const n=dim(ym);let tot={};
+  let h=`<div class="card"><h2>${ymLabel(ym)} 日別実績<span class="r"><button class="btn s" onclick="csvData('${ym}')">CSV</button><button class="btn s d" onclick="delMonth('${ym}')">この月を削除</button></span></h2>
+   <p class="sub" style="margin:0 0 8px">読み取り結果の確認・修正や直接入力ができます。売上・人件費・仕入れは円、客数は人。</p>
+   <div class="tw tall"><table><thead><tr><th class="l">日付</th>${COLS.map(c=>`<th>${c.n}</th>`).join('')}<th>客単価</th><th>仕入計</th></tr></thead><tbody>`;
+  for(let d=1;d<=n;d++){const i=dayInfo(ym,d),r=rec(ym,d)||{};
+    h+=`<tr><td class="l ${wdCls(i)}">${d}日（${WD[i.w]}）${i.hol?'祝':''}</td>${COLS.map(c=>{const v=val(r,c.k);if(v!=null)tot[c.k]=(tot[c.k]||0)+v;return`<td><input inputmode="numeric" value="${v??''}" onchange="setCell('${ym}',${d},'${c.k}',this.value)" style="width:${c.k==='guests'?70:96}px"></td>`}).join('')}
+    <td class="sub">${val(r,'sales')&&val(r,'guests')?yen(r.sales/r.guests):''}</td><td class="sub">${purTotal(r)!=null?yen(purTotal(r)):''}</td></tr>`}
+  h+=`</tbody><tfoot><tr><td class="l">合計</td>${COLS.map(c=>`<td>${tot[c.k]!=null?(c.k==='guests'?int(tot[c.k]):yen(tot[c.k])):''}</td>`).join('')}<td>${tot.sales&&tot.guests?yen(tot.sales/tot.guests):''}</td><td>${yen(sum(['r1','r2','r3'].map(k=>tot[k])))}</td></tr></tfoot></table></div></div>`;
+  return h;
+}
+function selMonth(ym){if(!/^\d{4}-\d{2}$/.test(ym))return;state.ui.dataMonth=ym;save();render()}
+function setCell(ym,d,k,v){const n=toNum(v);state.data[ym]??={d:{}};const r=state.data[ym].d[d]??={};if(n==null)delete r[k];else r[k]=n;if(!Object.keys(r).length)delete state.data[ym].d[d];save();render()}
+function delMonth(ym){if(!confirm(ymLabel(ym)+' の実績をすべて削除しますか？'))return;delete state.data[ym];state.ui.dataMonth='';save();render()}
+function csvData(ym){const rows=[['日付','曜日',...COLS.map(c=>c.n),'客単価','仕入計']];for(let d=1;d<=dim(ym);d++){const r=rec(ym,d)||{};rows.push([ds(ym,d),WD[wdOf(ym,d)],...COLS.map(c=>val(r,c.k)??''),val(r,'sales')&&val(r,'guests')?R0(r.sales/r.guests):'',purTotal(r)??''])}dl(`実績_${ym}.csv`,rows)}
+
+/* ---------- 設定タブ ---------- */
+function rSet(){
+  const S=state.settings,C=S.cal,L=S.levels;
+  const calRow=(k,n,f)=>`<tr><td class="l"><label><input type="checkbox" ${C[k].on?'checked':''} onchange="setCal('${k}','on',this.checked)"> ${n}</label></td>${f.map(([fk,lab])=>`<td>${lab} <input type="number" step="1" value="${C[k][fk]}" style="width:76px" onchange="setCal('${k}','${fk}',this.value)">%</td>`).join('')}${f.length<2?'<td></td>':''}</tr>`;
+  return`<div class="card"><h2>セキュリティ</h2>
+   <div class="row"><label class="fld">自動ロック<select onchange="state.settings.lockMin=+this.value;save();resetIdle()">${[[3,'3分'],[5,'5分'],[10,'10分'],[30,'30分'],[0,'しない']].map(([v,n])=>`<option value="${v}" ${+S.lockMin===v?'selected':''}>${n}操作がないとき</option>`).join('')}</select></label>
+   <button class="btn" style="align-self:flex-end" onclick="changePw()">パスワードを変更</button></div>
+   <p class="sub" style="margin:10px 0 0">データはパスワードから作った鍵で暗号化（AES-256）して、この端末の中だけに保存しています。パスワードを知らない人は、端末を触れても中身を読めません。入力ミスが5回続くと一定時間ログインできなくなります。</p>
+   <h3>外部通信</h3><div class="ok">このアプリは外部のサイトと通信できないように設定されています（ブラウザが外部への送信をすべて止めます）。読み取りエンジンも同じ場所に置いたものだけを使います。</div>
+   <h3>オフライン準備</h3><div class="row"><button class="btn" onclick="prepOffline()">オフラインで使えるようにする</button><span class="sub" id="offst">Wi-Fiにつないだ状態で一度押すと、機内モードでも写真の読み取りまで使えます（約30MB）。</span></div></div>
+  <div class="card"><h2>仕入れルートの名前</h2><p class="sub" style="margin:0 0 10px">使っている発注方法の名前をここで入れてください。写真の読み取りでは、この名前の列を探します。名前は暗号化して保存され、プログラムには残りません。</p>
+   ${ROUTES.map((r,i)=>`<div class="row"><label class="fld">仕入れ${i+1}の名前<input value="${esc(S.routes[i]?.name||'')}" placeholder="例）発注システム名" onchange="setRoute(${i},'name',this.value)"></label><label class="fld" style="flex:1;min-width:200px">写真での別の書き方（任意・カンマ区切り）<input value="${esc(S.routes[i]?.alias||'')}" placeholder="例）略称や英語表記" onchange="setRoute(${i},'alias',this.value)"></label></div>`).join('')}</div>
+  <div class="card"><h2>カレンダー補正（売上予測）</h2>
+   <div class="tw"><table><tbody>
+   ${calRow('eve','祝前日',[['sales','売上']])}${calRow('fri','金曜日',[['sales','売上']])}${calRow('sat','土曜日',[['unit','客単価']])}${calRow('sun','日曜日',[['sales','売上']])}
+   ${calRow('hol','祝日当日（14時開店・土曜ベース）',[['sales','売上'],['unit','客単価']])}${calRow('pay','給与日（25日〜月末の平日）',[['sales','売上']])}
+   </tbody></table></div>
+   <p class="sub" style="margin:8px 0 0">前年の曜日別実績や直近の曜日別客単価には、もともと金・土・日の差が入っています。金・土・日の補正をオンにすると二重にかかるため、初期値はオフです。</p></div>
+  <div class="card"><h2>稼働レベルの基準</h2><div class="row">
+   <label class="fld">超高稼働：売上（円）以上<input type="number" value="${L.s1}" onchange="setLv('s1',this.value)"></label><label class="fld">または客数（人）以上<input type="number" value="${L.g1}" onchange="setLv('g1',this.value)"></label></div>
+   <div class="row"><label class="fld">高稼働：売上（円）以上<input type="number" value="${L.s2}" onchange="setLv('s2',this.value)"></label><label class="fld">または客数（人）以上<input type="number" value="${L.g2}" onchange="setLv('g2',this.value)"></label></div>
+   <div class="row"><label class="fld">通常稼働：売上（円）以上<input type="number" value="${L.s3}" onchange="setLv('s3',this.value)"></label><span class="sub" style="align-self:flex-end">これ未満はアイドル注意</span></div></div>
+  <div class="card"><h2>写真の読み取り</h2><p class="sub" style="margin:0 0 8px">確認画面で列を選び直すと、その並びを覚えて次回から使います。</p>
+   ${Object.keys(state.learn).length?Object.entries(state.learn).map(([k,m])=>`<div class="sub">${KINDS[k]?.n}：${Object.entries(m).map(([c,i])=>COLS.find(x=>x.k===c)?.n+'＝'+(i?i+'番目':'使わない')).join('、')}</div>`).join('')+`<button class="btn s" style="margin-top:8px" onclick="state.learn={};save();render()">覚えた並びをリセット</button>`:'<div class="sub">まだ覚えた並びはありません</div>'}</div>
+  <div class="card"><h2>祝日</h2><p class="sub" style="margin:0 0 8px">1行に1日（YYYY-MM-DD）。2025〜2027年は入力済みです。</p>
+   <textarea class="mono" style="min-height:120px" onchange="setHolidays(this.value)">${S.holidays.join('\n')}</textarea></div>
+  <div class="card"><h2>バックアップ</h2><p class="sub" style="margin:0 0 10px">書き出したファイルも暗号化されていて、書き出した時点のパスワードがないと開けません。端末を替えるとき・ブラウザのデータを消す前に書き出してください。</p>
+   <div class="row"><button class="btn" onclick="exportBackup()">暗号化バックアップを書き出す</button><label class="btn">バックアップを読み込む<input type="file" accept=".json,application/json" class="hidden" onchange="importBackup(this.files[0])"></label></div>
+   <div class="row"><button class="btn" onclick="loadSample()">サンプルデータで試す</button><button class="btn d" onclick="resetAll()">すべてのデータを消去</button></div></div>`;
+}
+function setRoute(i,k,v){state.settings.routes[i]??={name:'',alias:''};state.settings.routes[i][k]=v.trim();save();render()}
+function setCal(k,f,v){state.settings.cal[k][f]=f==='on'?v:+v;save();render()}
+function setLv(k,v){state.settings.levels[k]=+v;save();render()}
+function setHolidays(v){state.settings.holidays=[...new Set(v.split(/\s+/).map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)))].sort();save();render();toast('祝日を更新しました')}
+async function changePw(){const cur=await askPassword('今のパスワード');if(cur==null)return;
+  try{const blob=JSON.parse(localStorage.getItem(ENC_KEY));await decWith(await deriveKey(cur,ub64(blob.salt)),blob)}catch(e){alert('今のパスワードが違います');return}
+  const a=await askPassword('新しいパスワード（8文字以上）');if(a==null)return;if(a.length<8){alert('8文字以上にしてください');return}
+  const b=await askPassword('新しいパスワード（もう一度）');if(a!==b){alert('一致しません');return}
+  await flushSave();encSalt=crypto.getRandomValues(new Uint8Array(16));cryptoKey=await deriveKey(a,encSalt);await flushSave();toast('パスワードを変更しました')}
+async function exportBackup(){await flushSave();const blob=localStorage.getItem(ENC_KEY);dlBlob(`翌月予測_暗号化バックアップ_${fmtDate(new Date())}.json`,new Blob([blob],{type:'application/json'}))}
+function importBackup(f){if(!f)return;const r=new FileReader();r.onload=async()=>{try{const blob=JSON.parse(r.result);if(!blob.ct)throw 0;
+  const pw=await askPassword('バックアップを書き出したときのパスワード');if(pw==null)return;
+  let s;try{s=await decWith(await deriveKey(pw,ub64(blob.salt)),blob)}catch(e){alert('パスワードが違います');return}
+  if(!confirm('今のデータを置き換えて読み込みますか？'))return;state=migrate(deepMerge(defaultState(),s));await flushSave();render();toast('読み込みました（今のパスワードで保存し直しました）')}catch(e){alert('バックアップファイルを読み込めませんでした')}};r.readAsText(f)}
+function resetAll(){if(!confirm('すべてのデータと設定を消去します（パスワードはそのまま）。よろしいですか？'))return;state=defaultState();save();render();toast('消去しました')}
+function loadSample(){
+  if(Object.keys(state.data).length&&!confirm('今の実績データをサンプルで置き換えますか？'))return;
+  let seed=42;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const t=state.settings.target,cur=nowYM(),today=new Date().getDate();const data={};const wf=[.72,.8,.85,.92,1.0,1.28,1.02];
+  const months=new Set();for(let k=1;k<=5;k++){months.add(ymAdd(t,-k));months.add(ymAdd(t,-k-12))}months.add(ymAdd(t,-12));
+  for(const ym of months){if(ym>cur)continue;const lvl=ym<ymAdd(t,-6)?400000:440000;const d={};
+    for(let day=1;day<=dim(ym);day++){if(ym===cur&&day>=today)break;const w=wdOf(ym,day),hol=holSet.has(ds(ym,day)),eve=isEve(ym,day);
+      const s=lvl*wf[w]*(hol?1.1:1)*(eve?1.22:1)*(day>=25&&w>=1&&w<=5?1.06:1)*(.9+rnd()*.2);const unit=(w===6||w===0||hol?2650:3000)*(.95+rnd()*.1);
+      const lab=s*(.22+rnd()*.05),pur=s*(.28+rnd()*.06)*(w===0?.4:1);
+      d[day]={sales:Math.round(s/100)*100,guests:Math.round(s/unit),pa:Math.round(lab*.68),labor:Math.round(lab),r1:Math.round(pur*.75),r2:Math.round(pur*.2),r3:Math.round(pur*.05)}}
+    data[ym]={d}}
+  state.data=data;state.ui.dataMonth='';save();render();toast('サンプルデータを入れました')}
+
+async function prepOffline(){const st=$('offst');try{st.textContent='準備中…';const files=await (await fetch('./ocr/files.json',{cache:'no-store'})).json();
+  const need=['./','./index.html','./manifest.webmanifest',...files.filter(f=>!/core\//.test(f)||/lstm/.test(f)).map(f=>'./'+f)];let n=0;
+  for(const f of need){const r=await fetch(f,{cache:'reload'});if(!r.ok)throw new Error(f);await r.arrayBuffer();n++;st.textContent=`ダウンロード中… ${n}/${need.length}`}
+  st.textContent='✓ オフライン準備ができました';toast('オフラインで使えるようになりました')}catch(e){st.textContent='準備できませんでした。GitHubへの設置が完了しているか、Wi-Fiにつながっているか確認してください。'}}
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+/* ================= 起動 ================= */
+(function boot(){
+  if(!window.crypto?.subtle){$('gate').innerHTML='<div class="gbox"><h1>開けません</h1><div class="sub">暗号化を使うため、https のページ（GitHub Pages など）で開いてください。</div></div>';return}
+  if(localStorage.getItem(ENC_KEY))showLogin();else showSetup();
+})();
+</script>
+</body>
+</html>

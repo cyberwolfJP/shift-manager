@@ -1,0 +1,1 @@
+["ocr/core/tesseract-core-lstm.js", "ocr/core/tesseract-core-lstm.wasm", "ocr/core/tesseract-core-lstm.wasm.js", "ocr/core/tesseract-core-simd-lstm.js", "ocr/core/tesseract-core-simd-lstm.wasm", "ocr/core/tesseract-core-simd-lstm.wasm.js", "ocr/files.json", "ocr/lang/eng.traineddata.gz", "ocr/lang/jpn.traineddata.gz", "ocr/tesseract.min.js", "ocr/worker.min.js"]
