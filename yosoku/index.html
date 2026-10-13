@@ -278,7 +278,7 @@ const dateJP=d=>`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;
 function defaultState(){
   const t=nowYM();
   return {v:2,
-    settings:{target:ymAdd(t,1),window:3,growthMode:'auto',growthManual:110,salesAdj:0,targetLaborRate:24,lockMin:10,routes:[{name:'',alias:''},{name:'',alias:''},{name:'',alias:''}],holidays:DEFAULT_HOL.slice(),
+    settings:{target:ymAdd(t,1),window:3,growthMode:'auto',growthManual:110,salesAdj:0,targetLaborRate:24,lockMin:10,backupDays:7,lastBackup:'',backupSnooze:'',routes:[{name:'',alias:''},{name:'',alias:''},{name:'',alias:''}],holidays:DEFAULT_HOL.slice(),
       levels:{s1:700000,g1:240,s2:580000,g2:200,s3:450000},
       cal:{fri:{on:false,sales:25},eve:{on:true,sales:25},sat:{on:false,unit:-17},sun:{on:false,sales:-8},hol:{on:true,sales:10,unit:-5},pay:{on:true,sales:7}}},
     data:{},salesOverride:{},
@@ -337,7 +337,14 @@ async function doLogin(){const f=failInfo();if(f.until>Date.now())return;const p
   catch(x){const n=f.n+1;const until=n>=5?Date.now()+Math.min(300,30*2**(n-5))*1000:0;localStorage.setItem(FAIL_KEY,JSON.stringify({n,until}));showLogin('パスワードが違います')}}
 function forgot(){const ok=prompt('パスワードを忘れた場合、この端末のデータをすべて消去して初期化するしかありません。\n（バックアップファイルがあれば、新しいパスワード設定後に元のパスワードで読み込めます）\n\n初期化する場合は「消去」と入力してください');
   if(ok==='消去'){localStorage.removeItem(ENC_KEY);localStorage.removeItem(FAIL_KEY);showSetup()}}
-function enterApp(){$('gate').classList.add('hidden');$('gate').innerHTML='';$('hdr').classList.remove('hidden');resetIdle();render()}
+function enterApp(){$('gate').classList.add('hidden');$('gate').innerHTML='';$('hdr').classList.remove('hidden');resetIdle();render();setTimeout(backupCheck,600)}
+const daysSince=d=>d?Math.floor((Date.now()-new Date(d+'T00:00').getTime())/864e5):Infinity;
+function hasAnyData(){return Object.keys(state.data).length||state.todo.tpl.length||state.att.emps.length||Object.keys(state.todo.m).length}
+function backupDue(){const S=state.settings,n=+S.backupDays||0;return n>0&&hasAnyData()&&daysSince(S.lastBackup)>=n&&S.backupSnooze!==fmtDate(new Date())}
+function backupCheck(){if(!state||!backupDue())return;const last=state.settings.lastBackup;
+  openModal(`<h2>バックアップの時期です</h2><p>${last?`前回のバックアップから${daysSince(last)}日たちました（前回：${last.replace(/-/g,'/')}）。`:'まだ一度もバックアップしていません。'}<br>iPadの故障・紛失やブラウザのデータ消去に備えて、書き出しておきましょう。</p>
+   <p class="sub">書き出したファイルは暗号化されているので、「ファイル」アプリやiCloudに置いても中身は読まれません。開くにはパスワードが必要です。</p>
+   <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="state.settings.backupSnooze=fmtDate(new Date());save();closeModal()">あとで（明日もう一度）</button><button class="btn p" onclick="closeModal();exportBackup()">今すぐバックアップ</button></div>`,true)}
 function lockNow(){flushSave().finally(()=>{state=null;cryptoKey=null;queue.forEach(q=>URL.revokeObjectURL(q.url));queue=[];closeModal();showLogin()})}
 let idleT=null;
 function resetIdle(){clearTimeout(idleT);if(!state)return;const m=+state.settings.lockMin;if(m>0)idleT=setTimeout(()=>{if(busy){resetIdle();return}lockNow();},m*60000)}
@@ -1092,7 +1099,10 @@ function rSet(){
    ${Object.keys(state.learn).length?Object.entries(state.learn).map(([k,m])=>`<div class="sub">${KINDS[k]?.n}：${Object.entries(m).map(([c,i])=>COLS.find(x=>x.k===c)?.n+'＝'+(i?i+'番目':'使わない')).join('、')}</div>`).join('')+`<button class="btn s" style="margin-top:8px" onclick="state.learn={};save();render()">覚えた並びをリセット</button>`:'<div class="sub">まだ覚えた並びはありません</div>'}</div>
   <div class="card"><h2>祝日</h2><p class="sub" style="margin:0 0 8px">1行に1日（YYYY-MM-DD）。2025〜2027年は入力済みです。</p>
    <textarea class="mono" style="min-height:120px" onchange="setHolidays(this.value)">${S.holidays.join('\n')}</textarea></div>
-  <div class="card"><h2>バックアップ</h2><p class="sub" style="margin:0 0 10px">書き出したファイルも暗号化されていて、書き出した時点のパスワードがないと開けません。端末を替えるとき・ブラウザのデータを消す前に書き出してください。</p>
+  <div class="card"><h2>バックアップ</h2>
+   <div class="${daysSince(S.lastBackup)>=(+S.backupDays||9999)?'note':'ok'}" style="margin-bottom:10px">前回のバックアップ：${S.lastBackup?S.lastBackup.replace(/-/g,'/')+`（${daysSince(S.lastBackup)}日前）`:'まだありません'}</div>
+   <div class="row" style="margin-bottom:10px"><label class="fld">お知らせの間隔<select onchange="state.settings.backupDays=+this.value;save();render()">${[[3,'3日ごと'],[7,'7日ごと'],[14,'14日ごと'],[30,'30日ごと'],[0,'知らせない']].map(([v,n])=>`<option value="${v}" ${+S.backupDays===v?'selected':''}>${n}</option>`).join('')}</select></label></div>
+   <p class="sub" style="margin:0 0 10px">書き出したファイルも暗号化されていて、書き出した時点のパスワードがないと開けません。端末を替えるとき・ブラウザのデータを消す前に書き出してください。</p>
    <div class="row"><button class="btn" onclick="exportBackup()">暗号化バックアップを書き出す</button><label class="btn">バックアップを読み込む<input type="file" accept=".json,application/json" class="hidden" onchange="importBackup(this.files[0])"></label></div>
    <div class="row"><button class="btn" onclick="loadSample()">サンプルデータで試す</button><button class="btn d" onclick="resetAll()">すべてのデータを消去</button></div></div>`;
 }
@@ -1105,7 +1115,8 @@ async function changePw(){const cur=await askPassword('今のパスワード');i
   const a=await askPassword('新しいパスワード（8文字以上）');if(a==null)return;if(a.length<8){alert('8文字以上にしてください');return}
   const b=await askPassword('新しいパスワード（もう一度）');if(a!==b){alert('一致しません');return}
   await flushSave();encSalt=crypto.getRandomValues(new Uint8Array(16));cryptoKey=await deriveKey(a,encSalt);await flushSave();toast('パスワードを変更しました')}
-async function exportBackup(){await flushSave();const blob=localStorage.getItem(ENC_KEY);dlBlob(`翌月予測_暗号化バックアップ_${fmtDate(new Date())}.json`,new Blob([blob],{type:'application/json'}))}
+async function exportBackup(){state.settings.lastBackup=fmtDate(new Date());state.settings.backupSnooze='';await flushSave();const blob=localStorage.getItem(ENC_KEY);dlBlob(`翌月予測_暗号化バックアップ_${fmtDate(new Date())}.json`,new Blob([blob],{type:'application/json'}));if(state.ui.tab==='set')render();toast('バックアップを書き出しました（「ファイル」アプリのダウンロードに保存されます）')}
+
 function importBackup(f){if(!f)return;const r=new FileReader();r.onload=async()=>{try{const blob=JSON.parse(r.result);if(!blob.ct)throw 0;
   const pw=await askPassword('バックアップを書き出したときのパスワード');if(pw==null)return;
   let s;try{s=await decWith(await deriveKey(pw,ub64(blob.salt)),blob)}catch(e){alert('パスワードが違います');return}
