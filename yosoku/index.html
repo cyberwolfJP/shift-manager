@@ -766,7 +766,7 @@ function rTodo(){
     <div class="ta"><button class="btn s" onclick="todoOrder(${ix},-1)" aria-label="上へ">↑</button><button class="btn s" onclick="todoOrder(${ix},1)" aria-label="下へ">↓</button><button class="btn s d" onclick="todoDel('${i.id}')" aria-label="削除">×</button></div></div>`}).join(''):'<div class="sub" style="padding:12px 0">未完了のタスクはありません</div>'}</div></div>`;
   h+=`<div class="card"><h2>タスクを追加</h2><div class="row"><input id="tdn" placeholder="例）消耗品の発注" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')todoAdd()"><input id="tdd" placeholder="期限メモ（例：月末、翌月3日）" style="width:200px">
    <select id="tde"><option value="1">毎月のタスク</option><option value="0">今月だけ</option></select><button class="btn p" onclick="todoAdd()">追加</button></div>
-   <p class="sub" style="margin:8px 0 0">「毎月のタスク」は翌月以降のリストにも自動で入ります。「今月だけ」はこの月のリストだけに入ります。</p>
+   <p class="sub" style="margin:8px 0 0">「毎月のタスク」は、編集しない限り毎月同じ内容・同じ順番で自動で始まります。「今月だけ」はこの月のリストだけに入ります。</p>
    <details${T.tpl.length?'':' open'}><summary>まとめて追加（1行に1タスク）</summary><textarea id="tdbulk" placeholder="1行に1つずつタスクを書いて「まとめて追加」を押してください"></textarea><div class="row" style="margin-top:8px"><button class="btn p" onclick="todoBulk()">毎月のタスクとしてまとめて追加</button></div></details></div>`;
   h+=`<div class="card"><details><summary>毎月のタスクを編集（${T.tpl.length}件）</summary><div class="tw" style="margin-top:8px"><table><thead><tr><th class="l">タスク名</th><th class="l">期限メモ</th><th></th></tr></thead><tbody>
    ${T.tpl.map((t,i)=>`<tr><td class="l"><input class="w" style="width:100%;min-width:220px" value="${esc(t.name)}" onchange="tplSet(${i},'name',this.value)"></td><td class="l"><input class="w" value="${esc(t.due)}" placeholder="—" onchange="tplSet(${i},'due',this.value)"></td>
@@ -779,17 +779,21 @@ function todoBulk(){const L=$('tdbulk').value.split(/\r?\n/).map(x=>x.trim()).fi
 function todoMove(k){state.todo.month=ymAdd(todoYM(),k);save();render()}
 function todoCheck(id,on){const r=todoRec(todoYM());if(on)r.done[id]=new Date().toISOString();else delete r.done[id];save();render();const st=todoStat(todoYM());if(on&&st.d===st.n)toast('🎉 月末作業がすべて完了しました')}
 function todoMemo(id,v){todoRec(todoYM()).memo[id]=v;save()}
-function todoOrder(i,k){const L=todoRec(todoYM()).list,j=i+k;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];save();render()}
+function todoOrder(i,k){const r=todoRec(todoYM()),L=r.list,j=i+k;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];tplFollow(L);save();render()}
+function tplFollow(L){const T=state.todo,pos=new Map(L.filter(x=>x.every).map((x,n)=>[x.id,n]));const inL=T.tpl.filter(t=>pos.has(t.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));let q=0;T.tpl=T.tpl.map(t=>pos.has(t.id)?inL[q++]:t);dropFuture()}
+function dropFuture(){const T=state.todo,cur=todoYM();for(const ym in T.m)if(ym>cur&&ym>nowYM()){const r=T.m[ym];if(!Object.keys(r.done||{}).length&&!Object.values(r.memo||{}).some(Boolean))delete T.m[ym]}}
 function todoDel(id){const r=todoRec(todoYM()),it=r.list.find(x=>x.id===id);if(!it)return;
-  if(it.every&&state.todo.tpl.some(t=>t.id===id)){if(!confirm(`「${it.name}」をこの月のリストから外しますか？\n（毎月のタスクから消す場合は「毎月のタスクを編集」から）`))return}else if(!confirm(`「${it.name}」を削除しますか？`))return;
-  r.list=r.list.filter(x=>x.id!==id);delete r.done[id];delete r.memo[id];save();render()}
+  if(it.every&&state.todo.tpl.some(t=>t.id===id)){window._tdDel=(mode)=>{closeModal();if(!mode)return;r.list=r.list.filter(x=>x.id!==id);delete r.done[id];delete r.memo[id];
+      if(mode==='all'){state.todo.tpl=state.todo.tpl.filter(t=>t.id!==id);dropFuture()}save();render();toast(mode==='all'?'来月以降のリストからも外しました':'今月のリストから外しました')};
+    openModal(`<h2>「${esc(it.name)}」を外す</h2><p class="sub">毎月のタスクです。どちらにしますか？</p><div class="row" style="margin-top:12px;flex-direction:column;align-items:stretch"><button class="btn p" onclick="_tdDel('month')">今月だけ外す（来月はまた出てくる）</button><button class="btn d" onclick="_tdDel('all')">来月以降もやめる（毎月のタスクから削除）</button><button class="btn" onclick="_tdDel(null)">キャンセル</button></div>`,true);return}
+  if(!confirm(`「${it.name}」を削除しますか？`))return;r.list=r.list.filter(x=>x.id!==id);delete r.done[id];delete r.memo[id];save();render()}
 function todoAdd(){const n=$('tdn').value.trim();if(!n)return;const due=$('tdd').value.trim(),every=$('tde').value==='1',id='t'+Date.now().toString(36);
   if(every)state.todo.tpl.push({id,name:n,due});todoRec(todoYM()).list.push({id,name:n,due,every});save();render();toast(every?'毎月のタスクに追加しました':'今月のリストに追加しました')}
 function todoCarry(){const ym=todoYM(),r=todoRec(ym),pr=state.todo.m[ymAdd(ym,-1)];if(!pr)return;
   pr.list.filter(i=>!pr.done[i.id]&&!r.list.some(x=>x.carry===i.id)).forEach(i=>{const ex=r.list.find(x=>x.id===i.id);if(ex&&!r.done[i.id]){ex.carry=i.id;return}r.list.push({id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:i.name+'（'+mLabel(ymAdd(ym,-1))+'分）',due:i.due,every:false,carry:i.id})});save();render()}
-function syncTpl(fn){const r=todoRec(todoYM());fn(r);for(const ym in state.todo.m)if(ym>todoYM())delete state.todo.m[ym]}
+function syncTpl(fn){const r=todoRec(todoYM());fn(r);dropFuture()}
 function tplSet(i,k,v){const t=state.todo.tpl[i];t[k]=v;syncTpl(r=>{const it=r.list.find(x=>x.id===t.id);if(it&&!r.done[t.id])it[k]=v});save();render()}
-function tplOrder(i,k){const L=state.todo.tpl,j=i+k;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];save();render()}
+function tplOrder(i,k){const L=state.todo.tpl,j=i+k;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];const r=todoRec(todoYM()),pos=new Map(L.map((t,n)=>[t.id,n]));const ev=r.list.filter(x=>pos.has(x.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));let q=0;r.list=r.list.map(x=>pos.has(x.id)?ev[q++]:x);dropFuture();save();render()}
 function tplDel(i){const t=state.todo.tpl[i];if(!confirm(`「${t.name}」を毎月のタスクから削除しますか？`))return;state.todo.tpl.splice(i,1);syncTpl(r=>{if(!r.done[t.id])r.list=r.list.filter(x=>x.id!==t.id)});save();render()}
 function printTodo(){const ym=todoYM(),r=todoRec(ym);const w=$('main');const keep=w.innerHTML;
   w.innerHTML=`<div class="report"><div class="rh"><div class="tt">${ymLabel(ym)} 月末ToDo</div><div class="sub">印刷 ${fmtDone(new Date().toISOString())}</div></div><table><thead><tr><th class="l" style="width:40px">済</th><th class="l">タスク</th><th class="l">期限</th><th class="l">完了日時</th><th class="l">メモ</th></tr></thead><tbody>
