@@ -1695,6 +1695,7 @@ function vShift(){
     ${(d.shifts||[]).length?`<details${S.shortOpen?' open':''} id="shortDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">どの時間帯に、どのポジションが足りないか ${(()=>{const R=shortages(date);return R.ready?(R.items.length?`<span class="pill bad">${n1(R.posH)}人時</span>`:'<span class="pill good">なし</span>'):''})()}</summary><div style="margin-top:8px;display:grid;gap:8px">${shortMatrix(date)}${shortHtml(date)}</div></details>`:''}
     <div class="legend">${st.positions.map(p=>`<span style="${posStyle(p.name)}">${esc(p.name)}</span>`).join('')}<span style="--pc:var(--brk);color:var(--bg)">休憩</span></div>
   </section>
+  ${recruitPanel(date)}
   ${fairPanel()}
   ${(()=>{const xs=weekDiffs();if(!xs.length)return '';
     return `<section class="panel" aria-label="希望との違い"><div class="bar"><h2>希望との違い（${md(S.week)}〜${md(addDays(S.week,6))}）</h2><span class="pill warn">${xs.length}件</span>
@@ -1831,7 +1832,29 @@ function criticalItems(date){const st=set(),d=dayDoc(date),ideal=(d.ideal||[]).m
   if(wants.length)for(const [p,v] of wants)run(k=>posNeed(Number(v),sw,ideal[Math.floor(k/2)],peak(k))>0&&!(pos[k][p]>0),{kind:'pos',pos:p},()=>1);
   else run(k=>ideal[Math.floor(k/2)]>0&&n[k]<Math.ceil(ideal[Math.floor(k/2)]/2),{kind:'total',pos:'ポジション問わず'},k=>Math.ceil(ideal[Math.floor(k/2)]/2)-n[k]);
   return out}
+// シフト作成で登録した募集（日ごと）。この週に1件でも登録があれば、印刷は登録した内容だけを使う
+const recOf=dt=>(S.days[dt]?.recruit||[]);
+const recManual=week=>weekDates(week).some(dt=>recOf(dt).length);
+function recruitPanel(date){const st=set(),list=recOf(date),wp=workPositions(),C=criticalItems(date)||[];
+  const tsel=(id,v,from,to)=>`<select id="${id}" aria-label="${id==='rcFrom'?'開始':'終了'}">${Array.from({length:(to-from)*2+1},(_,i)=>from+i/2).map(t=>`<option value="${t}"${t===v?' selected':''}>${tLabel(t)}</option>`).join('')}</select>`;
+  const pv=S.rcPos??(wp[0]||'');
+  const sug=C.filter(x=>x.to-x.from>=1-1e-9&&!list.some(r=>r.pos===x.pos&&r.from<=x.from&&r.to>=x.to));
+  return `<section class="panel" aria-label="募集の登録"><div class="bar"><h2>募集の登録（${md(date)}）</h2><span class="hint">シフトを見ながら、足りない時間とポジションを選んで登録します。A4印刷の「募集」ページに載ります</span></div>
+    ${list.length?`<table class="t"><thead><tr><th>時間</th><th>ポジション</th><th class="r">人数</th><th>メモ</th><th></th></tr></thead><tbody>${list.map((r,i)=>`<tr><td class="num">${tLabel(r.from)}〜${tLabel(r.to)}</td><td>${r.pos?`<span class="legend"><span style="${posStyle(r.pos)}">${esc(r.pos)}</span></span>`:'ポジション問わず'}</td><td class="r num"><b>${r.n}名</b></td><td style="font-size:12px">${esc(r.note||'')}</td><td><button class="btn sm ghost" data-act="rcDel" data-i="${i}" aria-label="消す">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint" style="margin:0">この日の募集はまだありません。</p>'}
+    <form id="rcForm" class="autobar" style="flex-wrap:wrap;align-items:flex-end">
+      <label class="field" style="margin:0"><span>から</span>${tsel('rcFrom',S.rcFrom??st.peakFrom,8,31.5)}</label>
+      <label class="field" style="margin:0"><span>まで</span>${tsel('rcTo',S.rcTo??Math.min(31.5,(S.rcFrom??st.peakFrom)+2),8.5,32)}</label>
+      <label class="field" style="margin:0"><span>ポジション</span><select id="rcPos"><option value="">ポジション問わず</option>${wp.map(p=>`<option${p===pv?' selected':''}>${esc(p)}</option>`).join('')}</select></label>
+      <label class="field" style="margin:0"><span>人数</span><select id="rcN">${[1,2,3,4,5].map(n=>`<option${n===(S.rcN||1)?' selected':''}>${n}</option>`).join('')}</select></label>
+      <label class="field" style="margin:0;flex:1;min-width:140px"><span>メモ（任意）</span><input type="text" id="rcNote" maxlength="30" placeholder="例：経験者歓迎"></label>
+      <button class="btn pri" type="submit">募集に登録</button></form>
+    ${sug.length?`<div class="bar" style="flex-wrap:wrap;gap:6px"><span class="hint">営業できない時間の候補：</span>${sug.map(x=>`<button class="btn sm" data-act="rcAdd" data-f="${x.from}" data-t="${x.to}" data-p="${esc(x.kind==='pos'?x.pos:'')}" data-n="${x.n}">＋ ${tLabel(x.from)}〜${tLabel(x.to)} ${esc(x.pos)} ${x.n}名</button>`).join('')}</div>`:''}
+  </section>`}
 function recruitList(week){const out=[],o=S.printOpt||{},skip30=o.short30!==true,crit=o.allShort!==true;
+  if(recManual(week)){for(const dt of weekDates(week)){const g={};
+      for(const x of recOf(dt)){const k=x.from+'-'+x.to;(g[k]=g[k]||{dt,from:x.from,to:x.to,ps:[],notes:[]}).ps.push({pos:x.pos||'ポジション問わず',n:Math.max(1,Number(x.n)||1),h:(Number(x.n)||1)*(x.to-x.from)});if(x.note)g[k].notes.push(x.note)}
+      Object.values(g).sort((a,b)=>a.from-b.from||a.to-b.to).forEach(r=>{r.n=r.ps.reduce((a,p)=>a+p.n,0);r.h=r.ps.reduce((a,p)=>a+p.h,0);out.push(r)})}
+    return out}
   for(const dt of weekDates(week)){let list;
     if(crit){const C=criticalItems(dt);if(!C)continue;list=C.map(x=>({...x,maxNeed:x.n,minHave:0}))}
     else{const R=shortages(dt);if(!R.ready)continue;
@@ -1844,7 +1867,7 @@ function drawRecruit(K,week){const {W0,H0,M,T}=K,L=recruitList(week);
   const cols=[['日付',300],['時間',380],['ポジションと人数',1520],['計',220]],sc=(W0-2*M)/cols.reduce((a,x)=>a+x[1],0);cols.forEach(x=>x[1]*=sc);
   const top=M+290,rh=78,per=Math.max(1,Math.floor((H0-M-top-110)/rh)-1),pages=Math.max(1,Math.ceil(L.length/per));
   for(let pg=0;pg<pages;pg++){const c=K.mk();K.head(c,'シフト募集（足りない時間とポジション）'+(pages>1?`　${pg+1}/${pages}`:''));
-    T(c,(S.printOpt||{}).allShort===true?'この時間に入れる人を募集しています。入れる方は店長まで声をかけてください。':'このままでは営業できない時間です（そのポジションに誰もいません）。入れる方は店長まで声をかけてください。',M,M+215,34,{b:1,col:'#b3261e'});
+    T(c,recManual(week)||(S.printOpt||{}).allShort===true?'この時間に入れる人を募集しています。入れる方は店長まで声をかけてください。':'このままでは営業できない時間です（そのポジションに誰もいません）。入れる方は店長まで声をかけてください。',M,M+215,34,{b:1,col:'#b3261e'});
     if(!L.length){T(c,(S.printOpt||{}).allShort===true?'この週は、理想人数に対して足りない時間はありません。':'この週は、営業できないほど足りない時間はありません。',M,M+330,36,{col:'#2f7a4a',b:1});return}
     let y=top;c.fillStyle='#ebe7de';c.fillRect(M,y,W0-2*M,rh);let x=M;cols.forEach(([h,w])=>{T(c,h,x+20,y+rh/2,30,{b:1});x+=w});y+=rh;
     let last='';const part=L.slice(pg*per,(pg+1)*per);
@@ -1855,10 +1878,11 @@ function drawRecruit(K,week){const {W0,H0,M,T}=K,L=recruitList(week);
       T(c,`${tLabel(r.from)}〜${tLabel(r.to)}`,x+20,y+rh/2,34,{b:1});x+=cols[1][1];
       let cx=x+16;for(const p of r.ps){const lab=`${p.pos} ${p.n}名`;c.font=K.F(30,1);const tw=c.measureText(lab).width+40;if(cx+tw>x+cols[2][1]-10)break;
         c.fillStyle=p.pos==='ポジション問わず'?'#6f695e':(PRINT_TAG[posInfo(p.pos)?.color]||'#6f695e');rr(c,cx,y+rh*0.16,tw,rh*0.68,10);c.fill();T(c,lab,cx+20,y+rh/2,30,{b:1,col:'#fff'});cx+=tw+14}
+      if(r.notes&&r.notes.length&&cx<x+cols[2][1]-120)T(c,r.notes.join(' / '),cx+6,y+rh/2,24,{col:'#3d3a33',max:x+cols[2][1]-cx-20});
       x+=cols[2][1];T(c,`${r.n}名`,x+20,y+rh/2,36,{b:1,col:'#b3261e'});
       c.strokeStyle='#e4dfd5';c.lineWidth=1;c.beginPath();c.moveTo(M,y+rh);c.lineTo(W0-M,y+rh);c.stroke();y+=rh;last=r.dt});
     if(pg===pages-1){const tot=L.reduce((a,r)=>a+r.h,0);T(c,`合計 ${L.length}件・不足 ${n1(tot)}人時`,W0-M,Math.min(H0-M-10,y+50),30,{al:'right',b:1})}
-    T(c,`${(S.printOpt||{}).allShort===true?'理想人数との差をすべて載せています。':'営業できないレベル（ポジションに0人。ポジション別の人数がない日は全体が理想の半分未満）だけを載せています。'}30分ごとに比べています（休憩中・会議の人は数えず、フリーは足りないポジションに回します）。${(S.printOpt||{}).short30===true?'':'30分だけの不足は載せていません。'}`,M,H0-M+30,22,{col:'#6b655a'})}}
+    T(c,recManual(week)?'シフト作成で登録した募集を載せています。':`${(S.printOpt||{}).allShort===true?'理想人数との差をすべて載せています。':'営業できないレベル（ポジションに0人。ポジション別の人数がない日は全体が理想の半分未満）だけを載せています。'}30分ごとに比べています（休憩中・会議の人は数えず、フリーは足りないポジションに回します）。${(S.printOpt||{}).short30===true?'':'30分だけの不足は載せていません。'}`,M,H0-M+30,22,{col:'#6b655a'})}}
 function printPages(week){const o=S.printOpt||{week:true,days:true,recruit:true},K=printKit(week);
   if(o.week){const cv=document.createElement('canvas');cv.width=2970;cv.height=2100;drawPrint(cv);K.pages.push(cv)}
   if(o.days)for(const dt of weekDates(week))if((dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on))drawReportDay(K.mk(),dt,{...K,head:(c,t)=>K.head(c,t)});
@@ -2342,7 +2366,7 @@ function vFinal(){
       `<div class="bar"><button class="btn pri" data-act="printNow"${S.pdfBusy?' disabled':''}>印刷する</button><button class="btn" data-act="savePdf"${S.pdfBusy?' disabled':''}>${S.pdfBusy?'作成中…':'PDFで保存'}</button>
         <span class="hint">印刷画面で「用紙：A4・横」「余白：なし」を選んでください。</span></div>
        <div class="bar" style="flex-wrap:wrap;gap:14px;font-size:13px"><b>印刷するページ</b>${[['week','週のシフト表（1枚）'],['days','日ごとのバー（予算・人件費率・過不足つき、1日1枚）'],['recruit','募集（何時〜何時・どのポジション・何名）'],['allShort','募集に営業できるレベルの不足も載せる（ふだんは0人の時間だけ）'],['short30','募集に30分だけの不足も載せる']].map(([k,l])=>`<label><input type="checkbox" data-popt="${k}"${(S.printOpt||{week:true,days:true,recruit:true})[k]===true?' checked':''}> ${l}</label>`).join('')}</div>
-       ${(()=>{const L=recruitList(S.week);return L.length?`<details${S.recOpen?' open':''} id="recDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">募集の内容を見る（${L.length}件）</summary><table class="t" style="margin-top:6px"><thead><tr><th>日付</th><th>時間</th><th>ポジションと人数</th><th class="r">計</th></tr></thead><tbody>${L.map(r=>`<tr><td>${md(r.dt)}（${WD[wd(r.dt)]}）</td><td class="num">${tLabel(r.from)}〜${tLabel(r.to)}</td><td><span class="legend">${r.ps.map(p=>`<span style="${p.pos==='ポジション問わず'?'':posStyle(p.pos)}">${esc(p.pos)} ${p.n}名</span>`).join('')}</span></td><td class="r num"><b>${r.n}名</b></td></tr>`).join('')}</tbody></table></details>`:'<p class="hint" style="margin:0">この週は、募集に載せる時間はありません。</p>'})()}
+       ${(()=>{const L=recruitList(S.week);return L.length?`<details${S.recOpen?' open':''} id="recDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">募集の内容を見る（${L.length}件・${recManual(S.week)?'シフト作成で登録したもの':'自動で抽出した営業できない時間'}）</summary><table class="t" style="margin-top:6px"><thead><tr><th>日付</th><th>時間</th><th>ポジションと人数</th><th class="r">計</th></tr></thead><tbody>${L.map(r=>`<tr><td>${md(r.dt)}（${WD[wd(r.dt)]}）</td><td class="num">${tLabel(r.from)}〜${tLabel(r.to)}</td><td><span class="legend">${r.ps.map(p=>`<span style="${p.pos==='ポジション問わず'?'':posStyle(p.pos)}">${esc(p.pos)} ${p.n}名</span>`).join('')}</span></td><td class="r num"><b>${r.n}名</b></td></tr>`).join('')}</tbody></table></details>`:'<p class="hint" style="margin:0">この週は、募集に載せる時間はありません。</p>'})()}
        <div style="border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;max-width:1100px"><canvas id="printCv" width="2970" height="2100" style="width:100%;height:auto;display:block" aria-label="A4印刷イメージ"></canvas></div>`;
   }else if(mode==='week'){
     const ids=staffList(true).filter(s=>dates.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===s.id&&(isEmp(s)||calcShift(x).on||x.pos===PAID)))).sort((a,b)=>staffRank(a)-staffRank(b));
@@ -2540,7 +2564,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.49'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.50'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3214,6 +3238,8 @@ function syncSummary(){const st=S.settings;const work=st.positions.filter(p=>p.k
 app.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
   if(['addRow','adjDay','autoBrk','autoPos','brk','clearDay','clearDayGo','delRow','edu','pin','toReq'].includes(a)&&S.tab==='shift'&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return}
+  if(a==='rcAdd'){const dt=curDate(),d=newDay(dt);d.recruit=[...(d.recruit||[]),{from:+b.dataset.f,to:+b.dataset.t,pos:b.dataset.p||'',n:+b.dataset.n||1,note:''}].sort((a,b)=>a.from-b.from);saveDay(dt);toast('募集に登録しました');return render()}
+  if(a==='rcDel'){const dt=curDate(),d=newDay(dt);d.recruit=(d.recruit||[]).filter((_,i)=>i!==+b.dataset.i);saveDay(dt);return render()}
   if(a==='lockDay'){const dt=curDate(),d=ensureDay(dt);d.locked=!d.locked;saveDay(dt);toast(d.locked?`${md(dt)}を確定しました（まとめて実行・自動の調整・手での編集で変わりません）`:`${md(dt)}の確定を解除しました`);return render()}
   if(a==='pickStore'){const x=S.loginChoices[+b.dataset.i],pw=S.pendingPw;S.loginChoices=null;S.pendingPw=null;S.loginBusy=true;render();
     AU().signInWithEmailAndPassword(acctEmail(x.store,x.role),pw).then(()=>{S.loginBusy=false;savePw(x.store,x.role,pw)},()=>{S.loginBusy=false;S.loginErr='ログインできませんでした。もう一度入れてください';render()});return}
@@ -3408,6 +3434,9 @@ app.addEventListener('submit',e=>{
   if(id==='tplFillForm'){const a1=+document.getElementById('tfFrom').value,b1=+document.getElementById('tfTo').value,n=Math.max(0,Number(document.getElementById('tfN').value)||0),ws=[...document.querySelectorAll('[data-tfw]:checked')].map(x=>+x.dataset.tfw);
     S.tfFrom=a1;S.tfTo=b1;S.tfN=n;if(b1<a1)return toast('「まで」は「から」より後にしてください');if(!ws.length)return toast('曜日を選んでください');
     ws.forEach(w=>{const t=tplGet(w);for(let i=a1;i<=b1;i++)t.ideal[i]=n;tplPut(w,t)});document.activeElement?.blur?.();toast(`${ws.map(w=>WD[w]).join('・')}の${b1-a1+1}時間分を${n}人にしました`);return render()}
+  if(id==='rcForm'){const f=Number(document.getElementById('rcFrom').value),t=Number(document.getElementById('rcTo').value),p=document.getElementById('rcPos').value,n=Number(document.getElementById('rcN').value)||1,note=document.getElementById('rcNote').value.trim().slice(0,30);
+    if(!(t>f))return toast('「まで」は「から」より後にしてください');S.rcFrom=f;S.rcTo=t;S.rcPos=p;S.rcN=n;
+    const dt=curDate(),d=newDay(dt);d.recruit=[...(d.recruit||[]),{from:f,to:t,pos:p,n,note}].sort((a,b)=>a.from-b.from);saveDay(dt);document.activeElement?.blur?.();toast(`${tLabel(f)}〜${tLabel(t)} ${p||'ポジション問わず'} ${n}名を募集に登録しました`);return render()}
   if(id==='calEntryForm'){const tx=document.getElementById('ceText').value.trim(),tm=document.getElementById('ceTime').value;if(!tx)return toast('記入する内容を入れてください');
     const d=newDay(S.cday);d.cal=[...(d.cal||[]),{time:tm||'',text:tx.slice(0,80)}].sort((x,y)=>(x.time||'99').localeCompare(y.time||'99'));saveDay(S.cday);document.activeElement?.blur?.();return render()}
   if(id==='calTaskForm'){const ti=document.getElementById('ctTitle').value.trim(),rp=document.getElementById('ctRep').value;if(!ti)return toast('タスク名を入れてください');
