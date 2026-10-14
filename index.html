@@ -1291,6 +1291,17 @@ function check28(dates){
   }
   return out.sort((a,b)=>b.max-a.max);
 }
+/* 留学生の週の労働時間：シフトを作りながら、いつでも見られる表 */
+function intlWeekPanel(date,compact){const list=staffList().filter(s=>s.limit28);if(!list.length)return '';
+  const st=set(),lim=Number(st.limit28),ds=weekDates(monday(date)),f=sid=>hoursFn(sid);
+  const rows=list.map(s=>{const h=ds.map(dt=>f(s.id)(dt)),tot=h.reduce((a,b)=>a+b,0),R=rollMax(s.id,ds[0],addDays(ds[6],6)),left=lim-R.m;return {s,h,tot,R,left}}).sort((a,b)=>a.left-b.left);
+  const col=x=>x.left<0?'var(--bad)':x.left<=3?'var(--warn)':'var(--good)';
+  return `<section class="panel" style="padding:10px 14px"${compact?'':''}><div class="bar"><h2 style="font-size:16px">留学生の労働時間（週${lim}時間まで）</h2><span class="hint">${st.paid28?'有給も含めて':'労働時間（休憩を除く）で'}数えています。「連続7日の最大」は前後の週もまたいだ一番多い7日間です</span></div>
+    <div class="scroll"><table class="t ewk"><thead><tr><th>名前</th>${ds.map(dt=>`<th class="${dt===date?'cur':''}">${WD[wd(dt)]} ${md(dt)}</th>`).join('')}<th class="r">この週</th><th style="min-width:120px"></th><th class="r">連続7日の最大</th><th class="r">残り</th></tr></thead><tbody>
+    ${rows.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${ds[i]===date?' cur':''}${v?'':' muted'}">${v?n1(v):'—'}</td>`).join('')}
+      <td class="num"><b>${n1(x.tot)}h</b></td><td><div class="meter"><i style="width:${Math.min(100,x.tot/lim*100)}%;background:${col(x)}"></i></div></td>
+      <td class="num" title="${x.R.at?md(addDays(x.R.at,-6))+'〜'+md(x.R.at):''}">${n1(x.R.m)}h</td><td class="num" style="color:${col(x)};font-weight:700">${x.left<0?`${n1(-x.left)}h 超過`:`${n1(x.left)}h`}</td></tr>`).join('')}
+    </tbody></table></div></section>`}
 function alert28Html(dates){
   const a=check28(dates),lim=set().limit28;if(!a.length)return '';
   const over=a.filter(x=>x.level==='over'),near=a.filter(x=>x.level==='near');
@@ -1661,6 +1672,7 @@ function vShift(){
     ${alert28Html(dates)}
     ${subStatus()}</section>
   ${empWeekPanel(date)}
+  ${intlWeekPanel(date)}
   ${shoteiPanel(date)}
   <section class="panel" aria-label="${md(date)}の集計">
     <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
@@ -2592,7 +2604,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.52'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.53'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2639,7 +2651,7 @@ function vReq(){
     <div style="display:grid;gap:12px;min-width:0">
       <label class="field reqpick" hidden><span>スタッフ</span><select id="reqPick" style="font-size:16px;padding:8px">${groups.map(([g,xs])=>`<optgroup label="${g}">${xs.map(x=>`<option value="${x.id}"${x.id===S.bulk.sid?' selected':''}>${has(x.id)?'✓ ':''}${esc(x.name)}${isNew(x)?'（新人）':''}</option>`).join('')}</optgroup>`).join('')}</select></label>
       ${vBulk(true)}
-      ${isEmp(S.staff[S.bulk.sid])?shoteiPanel(S.week,true):alert28Html(dates)}
+      ${isEmp(S.staff[S.bulk.sid])?shoteiPanel(S.week,true):alert28Html(dates)+intlWeekPanel(S.week,true)}
     </div></div>`;
 }
 function vBulk(page){
