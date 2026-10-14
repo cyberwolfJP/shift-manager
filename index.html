@@ -215,6 +215,9 @@ table.wk tr.me td{background:var(--warn-bg)}
 .steps4 .st{color:var(--muted)}.steps4 .btn.pri i{background:var(--bg);color:var(--fg)}
 .tpl td,.tpl th{text-align:center;padding:3px 4px}.tpl th.sat{color:#1f4f8a}.tpl th.sun{color:var(--bad)}.tpl input.tpin{width:58px;text-align:center;padding:4px}.tpl input.pk{background:var(--warn-bg)}.tpl tr.tot th,.tpl tr.tot td{font-weight:700;background:var(--sunk)}
 .scroll.locked select,.scroll.locked input,.scroll.locked button{pointer-events:none;opacity:.75}.scroll.locked td[data-act]{pointer-events:none}
+.recbox{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;border:3px solid var(--bad);background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:8px 12px;font-weight:700;font-size:15px}.recbox b{background:var(--bad);color:#fff;border-radius:4px;padding:2px 10px}
+.recbox.ok{border-color:var(--good);background:var(--good-bg);color:var(--good)}.recbox.ok b{background:var(--good)}
+@media print{#printArea.html .recbox{border:3px solid #b3261e;background:#fde3df;color:#b3261e}#printArea.html .recbox b{background:#b3261e;color:#fff}#printArea.html .recbox.ok{border-color:#2f7a4a;background:#dcefe2;color:#2f7a4a}#printArea.html .recbox.ok b{background:#2f7a4a}}
 .cgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 64px;gap:3px}
 .ccell{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:4px;min-height:86px;display:flex;flex-direction:column;gap:2px;background:var(--surface);min-width:0;font-size:11px;overflow:hidden}
 .ccell:focus-visible{outline:2px solid var(--accent)}.ccell.we{background:var(--sunk)}.ccell.out{opacity:.45}.ccell.today{border-color:var(--accent);border-width:2px}.ccell.sel{box-shadow:inset 0 0 0 2px var(--fg)}
@@ -1740,8 +1743,8 @@ function drawPrint(cv){
   const nEmp=ids.filter(isEmp).length;
   const memos=dates.map(dt=>[dayDoc(dt).note,dayDoc(dt).memo].filter(Boolean).join(' / '));
   const hasMemo=memos.some(Boolean);
-  const shorts=dates.map(dt=>shortText(dt)),hasShort=shorts.some(t=>t&&t!=='不足なし');
-  const top=M+160,nameW=270,dayW=(W-2*M-nameW)/7,headH=120,footH=64,memoH=hasMemo?140:0,shortH=hasShort?110:0;
+  const shorts=dates.map(dt=>recOf(dt).slice().sort((a,b)=>a.from-b.from).map(r=>`${tLabel(r.from)}–${tLabel(r.to)} ${r.pos?short(r.pos):'問わず'}${Math.max(1,Number(r.n)||1)}名`)),hasShort=(dates.some(dt=>(dayDoc(dt).shifts||[]).length));
+  const top=M+160,nameW=270,dayW=(W-2*M-nameW)/7,headH=120,footH=64,memoH=hasMemo?140:0;const dayW0=(W-2*M-nameW)/7,recW=shorts.map(L=>{const o=[];for(const t of L)o.push(...wrap(t,dayW0-28,24));return o}),shortH=hasShort?Math.min(260,44+Math.max(1,...recW.map(x=>x.length))*32):0;
   const avail=H-M-top-headH-footH-memoH-shortH;
   const rowH=Math.max(44,Math.min(112,avail/Math.max(ids.length,1)));
   const X=i=>M+nameW+dayW*i;
@@ -1782,9 +1785,12 @@ function drawPrint(cv){
   ctx.fillText('出勤人数',M+nameW/2,yEnd+footH/2);
   dates.forEach((dt,i)=>ctx.fillText(`${(dayDoc(dt).shifts||[]).filter(sh=>calcShift(sh).on).length}人`,X(i)+dayW/2,yEnd+footH/2));
   // 不足
-  if(hasShort){const y0=yEnd+footH;ctx.fillStyle='#f8dcd8';ctx.fillRect(M,y0,nameW,shortH);ctx.fillStyle='#b3261e';ctx.font=font(28,1);ctx.textAlign='center';ctx.fillText('不足',M+nameW/2,y0+shortH/2);
-    dates.forEach((dt,i)=>{const t=shorts[i];if(!t)return;ctx.textAlign='left';ctx.fillStyle=t==='不足なし'?'#2f7a4a':'#b3261e';
-      wrap(t.split(' / ').join('／'),dayW-24,22).slice(0,3).forEach((ln,k)=>{ctx.font=font(22);ctx.fillText(ln,X(i)+12,y0+24+k*30)})})}
+  if(hasShort){const y0=yEnd+footH;ctx.fillStyle='#b3261e';ctx.fillRect(M,y0,nameW,shortH);ctx.fillStyle='#fff';ctx.font=font(34,1);ctx.textAlign='center';ctx.fillText('募集',M+nameW/2,y0+shortH/2);
+    dates.forEach((dt,i)=>{const L=shorts[i];ctx.textAlign='left';
+      if(!L.length){ctx.fillStyle='#2f7a4a';ctx.font=font(26,1);ctx.fillText('不足なし',X(i)+14,y0+34);return}
+      ctx.fillStyle='#fde3df';ctx.fillRect(X(i)+2,y0+2,dayW-4,shortH-4);ctx.strokeStyle='#b3261e';ctx.lineWidth=3;ctx.strokeRect(X(i)+4,y0+4,dayW-8,shortH-8);
+      const lines=recW[i];ctx.fillStyle='#b3261e';
+      lines.slice(0,Math.floor((shortH-20)/32)).forEach((ln,k)=>{ctx.font=font(24,1);ctx.fillText(ln,X(i)+14,y0+30+k*32)})})}
   // メモ
   if(hasMemo){const y0=yEnd+footH+shortH;ctx.font=font(28,1);ctx.fillText('メモ',M+nameW/2,y0+memoH/2);
     dates.forEach((dt,i)=>{if(!memos[i])return;ctx.textAlign='left';ctx.fillStyle='#1d1b16';
@@ -1835,11 +1841,13 @@ function criticalItems(date){const st=set(),d=dayDoc(date),ideal=(d.ideal||[]).m
 // シフト作成で登録した募集（日ごと）。この週に1件でも登録があれば、印刷は登録した内容だけを使う
 const recOf=dt=>(S.days[dt]?.recruit||[]);
 const recManual=week=>weekDates(week).some(dt=>recOf(dt).length);
+// 印刷用の募集の文（登録がなければ「不足なし」）
+const recLines=dt=>recOf(dt).slice().sort((a,b)=>a.from-b.from).map(r=>`${tLabel(r.from)}〜${tLabel(r.to)} ${r.pos||'ポジション問わず'} ${Math.max(1,Number(r.n)||1)}名${r.note?'（'+r.note+'）':''}`);
 function recruitPanel(date){const st=set(),list=recOf(date),wp=workPositions(),C=criticalItems(date)||[];
   const tsel=(id,v,from,to)=>`<select id="${id}" aria-label="${id==='rcFrom'?'開始':'終了'}">${Array.from({length:(to-from)*2+1},(_,i)=>from+i/2).map(t=>`<option value="${t}"${t===v?' selected':''}>${tLabel(t)}</option>`).join('')}</select>`;
   const pv=S.rcPos??(wp[0]||'');
   const sug=C.filter(x=>x.to-x.from>=1-1e-9&&!list.some(r=>r.pos===x.pos&&r.from<=x.from&&r.to>=x.to));
-  return `<section class="panel" aria-label="募集の登録"><div class="bar"><h2>募集の登録（${md(date)}）</h2><span class="hint">シフトを見ながら、足りない時間とポジションを選んで登録します。A4印刷の「募集」ページに載ります</span></div>
+  return `<section class="panel" aria-label="募集の登録"><div class="bar"><h2>募集の登録（${md(date)}）</h2><span class="hint">シフトを見ながら、足りない時間とポジションを選んで登録します。印刷するシフトの各日の下に載ります（登録がない日は「不足なし」）</span></div>
     ${list.length?`<table class="t"><thead><tr><th>時間</th><th>ポジション</th><th class="r">人数</th><th>メモ</th><th></th></tr></thead><tbody>${list.map((r,i)=>`<tr><td class="num">${tLabel(r.from)}〜${tLabel(r.to)}</td><td>${r.pos?`<span class="legend"><span style="${posStyle(r.pos)}">${esc(r.pos)}</span></span>`:'ポジション問わず'}</td><td class="r num"><b>${r.n}名</b></td><td style="font-size:12px">${esc(r.note||'')}</td><td><button class="btn sm ghost" data-act="rcDel" data-i="${i}" aria-label="消す">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint" style="margin:0">この日の募集はまだありません。</p>'}
     <form id="rcForm" class="autobar" style="flex-wrap:wrap;align-items:flex-end">
       <label class="field" style="margin:0"><span>から</span>${tsel('rcFrom',S.rcFrom??st.peakFrom,8,31.5)}</label>
@@ -1886,7 +1894,6 @@ function drawRecruit(K,week){const {W0,H0,M,T}=K,L=recruitList(week);
 function printPages(week){const o=S.printOpt||{week:true,days:true,recruit:true},K=printKit(week);
   if(o.week){const cv=document.createElement('canvas');cv.width=2970;cv.height=2100;drawPrint(cv);K.pages.push(cv)}
   if(o.days)for(const dt of weekDates(week))if((dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on))drawReportDay(K.mk(),dt,{...K,head:(c,t)=>K.head(c,t)});
-  if(o.recruit)drawRecruit(K,week);
   return K.pages}
 async function savePdf(){
   S.pdfBusy=true;render();
@@ -2039,8 +2046,8 @@ function drawReportDay(c,dt,K){
   const order=st.positions.map(p=>p.name);
   on.sort((a,b)=>(order.indexOf(a.sh.pos)+99*!a.sh.pos)-(order.indexOf(b.sh.pos)+99*!b.sh.pos)||a.sh.start-b.sh.start);
   const groups=[];for(const r of on){const g=groups[groups.length-1];if(g&&g.pos===r.sh.pos)g.rows.push(r);else groups.push({pos:r.sh.pos,rows:[r]})}
-  const shortList=R.ready?R.items.filter(x=>x.kind==='pos'&&x.lack>=0.5):[],offL=(d.shifts||[]).filter(sh=>S.staff[sh.sid]&&isOff(sh.pos)&&(isEmp(S.staff[sh.sid])||sh.pos===PAID));
-  const botH=3*58+20,noteH=(shortList.length||offL.length)?110:20,gTop=ky+kh+70,axisH=40;
+  const shortList=recLines(dt),offL=(d.shifts||[]).filter(sh=>S.staff[sh.sid]&&isOff(sh.pos)&&(isEmp(S.staff[sh.sid])||sh.pos===PAID));
+  const botH=3*58+20,noteH=(shortList.length?130:50)+(offL.length?40:0),gTop=ky+kh+70,axisH=40;
   const avail=H0-M-gTop-axisH-botH-noteH,gh=40,rowH=Math.max(30,Math.min(62,(avail-groups.length*gh)/Math.max(1,on.length)));
   // 時刻の目盛り
   c.font=F(22,1);for(let h=from;h<=from+span;h++){const x=X(h);T(c,String(h>=24?h-24:h),x,gTop-18,22,{al:'center',col:'#6b655a',b:1})}
@@ -2077,8 +2084,11 @@ function drawReportDay(c,dt,K){
     by+=bh2}
   // 不足ポジション・休み
   let ny=by+40;
-  if(shortList.length){const t='ポジションの不足：'+shortList.map(x=>`${x.pos} ${tLabel(x.from)}–${tLabel(x.to)}（${x.maxNeed-x.minHave}人）`).join('、');
-    for(const ln of wrap(c,t,W0-2*M-20,22,true).slice(0,2)){T(c,ln,M,ny,22,{col:'#b3261e',b:1});ny+=32}}
+  {const RL=recLines(dt);
+    if(RL.length){const t='募集：'+RL.join('、'),lines=wrap(c,t,W0-2*M-60,30,true).slice(0,2),bh=lines.length*42+24;
+      c.fillStyle='#fde3df';c.fillRect(M,ny-22,W0-2*M,bh);c.strokeStyle='#b3261e';c.lineWidth=4;c.strokeRect(M,ny-22,W0-2*M,bh);
+      lines.forEach((ln,k)=>T(c,ln,M+24,ny+k*42,30,{col:'#b3261e',b:1}));ny+=bh+10}
+    else{T(c,'募集：不足なし',M,ny,26,{col:'#2f7a4a',b:1});ny+=40}}
   if(offL.length)T(c,'休み：'+offL.map(sh=>`${S.staff[sh.sid].name}（${sh.pos}${sh.pos===PAID?' '+n1(Number(sh.paidH)||0)+'h':''}）`).join('、'),M,ny,22,{col:'#3d3a33',max:W0-2*M});
   T(c,'過不足：赤＝理想より少ない／青＝多い／緑＝ちょうど（30分ごと・休憩中の人は数えない）　バーの白い部分＝休憩',W0-M,H0-M+30,20,{al:'right',col:'#6b655a'});
 }
@@ -2365,8 +2375,8 @@ function vFinal(){
     body=empty?'<div class="empty">この週のシフトはまだありません。</div>':
       `<div class="bar"><button class="btn pri" data-act="printNow"${S.pdfBusy?' disabled':''}>印刷する</button><button class="btn" data-act="savePdf"${S.pdfBusy?' disabled':''}>${S.pdfBusy?'作成中…':'PDFで保存'}</button>
         <span class="hint">印刷画面で「用紙：A4・横」「余白：なし」を選んでください。</span></div>
-       <div class="bar" style="flex-wrap:wrap;gap:14px;font-size:13px"><b>印刷するページ</b>${[['week','週のシフト表（1枚）'],['days','日ごとのバー（予算・人件費率・過不足つき、1日1枚）'],['recruit','募集（何時〜何時・どのポジション・何名）'],['allShort','募集に営業できるレベルの不足も載せる（ふだんは0人の時間だけ）'],['short30','募集に30分だけの不足も載せる']].map(([k,l])=>`<label><input type="checkbox" data-popt="${k}"${(S.printOpt||{week:true,days:true,recruit:true})[k]===true?' checked':''}> ${l}</label>`).join('')}</div>
-       ${(()=>{const L=recruitList(S.week);return L.length?`<details${S.recOpen?' open':''} id="recDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">募集の内容を見る（${L.length}件・${recManual(S.week)?'シフト作成で登録したもの':'自動で抽出した営業できない時間'}）</summary><table class="t" style="margin-top:6px"><thead><tr><th>日付</th><th>時間</th><th>ポジションと人数</th><th class="r">計</th></tr></thead><tbody>${L.map(r=>`<tr><td>${md(r.dt)}（${WD[wd(r.dt)]}）</td><td class="num">${tLabel(r.from)}〜${tLabel(r.to)}</td><td><span class="legend">${r.ps.map(p=>`<span style="${p.pos==='ポジション問わず'?'':posStyle(p.pos)}">${esc(p.pos)} ${p.n}名</span>`).join('')}</span></td><td class="r num"><b>${r.n}名</b></td></tr>`).join('')}</tbody></table></details>`:'<p class="hint" style="margin:0">この週は、募集に載せる時間はありません。</p>'})()}
+       <div class="bar" style="flex-wrap:wrap;gap:14px;font-size:13px"><b>印刷するページ</b>${[['week','週のシフト表（1枚）'],['days','日ごとのバー（予算・人件費率・過不足つき、1日1枚）']].map(([k,l])=>`<label><input type="checkbox" data-popt="${k}"${(S.printOpt||{week:true,days:true,recruit:true})[k]===true?' checked':''}> ${l}</label>`).join('')}</div>
+       <p class="hint" style="margin:0">各日の下に、シフト作成で登録した「募集」を赤い枠で載せます。登録がない日は「不足なし」です。</p>
        <div style="border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;max-width:1100px"><canvas id="printCv" width="2970" height="2100" style="width:100%;height:auto;display:block" aria-label="A4印刷イメージ"></canvas></div>`;
   }else if(mode==='week'){
     const ids=staffList(true).filter(s=>dates.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===s.id&&(isEmp(s)||calcShift(x).on||x.pos===PAID)))).sort((a,b)=>staffRank(a)-staffRank(b));
@@ -2439,6 +2449,7 @@ function dayGantt(date,forPrint){
         <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${d.note?`<span class="pill warn">${esc(d.note)}</span>`:''}<span class="muted">出勤 ${on.length}人</span></div>
         ${d.memo?`<p style="margin:0;font-weight:700">メモ：${esc(d.memo)}</p>`:''}
         <div class="scroll" style="padding:10px;border:0"><div class="gantt">${head}${rows}${cov}</div></div>
+        ${(()=>{const L=recLines(date);return L.length?`<div class="recbox"><b>募集</b>${L.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:'<div class="recbox ok"><b>募集</b><span>不足なし</span></div>'})()}
         ${off.length?`<p class="hint">休み：${off.map(sh=>`${esc(S.staff[sh.sid].name)}（${esc(sh.pos)}）`).join('、')}</p>`:''}`;
 }
 
@@ -2564,7 +2575,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.50'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.51'}</p></section>`;
 }
 
 /* --- 有給 --- */
