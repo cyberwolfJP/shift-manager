@@ -1121,17 +1121,20 @@ function ocState(date,list){const st=set(),L=(list||dayDoc(date).shifts||[]).fil
   if(!L.length)return null;
   const o=st.openAt!=null&&st.openAt!==''?Number(st.openAt):Math.min(...L.map(x=>x.start)),c=st.closeAt!=null&&st.closeAt!==''?Number(st.closeAt):Math.max(...L.map(x=>x.end));
   const op=L.filter(sh=>S.staff[sh.sid].canOpen&&sh.start<=o+1e-9),cl=L.filter(sh=>S.staff[sh.sid].canClose&&sh.end>=c-1e-9);
-  return {o,c,op,cl}}
-const ocUsed=()=>Object.values(S.staff).some(s=>s.active!==false&&(s.canOpen||s.canClose));
-// 変更の前後で、立ち上げ・締めの人がいなくならないか
-const ocKeeps=(B,A)=>!B||!A||((!B.op.length||A.op.length)&&(!B.cl.length||A.cl.length));
+  // 週報：毎週日曜（設定で変更可）に、週報を作れる人が1人出勤している
+  const rp=wd(date)===Number(st.reportWd??0)&&Object.values(S.staff).some(s=>s.active!==false&&s.canReport)?L.filter(sh=>S.staff[sh.sid].canReport):null;
+  return {o,c,op,cl,rp}}
+const ocUsed=()=>Object.values(S.staff).some(s=>s.active!==false&&(s.canOpen||s.canClose||s.canReport));
+const ocNeedOp=()=>Object.values(S.staff).some(s=>s.active!==false&&s.canOpen),ocNeedCl=()=>Object.values(S.staff).some(s=>s.active!==false&&s.canClose);
+// 変更の前後で、立ち上げ・締め・週報の人がいなくならないか
+const ocKeeps=(B,A)=>!B||!A||((!B.op.length||A.op.length)&&(!B.cl.length||A.cl.length)&&(!B.rp||!B.rp.length||(A.rp&&A.rp.length)));
 function ocLabel(date){if(!ocUsed())return '';const R=ocState(date);if(!R)return '';
   const nm=a=>a.map(sh=>S.staff[sh.sid].name).join('・');
-  return `<span class="pill ${R.op.length?'good':'bad'}" title="${tLabel(R.o)}の時点で、立ち上げができる人">立ち上げ ${R.op.length?esc(nm(R.op)):'いません'}</span><span class="pill ${R.cl.length?'good':'bad'}" title="${tLabel(R.c)}まで残る、締めができる人">締め ${R.cl.length?esc(nm(R.cl)):'いません'}</span>`}
+  return `${ocNeedOp()?`<span class="pill ${R.op.length?'good':'bad'}" title="${tLabel(R.o)}の時点で、立ち上げができる人">立ち上げ ${R.op.length?esc(nm(R.op)):'いません'}</span>`:''}${ocNeedCl()?`<span class="pill ${R.cl.length?'good':'bad'}" title="${tLabel(R.c)}まで残る、締めができる人">締め ${R.cl.length?esc(nm(R.cl)):'いません'}</span>`:''}${R.rp?`<span class="pill ${R.rp.length?'good':'bad'}" title="週報を作れる人">週報 ${R.rp.length?esc(nm(R.rp)):'いません'}</span>`:''}`}
 function genEmployees(week){
   const st=set(),dates=weekDates(week),emps=staffList().filter(x=>x.kind==='社員'),minE=Number(st.minEmp??2),notes=[];
   if(!emps.length)return {msg:'名簿に社員がいません'};
-  for(const dt of dates){const d=ensureDay(dt);d.shifts=d.shifts.filter(r=>!(r.gen&&(emps.some(e=>e.id===r.sid)||(isEmp(S.staff[r.sid])&&S.staff[r.sid].active===false))))}
+  for(const dt of dates){const d=ensureDay(dt);d.shifts=d.shifts.filter(r=>!(r.gen&&!r.pin&&!isOther(r.pos)&&(emps.some(e=>e.id===r.sid)||(isEmp(S.staff[r.sid])&&S.staff[r.sid].active===false))))}
   const state={},cnt={};dates.forEach(dt=>cnt[dt]=0);
   for(const e of emps){state[e.id]={};
     for(const dt of dates){const r=(dayDoc(dt).shifts||[]).find(x=>x.sid===e.id);
@@ -1149,11 +1152,11 @@ function genEmployees(week){
   const OC=ocUsed(),virt={},times={};for(const dt of dates)virt[dt]=(dayDoc(dt).shifts||[]).filter(x=>!x.gen).map(x=>({...x}));
   const vsh=(e,dt)=>{const L=virt[dt].filter(x=>{const c=calcShift(x);return c.on&&!c.help&&!c.edu});let st0=Number(e.defStart??12),en0=Number(e.defEnd??23.5);
     const R=OC?ocState(dt,virt[dt]):null;
-    if(OC&&e.canOpen&&!(R&&R.op.length)&&L.length)st0=Math.min(st0,set().openAt!=null&&set().openAt!==''?Number(set().openAt):Math.min(...L.map(x=>x.start)));
-    if(OC&&e.canClose&&!(R&&R.cl.length)&&L.length)en0=Math.max(en0,set().closeAt!=null&&set().closeAt!==''?Number(set().closeAt):Math.max(...L.map(x=>x.end)));
+    if(OC&&e.canOpen&&ocNeedOp()&&!(R&&R.op.length)&&L.length)st0=Math.min(st0,set().openAt!=null&&set().openAt!==''?Number(set().openAt):Math.min(...L.map(x=>x.start)));
+    if(OC&&e.canClose&&ocNeedCl()&&!(R&&R.cl.length)&&L.length)en0=Math.max(en0,set().closeAt!=null&&set().closeAt!==''?Number(set().closeAt):Math.max(...L.map(x=>x.end)));
     return {sid:e.id,start:st0,end:en0,pos:e.defPos||'',bs:null,gen:true}};
   const ocGain=(e,dt)=>{if(!OC||!(e.canOpen||e.canClose))return 0;const B=ocState(dt,virt[dt]),A=ocState(dt,[...virt[dt],vsh(e,dt)]);if(!A)return 0;
-    return ((!B||!B.op.length)&&A.op.length?1:0)+((!B||!B.cl.length)&&A.cl.length?1:0)};
+    return (ocNeedOp()&&(!B||!B.op.length)&&A.op.length?1:0)+(ocNeedCl()&&(!B||!B.cl.length)&&A.cl.length?1:0)+(A.rp&&(!B||!B.rp||!B.rp.length)&&A.rp.length?1:0)};
   for(;;){let best=null,bs=-Infinity;
     for(const e of emps){if(need[e.id]<=0)continue;
       for(const dt of dates){if(state[e.id][dt]!=='free')continue;
@@ -1170,7 +1173,7 @@ function genEmployees(week){
     if(r&&r.pos!==PAID&&isOff(r.pos)&&(seq.includes(r.pos)||r.gen)){r.pos=seq[Math.min(k,seq.length-1)];k++}}}
   dates.forEach(dt=>saveDay(dt));
   for(const e of emps)if(need[e.id]>0)notes.push(`${e.name}さんは休み希望を優先したため、週${Number(e.workDays??5)}日に${need[e.id]}日足りません`);
-  if(OC)for(const dt of dates){const R=ocState(dt);if(!R)continue;const miss=[!R.op.length?'立ち上げ':'',!R.cl.length?'締め':''].filter(Boolean);
+  if(OC)for(const dt of dates){const R=ocState(dt);if(!R)continue;const miss=[ocNeedOp()&&!R.op.length?'立ち上げ':'',ocNeedCl()&&!R.cl.length?'締め':'',R.rp&&!R.rp.length?'週報':''].filter(Boolean);
     if(miss.length)notes.push(`${md(dt)}（${WD[wd(dt)]}）は${miss.join('と')}ができる人がいません（休み希望を優先）`)}
   for(const dt of dates)if(cnt[dt]<minE)notes.push(`${md(dt)}（${WD[wd(dt)]}）は社員が${cnt[dt]}人です（休み希望を優先）`);
   return {msg:`社員${emps.length}人のシフトを作りました（決め打ちと休み希望はそのまま、出勤${made}日分を追加）。${notes.join('。')}${notes.length?'。':''}`};
@@ -2459,7 +2462,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.44'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.45'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2793,9 +2796,10 @@ function empWeekPanel(date){const emps=staffList().filter(isEmp);if(!emps.length
     <div class="scroll"><table class="t ewk"><thead><tr><th>社員</th>${ds.map((dt,i)=>`<th class="${dt===date?'cur':''}"><button class="mini" data-act="day" data-i="${i}">${WD[wd(dt)]} ${md(dt)}</button></th>`).join('')}<th class="r">出勤</th></tr></thead><tbody>
     ${emps.map(e=>{const cs=ds.map(dt=>cell(e,dt));return `<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td>${cs.map((c,i)=>`<td class="${c.cls}${ds[i]===date?' cur':''}">${esc(c.t)}${c.sub?`<div class="sub">${esc(c.sub)}</div>`:''}</td>`).join('')}<td class="num">${cs.filter(c=>c.cls==='on').length}日</td></tr>`}).join('')}
     <tr class="tot"><td>出勤の社員</td>${cnt.map((n,i)=>`<td class="num ${n<minE?'cell-bad':''}${ds[i]===date?' cur':''}">${n}人</td>`).join('')}<td></td></tr>
-    ${ocUsed()?`<tr class="tot"><td>立ち上げ／締め</td>${ds.map(dt=>{const R=ocState(dt);if(!R)return `<td class="muted">—</td>`;const ok=R.op.length&&R.cl.length;
-      return `<td class="${ok?'':'cell-bad'}${dt===date?' cur':''}" title="立ち上げ：${esc(R.op.map(x=>S.staff[x.sid].name).join('・')||'いません')}／締め：${esc(R.cl.map(x=>S.staff[x.sid].name).join('・')||'いません')}">${R.op.length?'○':'×'}／${R.cl.length?'○':'×'}</td>`}).join('')}<td></td></tr>`:''}</tbody></table></div>
-    ${ocUsed()?'<p class="hint" style="margin:4px 0 0">立ち上げ／締め：○＝できる人がいる、×＝いない（名簿の「立ち上げ」「締め」にチェックした人で判定）</p>':''}</section>`}
+    ${ocUsed()?`<tr class="tot"><td>立ち上げ／締め／週報</td>${ds.map(dt=>{const R=ocState(dt);if(!R)return `<td class="muted">—</td>`;
+      const parts=[ocNeedOp()?(R.op.length?'立○':'立×'):'',ocNeedCl()?(R.cl.length?'締○':'締×'):'',R.rp?(R.rp.length?'週○':'週×'):''].filter(Boolean),ok=!parts.some(x=>x.endsWith('×'));
+      return `<td class="${ok?'':'cell-bad'}${dt===date?' cur':''}" title="立ち上げ：${esc(R.op.map(x=>S.staff[x.sid].name).join('・')||'いません')}／締め：${esc(R.cl.map(x=>S.staff[x.sid].name).join('・')||'いません')}${R.rp?'／週報：'+esc(R.rp.map(x=>S.staff[x.sid].name).join('・')||'いません'):''}">${parts.join(' ')||'—'}</td>`}).join('')}<td></td></tr>`:''}</tbody></table></div>
+    ${ocUsed()?'<p class="hint" style="margin:4px 0 0">立＝立ち上げ、締＝締め、週＝週報（日曜）。○＝できる人がいる、×＝いない（名簿のチェックで判定）</p>':''}</section>`}
 function shoteiPanel(date,compact){
   const emps=staffList().filter(isEmp);if(!emps.length)return '';
   const {y,m}=monthOf(date),wk=weekDates(monday(date));
@@ -2839,6 +2843,7 @@ function vRoster(){
         <label title="新人の印を付ける"><input type="checkbox" data-sf="newbie" data-id="${s.id}"${s.newbie?' checked':''}> 新人</label>
         <label title="お店の立ち上げ（開店準備）ができる"><input type="checkbox" data-sf="canOpen" data-id="${s.id}"${s.canOpen?' checked':''}> 立ち上げ</label>
         <label title="お店の締め（閉店作業・レジ締め）ができる"><input type="checkbox" data-sf="canClose" data-id="${s.id}"${s.canClose?' checked':''}> 締め</label>
+        <label title="週報を作れる（毎週日曜に1人必要）"><input type="checkbox" data-sf="canReport" data-id="${s.id}"${s.canReport?' checked':''}> 週報</label>
         <label><input type="checkbox" data-sf="active" data-id="${s.id}"${s.active!==false?' checked':''}> 在籍</label></div>
         ${s.newbie?`<div style="margin-top:2px;font-size:11px">入社日 <input type="date" data-sf="joinDate" data-id="${s.id}" value="${esc(s.joinDate||'')}" aria-label="入社日" style="font-size:11px"></div>`:''}</td>
       <td style="white-space:nowrap"><button class="btn sm ghost" data-act="mv" data-id="${s.id}" data-n="-1" aria-label="上へ">↑</button><button class="btn sm ghost" data-act="mv" data-id="${s.id}" data-n="1" aria-label="下へ">↓</button></td></tr>`}).join('');
@@ -3093,7 +3098,8 @@ app.addEventListener('change',e=>{
       else{sh[f]=el.value===''?null:Number(el.value);sh.bs=null;
         if(sh.req&&!sh.req.off&&sh.req.start===sh.start&&sh.req.end===sh.end){sh.why='';}
         else if(sh.req)sh.why=sh.why&&sh.why.startsWith('目標人件費率')?'':sh.why}
-      if(!sh.req&&sh.sid&&sh.start!=null&&sh.end!=null&&sh.end>sh.start)sh.req={start:sh.start,end:sh.end};}
+      if(!sh.req&&sh.sid&&sh.start!=null&&sh.end!=null&&sh.end>sh.start)sh.req={start:sh.start,end:sh.end};
+      if(sh.gen&&['sid','pos','start','end','paidH'].includes(f))delete sh.gen;} // 手で直した行は、自動作成で作り直さない
     saveDay(date);return render();
   }
   if(el.dataset.sf){const s=S.staff[el.dataset.id],k=el.dataset.sf;
