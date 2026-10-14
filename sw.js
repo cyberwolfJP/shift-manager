@@ -1,6 +1,6 @@
 // シフトマネージャーをネットなしでも開けるようにするためのファイル。
 // アプリを更新したら VERSION の数字を1つ上げてください。
-const VERSION = 'v52';
+const VERSION = 'v53';
 const CACHE = 'shift-app-' + VERSION;
 const APP = ['./', './index.html', './local-db.js', './firebase-config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
@@ -14,7 +14,9 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  const mine = url.origin === location.origin && url.pathname.startsWith(new URL('./', self.registration.scope).pathname);
+  const base = new URL('./', self.registration.scope).pathname;
+  // このフォルダ直下のファイルだけを扱う（yosoku/ など別のアプリのフォルダには手を出さない）
+  const mine = url.origin === location.origin && url.pathname.startsWith(base) && !url.pathname.slice(base.length).includes('/');
   const font = url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com');
   if (!mine && !font) return;
   // アプリのファイル：つながっていれば最新、つながらなければ保存済み
