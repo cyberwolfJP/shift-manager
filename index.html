@@ -214,6 +214,7 @@ table.wk tr.me td{background:var(--warn-bg)}
 .steps4 i{font-style:normal;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--fg);color:var(--bg);font-size:11px;margin-right:4px}
 .steps4 .st{color:var(--muted)}.steps4 .btn.pri i{background:var(--bg);color:var(--fg)}
 .tpl td,.tpl th{text-align:center;padding:3px 4px}.tpl th.sat{color:#1f4f8a}.tpl th.sun{color:var(--bad)}.tpl input.tpin{width:58px;text-align:center;padding:4px}.tpl input.pk{background:var(--warn-bg)}.tpl tr.tot th,.tpl tr.tot td{font-weight:700;background:var(--sunk)}
+.scroll.locked select,.scroll.locked input,.scroll.locked button{pointer-events:none;opacity:.75}.scroll.locked td[data-act]{pointer-events:none}
 .cgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 64px;gap:3px}
 .ccell{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:4px;min-height:86px;display:flex;flex-direction:column;gap:2px;background:var(--surface);min-width:0;font-size:11px;overflow:hidden}
 .ccell:focus-visible{outline:2px solid var(--accent)}.ccell.we{background:var(--sunk)}.ccell.out{opacity:.45}.ccell.today{border-color:var(--accent);border-width:2px}.ccell.sel{box-shadow:inset 0 0 0 2px var(--fg)}
@@ -708,6 +709,8 @@ const isHelp=name=>!!name&&(name==='ヘルプ'||posInfo(name)?.kind==='help');
 // 会議・その他：時間は勤務（人件費・労働時間・28時間に入る）だが、人数には数えず、自動の調整でも動かさない（決め打ち）
 const isOther=name=>!!name&&posInfo(name)?.kind==='other';
 const fixedRow=sh=>!!(sh.pin||isOther(sh.pos));
+// 確定した日：自動作成・まとめて実行・手での編集のどれでも変えない
+const dayLocked=dt=>!!(S.days[dt]&&S.days[dt].locked);
 const isNew=s=>!!(s&&s.newbie);
 const isEmp=s=>!!(s&&s.kind==='社員');
 // 表示順：社員が上、そのあとアルバイト（名簿の順）
@@ -944,6 +947,7 @@ function fairCtx(week){const F={};
     const f=F[sh.sid]=F[sh.sid]||{req:0,cut:0};f.req+=rq??cur;f.cut+=Math.max(0,(rq??cur)-cur)}
   return F}
 function adjustDay(date,F){
+  if(dayLocked(date))return {ok:false,cut:0,msg:`${md(date)}：確定した日なので変えていません`};
   const st=set(),d=ensureDay(date),ideal=(d.ideal||[]).map(Number),budget=Number(d.budget)||0,rate=targetRateOf(date);
   if(!budget)return {ok:false,msg:`${md(date)}：売上予算が入っていないので調整できません`};
   if(!ideal.some(v=>v>0))return {ok:false,msg:`${md(date)}：時間帯ごとの理想人数が入っていないので調整しません（入れると、人が足りている時間だけを削れます）`};
@@ -1143,14 +1147,15 @@ function ocLabel(date){if(!ocUsed())return '';const R=ocState(date);if(!R)return
 function genEmployees(week){
   const st=set(),dates=weekDates(week),emps=staffList().filter(x=>x.kind==='社員'),minE=Number(st.minEmp??2),notes=[];
   if(!emps.length)return {msg:'名簿に社員がいません'};
-  for(const dt of dates){const d=ensureDay(dt);d.shifts=d.shifts.filter(r=>!(r.gen&&!r.pin&&!isOther(r.pos)&&(emps.some(e=>e.id===r.sid)||(isEmp(S.staff[r.sid])&&S.staff[r.sid].active===false))))}
+  for(const dt of dates){if(dayLocked(dt))continue;const d=ensureDay(dt);d.shifts=d.shifts.filter(r=>!(r.gen&&!r.pin&&!isOther(r.pos)&&(emps.some(e=>e.id===r.sid)||(isEmp(S.staff[r.sid])&&S.staff[r.sid].active===false))))}
   // 同じ社員がその日に、会議・出勤の行と公休の行を両方持っていたら、公休の行を消す（2行にならないように）
-  for(const dt of dates){const d=ensureDay(dt);for(const e of emps){const mine=d.shifts.filter(x=>x.sid===e.id);if(mine.length<2)continue;
+  for(const dt of dates){if(dayLocked(dt))continue;const d=ensureDay(dt);for(const e of emps){const mine=d.shifts.filter(x=>x.sid===e.id);if(mine.length<2)continue;
     const real=mine.some(x=>isOther(x.pos)||calcShift(x).on);d.shifts=d.shifts.filter(x=>!(x.sid===e.id&&real&&isOff(x.pos)&&x.pos!==PAID))}}
   const state={},cnt={};dates.forEach(dt=>cnt[dt]=0);
   for(const e of emps){state[e.id]={};
     for(const dt of dates){const mine=(dayDoc(dt).shifts||[]).filter(x=>x.sid===e.id),r=mine.find(x=>isOther(x.pos)||calcShift(x).on)||mine.find(x=>!x.gen&&!isOff(x.pos))||mine[0];
       state[e.id][dt]=!r?'free':r.pos===PAID?'paid':isOff(r.pos)?'wish':isOther(r.pos)||(r.start!=null&&r.end!=null)?'pin':!r.gen?'fill':'free';
+      if(dayLocked(dt)){state[e.id][dt]=r&&calcShift(r).on&&!isOther(r.pos)?'pin':r&&isOther(r.pos)?'pin':'lock'} // 確定した日は今のまま
       if((state[e.id][dt]==='pin'&&!isOther(r.pos))||state[e.id][dt]==='fill')cnt[dt]++}}
   const need={};for(const e of emps){const W=Number(e.workDays??5);need[e.id]=Math.max(0,W-dates.filter(dt=>state[e.id][dt]==='pin'||state[e.id][dt]==='fill').length)}
   const budgetOf=dt=>Number(dayDoc(dt).budget)||0;
@@ -1176,20 +1181,21 @@ function genEmployees(week){
         if(sc>bs){bs=sc;best=[e,dt]}}}
     if(!best)break;const [e,dt]=best;state[e.id][dt]='work';cnt[dt]++;need[e.id]--;const v=vsh(e,dt);times[e.id+dt]=v;virt[dt].push(v);{const [a,b]=win(e);for(let k=a;k<b;k++)cov[dt][k]++}}
   let made=0;
-  for(const e of emps)for(const dt of dates){const d=ensureDay(dt);
+  for(const e of emps)for(const dt of dates){if(dayLocked(dt))continue;const d=ensureDay(dt);
     if(state[e.id][dt]==='fill'){const r=d.shifts.find(x=>x.sid===e.id&&!x.gen&&!isOff(x.pos)&&!isOther(x.pos)&&(x.start==null||x.end==null));if(r){r.start=Number(e.defStart??12);r.end=Number(e.defEnd??23.5);if(!r.pos)r.pos=e.defPos||'';made++}}
     if(state[e.id][dt]==='work'){const v=times[e.id+dt];d.shifts.push({sid:e.id,start:v?v.start:Number(e.defStart??12),end:v?v.end:Number(e.defEnd??23.5),pos:e.defPos||'',bs:null,gen:true});made++}
     else if(state[e.id][dt]==='free')d.shifts.push({sid:e.id,start:null,end:null,pos:offPos(),bs:null,gen:true})}
   // 休みに番号をつける（週の1日目の休み＝公休1、2日目＝公休2、3日目から＝公休調整）。有給はそのまま
   const offNames=set().positions.filter(p=>p.kind==='off').map(p=>p.name),seq=['公休1','公休2','公休調整'].filter(n=>offNames.includes(n));
   if(seq.length)for(const e of emps){let k=0;for(const dt of dates){const r=(ensureDay(dt).shifts||[]).find(x=>x.sid===e.id);
-    if(r&&r.pos!==PAID&&isOff(r.pos)&&(seq.includes(r.pos)||r.gen)){r.pos=seq[Math.min(k,seq.length-1)];k++}}}
-  dates.forEach(dt=>saveDay(dt));
+    if(r&&r.pos!==PAID&&isOff(r.pos)&&(seq.includes(r.pos)||r.gen)){if(!dayLocked(dt))r.pos=seq[Math.min(k,seq.length-1)];k++}}}
+  dates.forEach(dt=>{if(!dayLocked(dt))saveDay(dt)});
   for(const e of emps)if(need[e.id]>0)notes.push(`${e.name}さんは休み希望を優先したため、週${Number(e.workDays??5)}日に${need[e.id]}日足りません`);
   if(OC)for(const dt of dates){const R=ocState(dt);if(!R)continue;const miss=[ocNeedOp()&&!R.op.length?'立ち上げ':'',ocNeedCl()&&!R.cl.length?'締め':'',R.rp&&!R.rp.length?'週報':''].filter(Boolean);
     if(miss.length)notes.push(`${md(dt)}（${WD[wd(dt)]}）は${miss.join('と')}ができる人がいません（休み希望を優先）`)}
   for(const dt of dates)if(cnt[dt]<minE)notes.push(`${md(dt)}（${WD[wd(dt)]}）は社員が${cnt[dt]}人です（休み希望を優先）`);
-  return {msg:`社員${emps.length}人のシフトを作りました（決め打ちと休み希望はそのまま、出勤${made}日分を追加）。${notes.join('。')}${notes.length?'。':''}`};
+  const lk=dates.filter(dayLocked);
+  return {msg:`社員${emps.length}人のシフトを作りました（決め打ちと休み希望はそのまま、出勤${made}日分を追加${lk.length?`。確定した${lk.map(md).join('・')}は変えていません`:''}）。${notes.join('。')}${notes.length?'。':''}`};
 }
 /* 留学生の28時間：固定していない日を短くして収める（できるだけ理想人数を下回らない所から） */
 function adjust28(week){
@@ -1201,7 +1207,7 @@ function adjust28(week){
     // 短くするだけでは収まらないときは、まず固定していない日を1日ずつ休みにする（人が一番余っている日から）
     for(let g=0;g<7;g++){
       const winStart=addDays(r.at,-6),mins=Number(st.minShift||4);let trim=0;const cand=[];
-      for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);if(!sh||fixedRow(sh))continue;
+      for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);if(!sh||fixedRow(sh)||dayLocked(dt))continue;
         const c=calcShift(sh);if(!c.on)continue;trim+=Math.max(0,c.labor-(mins-breakHours(mins)));
         const B=hourCover(d),ideal=(d.ideal||[]).map(Number);let sur=0;for(let h=Math.floor(sh.start-8);h<Math.ceil(sh.end-8);h++)sur+=(B.H[h]||0)-(ideal[h]||0);
         if(ocUsed()){const R0=ocState(dt,d.shifts),R1=ocState(dt,d.shifts.filter(x=>x!==sh));if(!ocKeeps(R0,R1))sur-=1e5}cand.push({dt,sh,sur})}
@@ -1211,7 +1217,7 @@ function adjust28(week){
     while(r.m>lim&&guard++<200){
       const winStart=addDays(r.at,-6);let best=null,bs=-Infinity;
       for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);
-        if(!sh||fixedRow(sh))continue;const c=calcShift(sh);if(!c.on||sh.end-sh.start-0.5<Number(st.minShift||4))continue;
+        if(!sh||fixedRow(sh)||dayLocked(dt))continue;const c=calcShift(sh);if(!c.on||sh.end-sh.start-0.5<Number(st.minShift||4))continue;
         const B=hourCover(d),ideal=(d.ideal||[]).map(Number);
         for(const edge of ['end','start']){const t=edge==='end'?sh.end-0.5:sh.start,h=Math.floor(t-8),surplus=B.H[h]-0.5-(ideal[h]||0);
           let ocp=0;if(ocUsed()){const R0=ocState(dt,d.shifts),old=sh[edge];sh[edge]=edge==='end'?sh.end-0.5:sh.start+0.5;const R1=ocState(dt,d.shifts);sh[edge]=old;if(!ocKeeps(R0,R1))ocp=5000}
@@ -1581,7 +1587,7 @@ function vShift(){
   const days=dates.map((dt,i)=>{const c=calcDay(dt),w=wd(dt);
     const cls=w===6?'w-sat':w===0?'w-sun':w===5?'w-fri':'';
     return `<button class="day" data-act="day" data-i="${i}" aria-pressed="${i===S.dayIdx}">
-      <span class="d"><span class="w ${cls}">${WD[w]}</span>${md(dt)}</span>
+      <span class="d"><span class="w ${cls}">${WD[w]}</span>${md(dt)}${dayLocked(dt)?' <span title="確定" aria-label="確定">🔒</span>':''}</span>
       <span class="m num">${c.cost?yen(c.cost):'未入力'}</span>
       <span class="m">${c.rate!=null?'率 '+(c.rate*100).toFixed(1)+'%':esc(dayDoc(dt).note)||'&nbsp;'}</span></button>`}).join('');
   const weekEmpty=dates.every(dt=>!(dayDoc(dt).shifts||[]).length);
@@ -1679,10 +1685,10 @@ function vShift(){
       <label class="field"><span>メモ（指示・作業）</span><textarea id="memo" data-f="memo" rows="1" placeholder="例：○○さん ホール者にレジ講習">${esc(d.memo)}</textarea></label>
     </div></section>
   <section class="panel" aria-label="シフト表">
-    <div class="bar"><h2>シフト表</h2><span class="hint">色付きのマスをタップすると、その時刻に休憩（黒）を移動できます</span>
-      <span style="margin-left:auto" class="bar"><button class="btn sm ghost" data-act="clearDay">この日を空にする</button><button class="btn sm pri" data-act="addRow">＋ 行を追加</button></span></div>
+    <div class="bar"><h2>シフト表</h2>${dayLocked(date)?'<span class="pill good">🔒 確定済み</span>':'<span class="hint">色付きのマスをタップすると、その時刻に休憩（黒）を移動できます</span>'}
+      <span style="margin-left:auto" class="bar"><button class="btn sm ${dayLocked(date)?'':'ghost'}" data-act="lockDay" title="確定すると、まとめて実行・自動の調整・手での編集でこの日が変わりません">${dayLocked(date)?'確定を解除':'🔒 この日を確定'}</button>${dayLocked(date)?'':'<button class="btn sm ghost" data-act="clearDay">この日を空にする</button><button class="btn sm pri" data-act="addRow">＋ 行を追加</button>'}</span></div>
     ${autobar}
-    ${(d.shifts||[]).length?`<div class="scroll" data-init="${(st.peakFrom-8-2)*32}"><table class="grid"><thead>${head}</thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table></div>`:
+    ${(d.shifts||[]).length?`<div class="scroll${dayLocked(date)?' locked':''}" data-init="${(st.peakFrom-8-2)*32}"><table class="grid"><thead>${head}</thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table></div>`:
       `<div class="empty">まだシフトがありません。「＋ 行を追加」で名前・開始・終了・ポジションを選ぶと、勤務・休憩・労働・深夜時間と人件費が自動で計算されます。${staffList().length?'':'<br>先に「マスタ → 名簿」でスタッフを登録してください。'}</div>
        <div class="scroll"><table class="grid"><thead>${head}</thead><tfoot>${foot}</tfoot></table></div>`}
     ${offLine}
@@ -2478,7 +2484,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.47'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.48'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2564,6 +2570,7 @@ function bulkSave(){
   const B=S.bulk,orig=JSON.parse(B.orig);let n=0;
   for(const [dt,v] of Object.entries(B.days)){
     if(JSON.stringify(v)===JSON.stringify(orig[dt]))continue;
+    if(dayLocked(dt)){toast(`${md(dt)}は確定しているので、この日の希望は反映していません`);continue}
     if(v.st==='on'&&!(v.end>v.start)){toast(`${md(dt)}の時間を選んでください（終了は開始より後）`);return false}
     const d=ensureDay(dt);let i=d.shifts.findIndex(x=>x.sid===B.sid),row=i>=0?d.shifts[i]:null;
     if(v.st===''){if(row&&!row.gen){d.shifts.splice(i,1);n++;saveDay(dt)}continue}
@@ -2658,7 +2665,7 @@ function vCal(){
     <div class="ccols">${detail}<div>${tlist}${rsec}</div></div>`}
 // 有給の予定をシフトに入れる
 function addPaid(sid,from,to,h){const s=S.staff[sid];if(!s)throw 'スタッフを選んでください';const hh=h>0?h:Number(s.paidDayH)||8;let n=0,skip=[];
-  for(let dt=from;dt<=(to&&to>=from?to:from);dt=addDays(dt,1)){if(n>31)break;const d=newDay(dt);d.shifts=d.shifts||[];const i=d.shifts.findIndex(x=>x.sid===sid);
+  for(let dt=from;dt<=(to&&to>=from?to:from);dt=addDays(dt,1)){if(n>31)break;if(dayLocked(dt)){skip.push(md(dt)+'（確定）');continue}const d=newDay(dt);d.shifts=d.shifts||[];const i=d.shifts.findIndex(x=>x.sid===sid);
     if(i>=0&&d.shifts[i].pos===PAID){d.shifts[i].paidH=hh;saveDay(dt);n++;continue}
     if(i>=0&&!d.shifts[i].gen&&calcShift(d.shifts[i]).on){skip.push(md(dt));continue}
     const row={sid,start:null,end:null,pos:PAID,paidH:hh,bs:null};if(i>=0)d.shifts[i]=row;else d.shifts.push(row);saveDay(dt);n++}
@@ -2810,7 +2817,7 @@ function empWeekPanel(date){const emps=staffList().filter(isEmp);if(!emps.length
     return {t:'未定',cls:'muted'}};
   const cnt=ds.map(dt=>emps.filter(e=>cell(e,dt).cls==='on').length),minE=Number(set().minEmp??2);
   return `<section class="panel" style="padding:10px 14px"><div class="bar"><h2 style="font-size:16px">社員の週（出勤と休み）</h2><span class="hint">日付を押すとその日に移ります</span></div>
-    <div class="scroll"><table class="t ewk"><thead><tr><th>社員</th>${ds.map((dt,i)=>`<th class="${dt===date?'cur':''}"><button class="mini" data-act="day" data-i="${i}">${WD[wd(dt)]} ${md(dt)}</button></th>`).join('')}<th class="r">出勤</th></tr></thead><tbody>
+    <div class="scroll"><table class="t ewk"><thead><tr><th>社員</th>${ds.map((dt,i)=>`<th class="${dt===date?'cur':''}"><button class="mini" data-act="day" data-i="${i}">${WD[wd(dt)]} ${md(dt)}${dayLocked(dt)?' 🔒':''}</button></th>`).join('')}<th class="r">出勤</th></tr></thead><tbody>
     ${emps.map(e=>{const cs=ds.map(dt=>cell(e,dt));return `<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td>${cs.map((c,i)=>`<td class="${c.cls}${ds[i]===date?' cur':''}">${esc(c.t)}${c.sub?`<div class="sub">${esc(c.sub)}</div>`:''}</td>`).join('')}<td class="num">${cs.filter(c=>c.cls==='on').length}日</td></tr>`}).join('')}
     <tr class="tot"><td>出勤の社員</td>${cnt.map((n,i)=>`<td class="num ${n<minE?'cell-bad':''}${ds[i]===date?' cur':''}">${n}人</td>`).join('')}<td></td></tr>
     ${ocUsed()?`<tr class="tot"><td>立ち上げ／締め／週報</td>${ds.map(dt=>{const R=ocState(dt);if(!R)return `<td class="muted">—</td>`;
@@ -3096,6 +3103,7 @@ app.addEventListener('change',e=>{
   if(el.dataset.bf){const v=S.bulk.days[el.dataset.d];v[el.dataset.bf]=el.value===''?null:Number(el.value);return render()}
   if(el.id==='paid28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.paid28=el.checked;saveSettings();return render()}
   if(el.dataset.subf){const v=S.draft.days[el.dataset.d];v[el.dataset.subf]=el.value===''?null:Number(el.value);S.draft.dirty=true;return render()}
+  if(f&&S.tab==='shift'&&!['monthStart','monthEnd','fareDate','h28Start','me','subNote','budget','note','memo','ideal','posIdeal'].includes(f)&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return render()}
   if(f){
     if(f==='monthStart'||f==='monthEnd'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings[f]=el.value;saveSettings();return render()}
     if(f==='fareDate'){S.fareDate=el.value||null;el.blur();return render()}
@@ -3148,6 +3156,8 @@ function syncSummary(){const st=S.settings;const work=st.positions.filter(p=>p.k
   st.summaryOrder=st.summaryOrder.filter(n=>work.includes(n)).concat(work.filter(n=>!st.summaryOrder.includes(n)))}
 app.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  if(['addRow','adjDay','autoBrk','autoPos','brk','clearDay','clearDayGo','delRow','edu','pin','toReq'].includes(a)&&S.tab==='shift'&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return}
+  if(a==='lockDay'){const dt=curDate(),d=ensureDay(dt);d.locked=!d.locked;saveDay(dt);toast(d.locked?`${md(dt)}を確定しました（まとめて実行・自動の調整・手での編集で変わりません）`:`${md(dt)}の確定を解除しました`);return render()}
   if(a==='pickStore'){const x=S.loginChoices[+b.dataset.i],pw=S.pendingPw;S.loginChoices=null;S.pendingPw=null;S.loginBusy=true;render();
     AU().signInWithEmailAndPassword(acctEmail(x.store,x.role),pw).then(()=>{S.loginBusy=false;savePw(x.store,x.role,pw)},()=>{S.loginBusy=false;S.loginErr='ログインできませんでした。もう一度入れてください';render()});return}
   if(a==='approveReq'){const r=b.dataset.r,g=k=>(document.getElementById(`ap-${k}-${r}`)?.value||'').trim(),name=g('name'),id=g('id').toLowerCase(),m=g('m'),st=g('s');
@@ -3239,7 +3249,7 @@ app.addEventListener('click',e=>{
   if(a==='cEntDel'){const d=newDay(S.cday);d.cal=(d.cal||[]).filter((_,i)=>i!==+b.dataset.i);saveDay(S.cday);return render()}
   if(a==='tDel'){const t=(set().tasks||[]).find(x=>x.id===b.dataset.id);if(!t)return;if(t.rep!=='once'&&!confirm(`「${t.title}」（${repLabel(t)}）を削除しますか？`))return;
     S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.tasks=(S.settings.tasks||[]).filter(x=>x.id!==t.id);saveSettings();toast('タスクを削除しました');return render()}
-  if(a==='cPaidDel'){const d=newDay(S.cday);d.shifts=(d.shifts||[]).filter(x=>!(x.sid===b.dataset.sid&&x.pos===PAID));saveDay(S.cday);toast('有給の予定を消しました');return render()}
+  if(a==='cPaidDel'){if(dayLocked(S.cday))return toast('この日は確定しています（シフト作成で確定を解除してください）');const d=newDay(S.cday);d.shifts=(d.shifts||[]).filter(x=>!(x.sid===b.dataset.sid&&x.pos===PAID));saveDay(S.cday);toast('有給の予定を消しました');return render()}
   if(a==='bym'){const [Y,M]=(S.bym||ymOf(S.week)).split('-').map(Number),d=new Date(Y,M-1+ +b.dataset.n,1);S.bym=d.getFullYear()+'-'+pad(d.getMonth()+1);return render()}
   if(a==='bymNow'){S.bym=ymOf(today);return render()}
   if(a==='bwPast'){const W=weightsFromPast();if(!W)return toast('過去の売上予算がまだありません');S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.budgetWeights=W;saveSettings();toast('直近の売上予算から曜日の比率を出しました');return render()}
@@ -3290,17 +3300,17 @@ app.addEventListener('click',e=>{
   if(a==='vpChange'){const c=document.getElementById('vpCur').value,n=document.getElementById('vpNew').value;
     changeViewPw(c,n).then(()=>{toast('閲覧用パスワードを変更しました');document.getElementById('vpCur').value='';document.getElementById('vpNew').value=''},e=>toast(typeof e==='string'?e:'変更できませんでした'));return}
   if(a==='finishWeek'){const ds=weekDates(S.week),before=ds.map(dt=>[dt,clone(dayDoc(dt).shifts||[])]);let n=0;
-    for(const dt of ds){if(!(dayDoc(dt).shifts||[]).length)continue;try{autoPositions(dt,'blank')}catch(_){}try{autoBreaks(dt)}catch(_){}saveDay(dt);n++}
+    for(const dt of ds){if(!(dayDoc(dt).shifts||[]).length||dayLocked(dt))continue;try{autoPositions(dt,'blank')}catch(_){}try{autoBreaks(dt)}catch(_){}saveDay(dt);n++}
     S.undo={date:curDate(),multi:before,shifts:clone(dayDoc(curDate()).shifts||[]),msg:n?`${n}日分：ポジションが空欄の人を割り振り、休憩を入れました`:'シフトが入っている日がありません'};return render()}
   if(a==='autoWeek'){const ds=weekDates(S.week),before=ds.map(dt=>[dt,clone(dayDoc(dt).shifts||[])]),msgs=[];
     if(!ds.some(dt=>(dayDoc(dt).shifts||[]).length)){toast('この週はまだシフトがありません（先に希望入力をしてください）');return}
     // ① 社員（休み希望・決め打ちはそのまま → 不足が出ないように出勤と公休1・公休2）→ ② 全体の修正（目標人件費率・公平さのルールつき）→ ③ 留学生の28時間（最後に公平に）→ ④ ポジション（空欄の人だけ）・休憩
     try{const re=genEmployees(S.week);if(re?.msg)msgs.push('① '+re.msg)}catch(_){}
     const F=fairCtx(S.week);let cut=0,left=0;
-    for(const dt of ds){if(!(dayDoc(dt).shifts||[]).length)continue;const r=adjustDay(dt,F);cut+=r.cut||0;left+=r.left||0;saveDay(dt)}
+    for(const dt of ds){if(!(dayDoc(dt).shifts||[]).length||dayLocked(dt))continue;const r=adjustDay(dt,F);cut+=r.cut||0;left+=r.left||0;saveDay(dt)}
     msgs.push(`② 全体の修正（人件費）：計${n1(cut)}時間を短縮${left>0?`（公平さと理想人数を守ったため、目標まであと${yen(left)}）`:''}`);
     try{const r28=adjust28(S.week);msgs.push('③ '+(r28?.msg||'28時間を超える留学生はいません'))}catch(_){}
-    for(const dt of ds){if(!(dayDoc(dt).shifts||[]).length)continue;try{autoPositions(dt,'blank')}catch(_){}try{autoBreaks(dt)}catch(_){}saveDay(dt)}
+    for(const dt of ds){if(!(dayDoc(dt).shifts||[]).length||dayLocked(dt))continue;try{autoPositions(dt,'blank')}catch(_){}try{autoBreaks(dt)}catch(_){}saveDay(dt)}
     msgs.push('④ ポジションが空欄の人を割り振り、休憩を配置しました。希望と違う行は下の「希望との違い」に理由つきで載っています');
     S.undo={date:curDate(),multi:before,shifts:clone(dayDoc(curDate()).shifts||[]),msg:msgs.join(' ／ ')};S.fairOpen=true;return render()}
   if(a==='adjDay'||a==='adjWeek'){const ds=a==='adjDay'?[curDate()]:weekDates(S.week);
@@ -3318,7 +3328,7 @@ app.addEventListener('click',e=>{
   if(a==='clearDay'){S.confirm='clearDay';return render()}
   if(a==='cancel'){S.confirm=null;return render()}
   if(a==='clearDayGo'){const d=ensureDay(curDate());d.shifts=[];S.confirm=null;saveDay(curDate());return render()}
-  if(a==='copyWeekGo'){weekDates(S.week).forEach((dt,i)=>{const src=dayDoc(addDays(dt,-7));if(!(src.shifts||[]).length&&!src.budget)return;
+  if(a==='copyWeekGo'){weekDates(S.week).forEach((dt,i)=>{if(dayLocked(dt))return;const src=dayDoc(addDays(dt,-7));if(!(src.shifts||[]).length&&!src.budget)return;
       const d=ensureDay(dt);d.shifts=clone(src.shifts||[]).map(sh=>({...sh,req:isOff(sh.pos)?{off:true}:(sh.start!=null?{start:sh.start,end:sh.end}:undefined),why:'',memo:''}));d.ideal=clone(src.ideal||Array(24).fill(0));d.posIdeal=clone(src.posIdeal||{});if(!d.budget)d.budget=src.budget||0;saveDay(dt)});
     S.confirm=null;toast('前週のシフトをコピーしました');return render()}
   if(a==='addStaff'){const id='s'+Date.now().toString(36);const order=Math.max(0,...Object.values(S.staff).map(s=>s.order||0))+1;
