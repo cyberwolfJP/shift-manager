@@ -1895,6 +1895,23 @@ function printPages(week){const o=S.printOpt||{week:true,days:true,recruit:true}
   if(o.week){const cv=document.createElement('canvas');cv.width=2970;cv.height=2100;drawPrint(cv);K.pages.push(cv)}
   if(o.days)for(const dt of weekDates(week))if((dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on))drawReportDay(K.mk(),dt,{...K,head:(c,t)=>K.head(c,t)});
   return K.pages}
+// JPEG で保存（LINEのアルバムに載せる用）：スマホ・iPadでは共有シートから「LINE」や「画像を保存」を選べる
+async function saveJpeg(){if(S.pdfBusy)return;S.pdfBusy=true;render();
+  try{try{await document.fonts?.ready}catch(_){}
+    const pages=printPages(S.week);if(!pages.length){toast('保存するページを選んでください');S.pdfBusy=false;return render()}
+    const store=S.stores[S.store]?.name||'シフト',jd=d=>`${+d.slice(5,7)}月${+d.slice(8)}日`,base=`【${store}】シフト【${jd(S.week)}〜${jd(addDays(S.week,6))}】`;
+    await shareJpegs(pages,base);
+  }catch(e){console.error(e);toast('画像を作れませんでした')}
+  S.pdfBusy=false;render()}
+async function shareJpegs(pages,base){
+  const files=await Promise.all(pages.map((cv,i)=>new Promise(r=>cv.toBlob(b=>r(new File([b],`${base}_${String(i+1).padStart(2,'0')}.jpg`,{type:'image/jpeg'})),'image/jpeg',0.92))));
+  let done=false;
+  if(navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files,title:base});done=true;toast(`${files.length}枚の画像を共有しました`)}catch(e){if(e&&e.name==='AbortError')done=true}}
+  if(!done){for(const f of files){downloadBlob(f,f.name);await new Promise(r=>setTimeout(r,400))}toast(`${files.length}枚のJPEGを保存しました`)}}
+async function reportJpeg(){if(S.reportBusy)return;S.reportBusy=true;render();
+  try{try{await document.fonts?.ready}catch(_){}const jd=d=>`${+d.slice(5,7)}月${+d.slice(8)}日`;
+    await shareJpegs(drawReport(S.week,S.reportNote||''),`【${S.stores[S.store]?.name||'店舗'}】週次報告【${jd(S.week)}〜${jd(addDays(S.week,6))}】`)}catch(e){console.error(e);toast('画像を作れませんでした')}
+  S.reportBusy=false;render()}
 async function savePdf(){
   S.pdfBusy=true;render();
   try{
@@ -2126,7 +2143,7 @@ function vReport(){
   const k=(key)=>{try{return localStorage.getItem(key)}catch(_){return null}};
   if(S.reportNoteWeek!==S.week){S.reportNote=k('shiftapp:report:'+S.store+':'+S.week)||'';S.reportNoteWeek=S.week}
   const {out}=reportFindings(S.week);
-  return `<div class="bar"><button class="btn pri" data-act="reportShare"${S.reportBusy?' disabled':''}>${S.reportBusy?'作成中…':'PDFを作って共有'}</button><button class="btn" data-act="reportSave"${S.reportBusy?' disabled':''}>PDFを保存</button>
+  return `<div class="bar"><button class="btn pri" data-act="reportShare"${S.reportBusy?' disabled':''}>${S.reportBusy?'作成中…':'PDFを作って共有'}</button><button class="btn" data-act="reportSave"${S.reportBusy?' disabled':''}>PDFを保存</button><button class="btn" data-act="reportJpeg"${S.reportBusy?' disabled':''}>画像（JPEG）で保存・共有</button>
       <span class="hint">週のまとめ・評価と分析に続けて、日ごとのページ（バーのシフト・理想と実数の過不足・売上予算と人件費率）を入れたPDFを作ります。スマホでは「共有」からLINEやメールで送れます。</span></div>
     <div class="kpis"><div class="kpi"><span class="k">売上予算（週）</span><span class="v">${W.bud?yen(W.bud):'—'}</span></div><div class="kpi hi"><span class="k">人件費（週）</span><span class="v">${yen(W.cost)}</span></div>
       <div class="kpi"><span class="k">人件費率（目標）</span><span class="v">${W.rate!=null?(W.rate*100).toFixed(1)+'%':'—'}<small class="muted" style="font-size:13px"> ${W.target!=null?(W.target*100).toFixed(1)+'%':''}</small></span></div>
@@ -2373,7 +2390,7 @@ function vFinal(){
   }else if(mode==='print'){
     const empty=dates.every(dt=>!(dayDoc(dt).shifts||[]).length);
     body=empty?'<div class="empty">この週のシフトはまだありません。</div>':
-      `<div class="bar"><button class="btn pri" data-act="printNow"${S.pdfBusy?' disabled':''}>印刷する</button><button class="btn" data-act="savePdf"${S.pdfBusy?' disabled':''}>${S.pdfBusy?'作成中…':'PDFで保存'}</button>
+      `<div class="bar"><button class="btn pri" data-act="printNow"${S.pdfBusy?' disabled':''}>印刷する</button><button class="btn" data-act="savePdf"${S.pdfBusy?' disabled':''}>${S.pdfBusy?'作成中…':'PDFで保存'}</button><button class="btn" data-act="saveJpeg"${S.pdfBusy?' disabled':''} title="1ページ1枚のJPEG。iPad・スマホでは共有からLINEのアルバムや写真に保存できます">画像（JPEG）で保存・共有</button>
         <span class="hint">印刷画面で「用紙：A4・横」「余白：なし」を選んでください。</span></div>
        <div class="bar" style="flex-wrap:wrap;gap:14px;font-size:13px"><b>印刷するページ</b>${[['week','週のシフト表（1枚）'],['days','日ごとのバー（予算・人件費率・過不足つき、1日1枚）']].map(([k,l])=>`<label><input type="checkbox" data-popt="${k}"${(S.printOpt||{week:true,days:true,recruit:true})[k]===true?' checked':''}> ${l}</label>`).join('')}</div>
        <p class="hint" style="margin:0">各日の下に、シフト作成で登録した「募集」を赤い枠で載せます。登録がない日は「不足なし」です。</p>
@@ -2575,7 +2592,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.51'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.52'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3329,6 +3346,8 @@ app.addEventListener('click',e=>{
   if(a==='evGo'){const dt=b.dataset.d;S.week=monday(dt);S.dayIdx=(wd(dt)+6)%7;S.evalMode='day';remember();return render()}
   if(a==='fmode'){S.finalMode=b.dataset.m;return render()}
   if(a==='savePdf'){S.pdfMode='pdf';savePdf();return}
+  if(a==='saveJpeg'){saveJpeg();return}
+  if(a==='reportJpeg'){reportJpeg();return}
   if(a==='printNow'){S.pdfMode='print';savePdf();return}
   if(a==='reportShare'||a==='reportSave'){reportPdf(a==='reportShare');return}
   if(a==='printDays'){printDays(b.dataset.d?[b.dataset.d]:weekDates(S.week));return}
