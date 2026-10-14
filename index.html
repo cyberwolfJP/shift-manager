@@ -442,6 +442,8 @@ const DEFAULT_SETTINGS = {
     {name:'公休1', color:'red', kind:'off'},
     {name:'公休2', color:'red', kind:'off'},
     {name:'ヘルプ', color:'violet', kind:'help'},
+    {name:'会議', color:'gray', kind:'other'},
+    {name:'その他', color:'gray', kind:'other'},
     {name:'ホール兼洗い場', color:'orange', kind:'work'}
   ],
   levelNames: ['できない','見習い','一人前','リーダー'],
@@ -450,7 +452,7 @@ const DEFAULT_SETTINGS = {
   idealCost: {1:110000,2:110000,3:110000,4:110000,5:140000,6:140000,0:130000},
   monthStart: '2026-10-01', monthEnd: '2026-10-31',
   border: 40, limit28: 28,
-  brk1At: 6, brk1: 0.75, brk2Over: 8, brk2: 1.0, brkV2: true,
+  brk1At: 6, brk1: 0.75, brk2Over: 8, brk2: 1.0, brkV2: true, otherV1: true,
   otAfter: 8, otRate: 1.25,
   nightFrom: 22, nightTo: 29,
   peakFrom: 16, peakTo: 23,
@@ -623,6 +625,8 @@ function subscribeStore(){
   S.unsubs.push(db.doc(P('config/settings')).onSnapshot(snap=>{if(S.pending.has('settings'))return;
     S.settings=snap.exists?Object.assign(clone(DEFAULT_SETTINGS),clone(snap.data())):null;
     // 休憩ルールの見直し（6時間以上は45分）：古い初期値（30分）のままの店舗は一度だけ45分に切り替える
+    // 「会議」「その他」のポジションを一度だけ追加（決め打ち・人数に数えない）
+    if(S.settings&&!snap.data().otherV1&&S.role==='manager'){const P=S.settings.positions||[];for(const n of ['会議','その他'])if(!P.some(x=>x.name===n))P.push({name:n,color:'gray',kind:'other'});S.settings.positions=P;S.settings.otherV1=true;saveSettings()}
     if(S.settings&&!snap.data().brkV2&&S.role==='manager'){if(Number(snap.data().brk1??0.5)===0.5)S.settings.brk1=0.75;S.settings.brkV2=true;saveSettings()}
     render()},fail));
   // 読み込み量（無料枠）を抑えるため、前年の1月1日以降の日だけを読む
@@ -701,6 +705,9 @@ const posInfo=name=>set().positions.find(p=>p.name===name);
 const PAID='有給';const PAID_COLOR='violet';
 const isOff=name=>name===PAID||posInfo(name)?.kind==='off';
 const isHelp=name=>!!name&&(name==='ヘルプ'||posInfo(name)?.kind==='help');
+// 会議・その他：時間は勤務（人件費・労働時間・28時間に入る）だが、人数には数えず、自動の調整でも動かさない（決め打ち）
+const isOther=name=>!!name&&posInfo(name)?.kind==='other';
+const fixedRow=sh=>!!(sh.pin||isOther(sh.pos));
 const isNew=s=>!!(s&&s.newbie);
 const isEmp=s=>!!(s&&s.kind==='社員');
 // 表示順：社員が上、そのあとアルバイト（名簿の順）
@@ -720,7 +727,7 @@ function calcShift(sh){
   const night=Math.max(0,Math.min(sh.end,st.nightTo)-Math.max(sh.start,st.nightFrom));
   const wage=Number(staff.wage)||0;
   const cost=wage*Math.min(labor,st.otAfter)+wage*st.otRate*Math.max(0,labor-st.otAfter);
-  return {work,brk,labor,night,cost,on:true,help:isHelp(sh.pos),edu:!!sh.edu&&!isHelp(sh.pos)};
+  return {work,brk,labor,night,cost,on:true,help:isHelp(sh.pos),edu:!!sh.edu&&!isHelp(sh.pos),other:isOther(sh.pos)};
 }
 function breakStart(sh,c){
   if(!c.brk)return null;
@@ -760,7 +767,7 @@ function calcDay(date){
     if(c.edu){eduH+=c.labor;eduCost+=c.cost;eduRows.push({sh,c});continue} // 教育（研修）は研修費として別に管理。人件費・人員に含めない
     cost+=c.cost; labor+=c.labor; work+=c.work; brk+=c.brk; night+=c.night;
     if(S.staff[sh.sid].kind!=='社員'||S.staff[sh.sid].paCount)pa+=c.cost;
-    const bs=breakStart(sh,c);
+    const bs=breakStart(sh,c);if(c.other)continue; // 会議・その他は人数に数えない
     for(let k=0;k<48;k++){const t=8+k/2;
       if(t>=sh.start&&t<sh.end&&!(bs!=null&&t>=bs&&t<bs+c.brk))perHour[Math.floor(k/2)]+=0.5;}
   }
@@ -798,7 +805,7 @@ function autoPositions(date,mode){
   const st=set(),d=ensureDay(date),w=workPositions(),hist=posHistory(date),need={},lead={},solid={};
   w.forEach(p=>{need[p]=Number(d.posIdeal?.[p]||0);lead[p]=0;solid[p]=0});
   const rows=d.shifts.filter(sh=>S.staff[sh.sid]&&sh.start!=null&&sh.end!=null&&sh.end>sh.start&&!isOff(sh.pos));
-  const keep=sh=>posInfo(sh.pos)?.kind==='free'||isHelp(sh.pos)||(mode==='blank'&&sh.pos);
+  const keep=sh=>posInfo(sh.pos)?.kind==='free'||isHelp(sh.pos)||isOther(sh.pos)||(mode==='blank'&&sh.pos);
   const lv=(sid,p)=>{const L=levelOf(sid,p);return L==null?((hist[sid]||{})[p]?2:1):L};
   const put=(sh,p)=>{if(need[p]!=null){need[p]--;const L=lv(sh.sid,p);if(L>=3)lead[p]++;if(L>=2)solid[p]++}};
   rows.filter(keep).forEach(sh=>put(sh,sh.pos));
@@ -851,7 +858,7 @@ function rateWhy(R){if(moneyLocked())return '金額が隠れているあいだ�
   return `${+R.ym.slice(5)}月の人件費の枠 ${yen(R.cap)}（売上予算×${R.MR}%）から、ほかの日の分 ${yen(R.others)}（シフト済み${R.act}日 ${yen(R.actCost)}・未作成${R.est}日は予算×${R.MR}%で ${yen(R.estCost)}）を引いた ${yen(R.allow)} を、この週の売上予算 ${yen(R.budW)} で割っています。${R.noBud?`売上予算が未入力の日が${R.noBud}日あります（枠に入りません）。`:''}`}
 const targetRateOf=date=>set().rateMode==='weekday'?Number((set().targetRate||{})[wd(date)]??22):weekRateInfo(date).rate;
 function slotState(d){
-  d={...d,shifts:(d.shifts||[]).filter(x=>!isHelp(x.pos)&&!x.edu)};
+  d={...d,shifts:(d.shifts||[]).filter(x=>!isHelp(x.pos)&&!x.edu&&!isOther(x.pos))};
   const n=Array(48).fill(0),pos=Array.from({length:48},()=>({}));
   for(const sh of d.shifts||[]){const c=calcShift(sh);if(!c.on)continue;const bs=breakStart(sh,c);
     for(let k=0;k<48;k++){const t=8+k/2;if(t>=sh.start&&t<sh.end&&!(bs!=null&&t>=bs&&t<bs+c.brk)){n[k]++;if(sh.pos)pos[k][sh.pos]=(pos[k][sh.pos]||0)+1}}}
@@ -941,7 +948,7 @@ function adjustDay(date,F){
   for(let guard=0;guard<300&&cost>cap;guard++){
     const B=hourCover(d),OCB=ocUsed()?ocState(date,d.shifts):null;let best=null,bs=-Infinity;
     for(const sh of d.shifts){const c=calcShift(sh),staff=S.staff[sh.sid];
-      if(!c.on||c.help||c.edu||!staff||sh.pin||(!st.adjustEmployees&&staff.kind==='社員'))continue;
+      if(!c.on||c.help||c.edu||!staff||fixedRow(sh)||(!st.adjustEmployees&&staff.kind==='社員'))continue;
       if(sh.end-sh.start-0.5<Number(st.minShift||4))continue;
       // 公平さ：1日で希望から削るのは最大${maxDay}時間、週で希望の${maxRatio*100}%まで。それを超えるカットはしない
       const rq=reqHours(sh)??((before.get(sh).end-before.get(sh).start)),dayCut=rq-(sh.end-sh.start-0.5),f=F[sh.sid]||{req:rq,cut:0},ratio=(f.cut+0.5)/Math.max(f.req,0.5);
@@ -1110,7 +1117,7 @@ function vHire(){
  ・休み希望を守った結果、社員が足りない日や出勤日数が足りない人は、無理に出さずに知らせる */
 /* 立ち上げ・締め：その日に、立ち上げができる人が一番早い出勤に、締めができる人が一番遅い退勤に必ず1人いるか
  時刻は「設定」で決められる（空欄なら、その日一番早い出勤・一番遅い退勤） */
-function ocState(date,list){const st=set(),L=(list||dayDoc(date).shifts||[]).filter(sh=>{const s=S.staff[sh.sid],c=calcShift(sh);return s&&c.on&&!c.help&&!c.edu});
+function ocState(date,list){const st=set(),L=(list||dayDoc(date).shifts||[]).filter(sh=>{const s=S.staff[sh.sid],c=calcShift(sh);return s&&c.on&&!c.help&&!c.edu&&!c.other});
   if(!L.length)return null;
   const o=st.openAt!=null&&st.openAt!==''?Number(st.openAt):Math.min(...L.map(x=>x.start)),c=st.closeAt!=null&&st.closeAt!==''?Number(st.closeAt):Math.max(...L.map(x=>x.end));
   const op=L.filter(sh=>S.staff[sh.sid].canOpen&&sh.start<=o+1e-9),cl=L.filter(sh=>S.staff[sh.sid].canClose&&sh.end>=c-1e-9);
@@ -1129,7 +1136,7 @@ function genEmployees(week){
   for(const e of emps){state[e.id]={};
     for(const dt of dates){const r=(dayDoc(dt).shifts||[]).find(x=>x.sid===e.id);
       state[e.id][dt]=!r?'free':r.pos===PAID?'paid':isOff(r.pos)?'wish':(r.start!=null&&r.end!=null)?'pin':'free';
-      if(state[e.id][dt]==='pin')cnt[dt]++}}
+      if(state[e.id][dt]==='pin'&&!isOther(r.pos))cnt[dt]++}}
   const need={};for(const e of emps){const W=Number(e.workDays??5);need[e.id]=Math.max(0,W-dates.filter(dt=>state[e.id][dt]==='pin').length)}
   const budgetOf=dt=>Number(dayDoc(dt).budget)||0;
   // 不足が出ないように：時間帯ごとの理想人数と、すでに入っている人（アルバイトの希望・社員の決め打ち）を比べ、
@@ -1178,7 +1185,7 @@ function adjust28(week){
     // 短くするだけでは収まらないときは、まず固定していない日を1日ずつ休みにする（人が一番余っている日から）
     for(let g=0;g<7;g++){
       const winStart=addDays(r.at,-6),mins=Number(st.minShift||4);let trim=0;const cand=[];
-      for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);if(!sh||sh.pin)continue;
+      for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);if(!sh||fixedRow(sh))continue;
         const c=calcShift(sh);if(!c.on)continue;trim+=Math.max(0,c.labor-(mins-breakHours(mins)));
         const B=hourCover(d),ideal=(d.ideal||[]).map(Number);let sur=0;for(let h=Math.floor(sh.start-8);h<Math.ceil(sh.end-8);h++)sur+=(B.H[h]||0)-(ideal[h]||0);
         if(ocUsed()){const R0=ocState(dt,d.shifts),R1=ocState(dt,d.shifts.filter(x=>x!==sh));if(!ocKeeps(R0,R1))sur-=1e5}cand.push({dt,sh,sur})}
@@ -1188,7 +1195,7 @@ function adjust28(week){
     while(r.m>lim&&guard++<200){
       const winStart=addDays(r.at,-6);let best=null,bs=-Infinity;
       for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);
-        if(!sh||sh.pin)continue;const c=calcShift(sh);if(!c.on||sh.end-sh.start-0.5<Number(st.minShift||4))continue;
+        if(!sh||fixedRow(sh))continue;const c=calcShift(sh);if(!c.on||sh.end-sh.start-0.5<Number(st.minShift||4))continue;
         const B=hourCover(d),ideal=(d.ideal||[]).map(Number);
         for(const edge of ['end','start']){const t=edge==='end'?sh.end-0.5:sh.start,h=Math.floor(t-8),surplus=B.H[h]-0.5-(ideal[h]||0);
           let ocp=0;if(ocUsed()){const R0=ocState(dt,d.shifts),old=sh[edge];sh[edge]=edge==='end'?sh.end-0.5:sh.start+0.5;const R1=ocState(dt,d.shifts);sh[edge]=old;if(!ocKeeps(R0,R1))ocp=5000}
@@ -1586,7 +1593,7 @@ function vShift(){
       `<td><select class="t" data-f="start" data-i="${i}" aria-label="開始">${tOptions(sh.start,8,31.5)}</select></td>
       <td><select class="t" data-f="end" data-i="${i}" aria-label="終了">${tOptions(sh.end,8.5,32)}</select></td>`}
       <td><select class="pos" data-f="pos" data-i="${i}" aria-label="ポジション">${posOpts(sh.pos)}</select></td>
-      ${isHelp(sh.pos)?`<td class="lvc" style="padding:0 2px"><input type="text" data-f="helpTo" data-i="${i}" value="${esc(sh.helpTo||'')}" placeholder="ヘルプ先" style="width:90px;font-size:11px" aria-label="ヘルプ先"></td>`:(()=>{const L=sh.sid&&posInfo(sh.pos)?.kind==='work'?levelOf(sh.sid,sh.pos):undefined;return L===undefined?'<td class="lvc"></td>':L===null?'<td class="lvc lv0" title="未設定">–</td>':`<td class="lvc lv${L}" title="${esc(lvName(L))}">${L}</td>`})()}
+      ${isOther(sh.pos)?`<td class="lvc" style="padding:0 2px"><input type="text" data-f="oNote" data-i="${i}" value="${esc(sh.oNote||'')}" placeholder="内容（例：店長会議）" maxlength="40" style="width:110px;font-size:11px" aria-label="内容"></td>`:isHelp(sh.pos)?`<td class="lvc" style="padding:0 2px"><input type="text" data-f="helpTo" data-i="${i}" value="${esc(sh.helpTo||'')}" placeholder="ヘルプ先" style="width:90px;font-size:11px" aria-label="ヘルプ先"></td>`:(()=>{const L=sh.sid&&posInfo(sh.pos)?.kind==='work'?levelOf(sh.sid,sh.pos):undefined;return L===undefined?'<td class="lvc"></td>':L===null?'<td class="lvc lv0" title="未設定">–</td>':`<td class="lvc lv${L}" title="${esc(lvName(L))}">${L}</td>`})()}
       ${cells}
       <td class="v${c.work?' red':''}">${n1(c.work)}</td><td class="v${c.brk?' navy':''}">${n1(c.brk)}</td>
       <td class="v">${n1(c.labor)}</td><td class="v">${n1(c.night)}</td>
@@ -1948,7 +1955,7 @@ function drawReportDay(c,dt,K){
       const bx=X(sh.start),bw=X(sh.end)-bx,bh=rowH*0.66,by=y+(rowH-bh)/2;
       c.fillStyle=col;rr(c,bx,by,bw,bh,6);c.fill();
       if(bs!=null){c.fillStyle='rgba(255,255,255,.72)';c.fillRect(X(bs),by+2,X(bs+cc.brk)-X(bs),bh-4)}
-      T(c,`${tLabel(sh.start)}–${tLabel(sh.end)}`,bx+12,y+rowH/2,Math.min(22,rowH*0.42),{b:1,col:'#fff',max:Math.max(40,(bs!=null?X(bs):bx+bw)-bx-16)});
+      T(c,`${tLabel(sh.start)}–${tLabel(sh.end)}${sh.oNote?'　'+sh.oNote:''}`,bx+12,y+rowH/2,Math.min(22,rowH*0.42),{b:1,col:'#fff',max:Math.max(40,(bs!=null?X(bs):bx+bw)-bx-16)});
       T(c,bs!=null?`${tLabel(bs)}〜 ${Math.round(cc.brk*60)}分`:'なし',W0-M-rightW+16,y+rowH/2,Math.min(22,rowH*0.42),{col:bs!=null?'#1d1b16':'#9a9488',b:bs!=null});
       c.strokeStyle='#eee9e0';c.lineWidth=1;c.beginPath();c.moveTo(M,y+rowH);c.lineTo(W0-M,y+rowH);c.stroke();y+=rowH}}
   // 理想・実数・過不足（30分ごと）
@@ -2315,12 +2322,12 @@ function dayGantt(date,forPrint){
         const bs=breakStart(sh,c);
         rows+=`<div class="g-row${S.me===sh.sid?' me':''}" style="${posStyle(sh.pos)}${S.me===sh.sid?';outline:2px solid var(--accent);border-radius:4px':''}">
           <div class="g-name">${esc(S.staff[sh.sid].name)}${isEmp(S.staff[sh.sid])?'<span class="tagemp">社員</span>':''}${newTag(S.staff[sh.sid])}${sh.edu?'<span class="tagedu">教育</span>':''}</div>
-          <div class="g-track" style="--span:${span}"><div class="g-bar" style="left:${x(sh.start)};width:calc(${x(sh.end)} - ${x(sh.start)})">${tLabel(sh.start)}–${tLabel(sh.end)}</div>
+          <div class="g-track" style="--span:${span}"><div class="g-bar" style="left:${x(sh.start)};width:calc(${x(sh.end)} - ${x(sh.start)})">${tLabel(sh.start)}–${tLabel(sh.end)}${sh.oNote?' '+esc(sh.oNote):''}</div>
           ${bs!=null?`<div class="g-brk" style="left:${x(bs)};width:calc(${x(bs+c.brk)} - ${x(bs)})" title="休憩 ${tLabel(bs)}–${tLabel(bs+c.brk)}"></div>`:''}</div>
           <div class="g-time">${bs!=null?`休 ${tLabel(bs)}〜<b>${Math.round(c.brk*60)}分</b>`:'休憩なし'}</div></div>`}
       const head=`<div class="g-row g-head"><div></div><div class="g-track" style="--span:${span}">${Array.from({length:span+1},(_,i)=>`<span style="left:${x(from+i)}">${(from+i)>=24?from+i-24:from+i}</span>`).join('')}</div><div></div></div>`;
       const ideal=d.ideal||[];const slots=[];for(let t=from;t<from+span;t+=0.5){const k=(t-8)*2;let n=0;
-        for(const {sh,c} of on){const b=breakStart(sh,c);if(t>=sh.start&&t<sh.end&&!(b!=null&&t>=b&&t<b+c.brk))n++}slots.push({n,i:ideal[Math.floor(k/2)]||0})}
+        for(const {sh,c} of on){if(c.other)continue;const b=breakStart(sh,c);if(t>=sh.start&&t<sh.end&&!(b!=null&&t>=b&&t<b+c.brk))n++}slots.push({n,i:ideal[Math.floor(k/2)]||0})}
       const mx=Math.max(1,...slots.map(s=>s.n));
       const cov=`<div class="g-cov"><div class="g-name" style="font-size:11px;color:var(--muted)">在店人数</div><div class="bars">${slots.map(s=>`<i class="${s.n<s.i?'short':''}" style="height:${s.n/mx*100}%" title="${s.n}人${s.i?'／理想'+s.i:''}"></i>`).join('')}</div><div class="g-time">最大${mx}人</div></div>`;
   return `
@@ -2452,7 +2459,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.43'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.44'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2987,7 +2994,7 @@ function vSettings(){
   const st=set();
   const pos=st.positions.map((p,i)=>`<tr><td><input type="text" data-pf="name" data-i="${i}" value="${esc(p.name)}" aria-label="ポジション名"></td>
     <td><div class="swatches">${COLORS.map(c=>`<button class="sw" style="--pc:var(--p-${c})" data-act="pcolor" data-i="${i}" data-c="${c}" aria-pressed="${p.color===c}" aria-label="${c}"></button>`).join('')}</div></td>
-    <td><select data-pf="kind" data-i="${i}" aria-label="扱い"><option value="work"${p.kind==='work'?' selected':''}>人数集計に入れる</option><option value="free"${p.kind==='free'?' selected':''}>勤務（集計外）</option><option value="help"${p.kind==='help'?' selected':''}>ヘルプ（他店へ・自店に含めない）</option><option value="off"${p.kind==='off'?' selected':''}>休み</option></select></td>
+    <td><select data-pf="kind" data-i="${i}" aria-label="扱い"><option value="work"${p.kind==='work'?' selected':''}>人数集計に入れる</option><option value="free"${p.kind==='free'?' selected':''}>勤務（集計外）</option><option value="help"${p.kind==='help'?' selected':''}>ヘルプ（他店へ・自店に含めない）</option><option value="other"${p.kind==='other'?' selected':''}>会議・その他（決め打ち・人数に数えない）</option><option value="off"${p.kind==='off'?' selected':''}>休み</option></select></td>
     <td><button class="del" data-act="delPos" data-i="${i}" aria-label="${esc(p.name)}を削除">×</button></td></tr>`).join('');
   const num=(f,l,step=1)=>`<label class="field"><span>${l}</span><input type="number" step="${step}" id="s_${f}" data-sset="${f}" value="${st[f]}"></label>`;
   const cur=S.stores[S.store]||{};
@@ -3082,6 +3089,7 @@ app.addEventListener('change',e=>{
       if(f==='sid')sh.sid=el.value; else if(f==='pos'){sh.pos=el.value;if(isOff(sh.pos)){if(sh.pos===PAID&&sh.paidH==null)sh.paidH=Number(S.staff[sh.sid]?.paidDayH)||null;sh.start=null;sh.end=null;if(!sh.req&&sh.sid&&sh.pos!==PAID)sh.req={off:true}}}
       else if(f==='paidH'){sh.paidH=el.value===''?null:Math.max(0,Number(el.value))}
       else if(f==='helpTo'){sh.helpTo=el.value.trim()}
+      else if(f==='oNote'){sh.oNote=el.value.trim().slice(0,40)}
       else{sh[f]=el.value===''?null:Number(el.value);sh.bs=null;
         if(sh.req&&!sh.req.off&&sh.req.start===sh.start&&sh.req.end===sh.end){sh.why='';}
         else if(sh.req)sh.why=sh.why&&sh.why.startsWith('目標人件費率')?'':sh.why}
