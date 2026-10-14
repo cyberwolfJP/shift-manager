@@ -60,7 +60,7 @@ window.__dbReady=new Promise(function(done){
 html,body{margin:0}
 [hidden]{display:none!important}
 #printArea{display:none}
-@media print{@page{size:A4 landscape;margin:0}body>*{display:none!important}#printArea{display:block!important}#printArea img{width:100%;height:auto;display:block}
+@media print{@page{size:A4 landscape;margin:0}body>*{display:none!important}#printArea{display:block!important}#printArea img{width:100%;height:auto;display:block;break-after:page;page-break-after:always}#printArea img:last-child{break-after:auto;page-break-after:auto}
   html:root:not([data-x]){--bg:#fff;--surface:#fff;--sunk:#ebe7de;--line:#d6d0c3;--fg:#1d1b16;--muted:#6b655a;--ink:#1f3a5c;--bad:#b3261e;--cellbg:#fbfaf7;--brk:#1d1b16;--gline:rgba(60,55,45,.22);--gline2:rgba(60,55,45,.1);--gbrk:#d4d0c8;--gbrk2:#c6c1b8;
     --p-yellow:#f2d64b;--p-blue:#9ec3ea;--p-green:#a9cf7a;--p-teal:#7fcdd0;--p-pink:#eea7a3;--p-red:#d9483b;--p-violet:#c7a6e6;--p-gray:#c8c3b8;--p-orange:#f1b45a;--p-text:#1d1b16;color-scheme:light}
   #printArea.html{background:#fff;color:#1d1b16;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1810,16 +1810,70 @@ function jpegPdf(jpeg,w,h){
   const x=len;push(`xref\n0 6\n0000000000 65535 f \n${[1,2,3,4,5].map(n=>String(off[n]).padStart(10,'0')+' 00000 n \n').join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`);
   return new Blob(parts,{type:'application/pdf'});
 }
+/* A4印刷の追加ページ：日ごとのバー（予算などの詳細つき）と、募集（何時から何時、どのポジションを何人） */
+function printKit(week,title){const W0=2970,H0=2100,M=110,store=S.stores[S.store]?.name||'',pages=[];
+  const mk=()=>{const cv=document.createElement('canvas');cv.width=W0;cv.height=H0;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W0,H0);c.textBaseline='middle';pages.push(cv);return c};
+  const F=(px,b)=>`${b?'700 ':''}${Math.round(px)}px ${PF}`;
+  const T=(c,t,x,y,px,o={})=>{c.font=F(px,o.b);c.fillStyle=o.col||'#1d1b16';c.textAlign=o.al||'left';if(o.max){let s=px;while(s>12&&c.measureText(t).width>o.max){s--;c.font=F(s,o.b)}}c.fillText(t,x,y)};
+  const wrap=(c,t,maxW,px,b)=>{c.font=F(px,b);const out=[];let line='';for(const ch of t){if(c.measureText(line+ch).width>maxW){out.push(line);line=ch}else line+=ch}if(line)out.push(line);return out};
+  const pc=v=>v==null?'—':(v*100).toFixed(1)+'%';
+  const head=(c,t)=>{T(c,t,M,M+20,58,{b:1});T(c,`${store}　${parse(week).getFullYear()}年 ${md(week)}（月）〜${md(addDays(week,6))}（日）`,M,M+92,34,{col:'#3d3a33'});
+    T(c,`印刷日 ${md(today)}`,W0-M,M+20,26,{al:'right',col:'#6b655a'});c.fillStyle='#1d1b16';c.fillRect(M,M+140,W0-2*M,4)};
+  return {W0,H0,M,mk,F,T,wrap,pc,head,pages}}
+// 募集：理想人数に対して足りない時間とポジション（ポジション別の人数がない日は「ポジション問わず」）
+// 同じ日・同じ時間帯はまとめて1行に（例：15:00〜16:00 ホール1・ドリンク1）。30分だけの不足は、設定しだいで除く
+// 営業できないレベル：理想人数があるのに、そのポジションに誰もいない時間（フリーの人を回しても0人）。
+// ポジション別の人数を入れていない日は、全体の人数が理想の半分に届かない時間
+function criticalItems(date){const st=set(),d=dayDoc(date),ideal=(d.ideal||[]).map(Number);if(!ideal.some(v=>v>0))return null;
+  const {n,pos:pos0}=slotState(d),peak=k=>{const h=8+Math.floor(k/2);return h>=st.peakFrom&&h<st.peakTo},pos=freeFill(d,pos0,ideal,peak),sw=posSum(d),out=[];
+  const wants=Object.entries(d.posIdeal||{}).filter(([p,v])=>Number(v)>0&&posInfo(p)?.kind==='work');
+  const run=(bad,meta,need)=>{let cur=null;for(let k=0;k<=48;k++){const b=k<48&&bad(k);if(b){if(!cur)cur={...meta,from:8+k/2,n:0};cur.n=Math.max(cur.n,need(k))}else if(cur){cur.to=8+k/2;cur.lack=cur.n*(cur.to-cur.from);out.push(cur);cur=null}}};
+  if(wants.length)for(const [p,v] of wants)run(k=>posNeed(Number(v),sw,ideal[Math.floor(k/2)],peak(k))>0&&!(pos[k][p]>0),{kind:'pos',pos:p},()=>1);
+  else run(k=>ideal[Math.floor(k/2)]>0&&n[k]<Math.ceil(ideal[Math.floor(k/2)]/2),{kind:'total',pos:'ポジション問わず'},k=>Math.ceil(ideal[Math.floor(k/2)]/2)-n[k]);
+  return out}
+function recruitList(week){const out=[],o=S.printOpt||{},skip30=o.short30!==true,crit=o.allShort!==true;
+  for(const dt of weekDates(week)){let list;
+    if(crit){const C=criticalItems(dt);if(!C)continue;list=C.map(x=>({...x,maxNeed:x.n,minHave:0}))}
+    else{const R=shortages(dt);if(!R.ready)continue;
+      const pos=R.items.filter(x=>x.kind==='pos'&&x.lack>=0.5),tot=R.items.filter(x=>x.kind==='total'&&x.lack>=0.5);list=pos.length?pos:tot}
+    list=list.filter(x=>!skip30||x.to-x.from>=1-1e-9);const g={};
+    for(const x of list){const k=x.from+'-'+x.to;(g[k]=g[k]||{dt,from:x.from,to:x.to,ps:[]}).ps.push({pos:x.kind==='pos'?x.pos:'ポジション問わず',n:Math.max(1,x.maxNeed-x.minHave),h:x.lack})}
+    Object.values(g).sort((a,b)=>a.from-b.from||a.to-b.to).forEach(r=>{r.n=r.ps.reduce((a,p)=>a+p.n,0);r.h=r.ps.reduce((a,p)=>a+p.h,0);out.push(r)})}
+  return out}
+function drawRecruit(K,week){const {W0,H0,M,T}=K,L=recruitList(week);
+  const cols=[['日付',300],['時間',380],['ポジションと人数',1520],['計',220]],sc=(W0-2*M)/cols.reduce((a,x)=>a+x[1],0);cols.forEach(x=>x[1]*=sc);
+  const top=M+290,rh=78,per=Math.max(1,Math.floor((H0-M-top-110)/rh)-1),pages=Math.max(1,Math.ceil(L.length/per));
+  for(let pg=0;pg<pages;pg++){const c=K.mk();K.head(c,'シフト募集（足りない時間とポジション）'+(pages>1?`　${pg+1}/${pages}`:''));
+    T(c,(S.printOpt||{}).allShort===true?'この時間に入れる人を募集しています。入れる方は店長まで声をかけてください。':'このままでは営業できない時間です（そのポジションに誰もいません）。入れる方は店長まで声をかけてください。',M,M+215,34,{b:1,col:'#b3261e'});
+    if(!L.length){T(c,(S.printOpt||{}).allShort===true?'この週は、理想人数に対して足りない時間はありません。':'この週は、営業できないほど足りない時間はありません。',M,M+330,36,{col:'#2f7a4a',b:1});return}
+    let y=top;c.fillStyle='#ebe7de';c.fillRect(M,y,W0-2*M,rh);let x=M;cols.forEach(([h,w])=>{T(c,h,x+20,y+rh/2,30,{b:1});x+=w});y+=rh;
+    let last='';const part=L.slice(pg*per,(pg+1)*per);
+    part.forEach((r,i)=>{if(r.dt!==last&&i){c.fillStyle='#8a8478';c.fillRect(M,y-1,W0-2*M,3)}
+      if(i%2){c.fillStyle='#faf8f4';c.fillRect(M,y,W0-2*M,rh)}
+      const w=wd(r.dt);let x=M;
+      T(c,r.dt!==last?`${md(r.dt)}（${WD[w]}）`:'',x+20,y+rh/2,34,{b:1,col:w===0?'#b3261e':w===6?'#1f4f8a':'#1d1b16'});x+=cols[0][1];
+      T(c,`${tLabel(r.from)}〜${tLabel(r.to)}`,x+20,y+rh/2,34,{b:1});x+=cols[1][1];
+      let cx=x+16;for(const p of r.ps){const lab=`${p.pos} ${p.n}名`;c.font=K.F(30,1);const tw=c.measureText(lab).width+40;if(cx+tw>x+cols[2][1]-10)break;
+        c.fillStyle=p.pos==='ポジション問わず'?'#6f695e':(PRINT_TAG[posInfo(p.pos)?.color]||'#6f695e');rr(c,cx,y+rh*0.16,tw,rh*0.68,10);c.fill();T(c,lab,cx+20,y+rh/2,30,{b:1,col:'#fff'});cx+=tw+14}
+      x+=cols[2][1];T(c,`${r.n}名`,x+20,y+rh/2,36,{b:1,col:'#b3261e'});
+      c.strokeStyle='#e4dfd5';c.lineWidth=1;c.beginPath();c.moveTo(M,y+rh);c.lineTo(W0-M,y+rh);c.stroke();y+=rh;last=r.dt});
+    if(pg===pages-1){const tot=L.reduce((a,r)=>a+r.h,0);T(c,`合計 ${L.length}件・不足 ${n1(tot)}人時`,W0-M,Math.min(H0-M-10,y+50),30,{al:'right',b:1})}
+    T(c,`${(S.printOpt||{}).allShort===true?'理想人数との差をすべて載せています。':'営業できないレベル（ポジションに0人。ポジション別の人数がない日は全体が理想の半分未満）だけを載せています。'}30分ごとに比べています（休憩中・会議の人は数えず、フリーは足りないポジションに回します）。${(S.printOpt||{}).short30===true?'':'30分だけの不足は載せていません。'}`,M,H0-M+30,22,{col:'#6b655a'})}}
+function printPages(week){const o=S.printOpt||{week:true,days:true,recruit:true},K=printKit(week);
+  if(o.week){const cv=document.createElement('canvas');cv.width=2970;cv.height=2100;drawPrint(cv);K.pages.push(cv)}
+  if(o.days)for(const dt of weekDates(week))if((dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on))drawReportDay(K.mk(),dt,{...K,head:(c,t)=>K.head(c,t)});
+  if(o.recruit)drawRecruit(K,week);
+  return K.pages}
 async function savePdf(){
   S.pdfBusy=true;render();
   try{
     try{await document.fonts?.ready}catch(_){}
-    const cv=document.createElement('canvas');cv.width=2970;cv.height=2100;drawPrint(cv);
-    const url=cv.toDataURL('image/jpeg',0.92),bin=atob(url.split(',')[1]),bytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-    const pdf=jpegPdf(bytes,cv.width,cv.height);
-    if(S.pdfMode==='print'){const pa=document.getElementById('printArea');pa.innerHTML=`<img src="${url}" alt="">`;
-      await new Promise(r=>{const im=pa.querySelector('img');if(im.complete)r();else im.onload=r});window.print();}
+    const pages=printPages(S.week);if(!pages.length){toast('印刷するページを選んでください');S.pdfBusy=false;return render()}
+    const urls=pages.map(cv=>cv.toDataURL('image/jpeg',0.92));
+    const imgs=urls.map((url,i)=>{const bin=atob(url.split(',')[1]),bytes=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k);return {bytes,w:pages[i].width,h:pages[i].height}});
+    const pdf=multiJpegPdf(imgs);
+    if(S.pdfMode==='print'){const pa=document.getElementById('printArea');pa.className='';pa.innerHTML=urls.map(u=>`<img src="${u}" alt="">`).join('');
+      await Promise.all([...pa.querySelectorAll('img')].map(im=>new Promise(r=>{if(im.complete)r();else im.onload=r})));window.print();}
     else{downloadBlob(pdf,`${S.stores[S.store]?.name||'シフト'}_シフト表_${S.week.replace(/-/g,'')}.pdf`);toast('PDFを保存しました')}
   }catch(e){toast('PDFを作れませんでした')}
   S.pdfBusy=false;render();
@@ -2286,7 +2340,9 @@ function vFinal(){
     const empty=dates.every(dt=>!(dayDoc(dt).shifts||[]).length);
     body=empty?'<div class="empty">この週のシフトはまだありません。</div>':
       `<div class="bar"><button class="btn pri" data-act="printNow"${S.pdfBusy?' disabled':''}>印刷する</button><button class="btn" data-act="savePdf"${S.pdfBusy?' disabled':''}>${S.pdfBusy?'作成中…':'PDFで保存'}</button>
-        <span class="hint">月〜日の1週間をA4横1枚にまとめます。印刷画面で「用紙：A4・横」「余白：なし」を選んでください。</span></div>
+        <span class="hint">印刷画面で「用紙：A4・横」「余白：なし」を選んでください。</span></div>
+       <div class="bar" style="flex-wrap:wrap;gap:14px;font-size:13px"><b>印刷するページ</b>${[['week','週のシフト表（1枚）'],['days','日ごとのバー（予算・人件費率・過不足つき、1日1枚）'],['recruit','募集（何時〜何時・どのポジション・何名）'],['allShort','募集に営業できるレベルの不足も載せる（ふだんは0人の時間だけ）'],['short30','募集に30分だけの不足も載せる']].map(([k,l])=>`<label><input type="checkbox" data-popt="${k}"${(S.printOpt||{week:true,days:true,recruit:true})[k]===true?' checked':''}> ${l}</label>`).join('')}</div>
+       ${(()=>{const L=recruitList(S.week);return L.length?`<details${S.recOpen?' open':''} id="recDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">募集の内容を見る（${L.length}件）</summary><table class="t" style="margin-top:6px"><thead><tr><th>日付</th><th>時間</th><th>ポジションと人数</th><th class="r">計</th></tr></thead><tbody>${L.map(r=>`<tr><td>${md(r.dt)}（${WD[wd(r.dt)]}）</td><td class="num">${tLabel(r.from)}〜${tLabel(r.to)}</td><td><span class="legend">${r.ps.map(p=>`<span style="${p.pos==='ポジション問わず'?'':posStyle(p.pos)}">${esc(p.pos)} ${p.n}名</span>`).join('')}</span></td><td class="r num"><b>${r.n}名</b></td></tr>`).join('')}</tbody></table></details>`:'<p class="hint" style="margin:0">この週は、募集に載せる時間はありません。</p>'})()}
        <div style="border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;max-width:1100px"><canvas id="printCv" width="2970" height="2100" style="width:100%;height:auto;display:block" aria-label="A4印刷イメージ"></canvas></div>`;
   }else if(mode==='week'){
     const ids=staffList(true).filter(s=>dates.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===s.id&&(isEmp(s)||calcShift(x).on||x.pos===PAID)))).sort((a,b)=>staffRank(a)-staffRank(b));
@@ -2484,7 +2540,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.48'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.49'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3085,6 +3141,7 @@ app.addEventListener('change',e=>{
   const el=e.target, f=el.dataset.f;
   if(el.dataset.dmemo){const [dt,i]=el.dataset.dmemo.split('|'),d=ensureDay(dt);if(d.shifts[+i]){d.shifts[+i].memo=el.value;saveDay(dt)}return render()}
   if(el.dataset.ocset){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings[el.dataset.ocset]=el.value===''?null:Number(el.value);saveSettings();return render()}
+  if(el.dataset.popt){S.printOpt={...(S.printOpt||{week:true,days:true,recruit:true}),[el.dataset.popt]:el.checked};return render()}
   if(el.dataset.tpl){const [w,i]=el.dataset.tpl.split('|').map(Number),t=tplGet(w);t.ideal[i]=Math.max(0,Number(el.value)||0);tplPut(w,t);return render()}
   if(el.dataset.tplp){const [w,p]=el.dataset.tplp.split('|'),t=tplGet(+w);const v=Math.max(0,Number(el.value)||0);if(v)t.posIdeal[p]=v;else delete t.posIdeal[p];tplPut(+w,t);return render()}
   if(el.dataset.tcto!=null||el.dataset.tfw!=null)return;
@@ -3392,7 +3449,7 @@ app.addEventListener('change',e=>{if(e.target.id!=='importFile')return;const f=e
     if(d.format!=='shift-app-backup')return toast('このアプリのバックアップファイルではありません');
     S.importInfo={data:d,msg:`「${d.store?.name||''}」のバックアップ（スタッフ${(d.staff||[]).length}人・${Object.keys(d.days||{}).length}日分）を、今の店舗「${S.stores[S.store]?.name||''}」に取り込みます。`};render()})});
 app.addEventListener('input',e=>{if(e.target.id!=='reportNote')return;S.reportNote=e.target.value;try{localStorage.setItem('shiftapp:report:'+S.store+':'+S.week,S.reportNote)}catch(_){}});
-app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
+app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
 document.getElementById('who').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
   if(b.dataset.act==='logout')logout();
   if(b.dataset.act==='changeMe'){S.me='';try{localStorage.removeItem('shiftapp:me:'+S.store)}catch(_){};S.draft=null;render()}});
