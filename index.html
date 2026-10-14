@@ -872,11 +872,19 @@ const short=s0=>s0.replace(/\/.*/,'');
 function posNeed(want,sumWant,idealH,isPeak){if(!(idealH>0)||!want)return 0;if(!isPeak)return 1;
   if(sumWant>0&&idealH<sumWant)return Math.max(1,Math.floor(want*idealH/sumWant));return want}
 const posSum=d=>Object.entries(d.posIdeal||{}).filter(([p])=>posInfo(p)?.kind==='work').reduce((a,[,v])=>a+(Number(v)||0),0);
+// フリーの人は、その時間に足りないポジションへ回せるものとして数える（ポジション別の不足を埋める）
+function freeFill(d,pos,ideal,peak){const st=set(),frees=st.positions.filter(p=>p.kind==='free').map(p=>p.name),sw=posSum(d);
+  const wants=Object.entries(d.posIdeal||{}).filter(([p,v])=>Number(v)>0&&posInfo(p)?.kind==='work');
+  return pos.map((P,k)=>{let f=frees.reduce((a,n)=>a+(P[n]||0),0);if(!f||!wants.length)return P;const e={...P};
+    const lst=wants.map(([p,v])=>({p,need:posNeed(Number(v),sw,ideal[Math.floor(k/2)],peak(k))}));
+    while(f>0){lst.sort((a,b)=>(b.need-(e[b.p]||0))-(a.need-(e[a.p]||0)));const t=lst[0];if(!t||t.need<=(e[t.p]||0))break;e[t.p]=(e[t.p]||0)+1;f--}
+    return e})}
 function shortages(date){
   const st=set(),d=dayDoc(date),ideal=(d.ideal||[]).map(Number);
   if(!ideal.some(v=>v>0))return {ready:false,items:[],posH:0,totalH:0};
-  const {n,pos}=slotState(d),items=[];
+  const {n,pos:pos0}=slotState(d),items=[];
   const open=k=>ideal[Math.floor(k/2)]>0,peak=k=>{const h=8+Math.floor(k/2);return h>=st.peakFrom&&h<st.peakTo};
+  const pos=freeFill(d,pos0,ideal,peak);
   const scan=(needAt,haveAt,meta)=>{let cur=null;const flush=k=>{if(cur){cur.to=8+k/2;items.push(cur);cur=null}};
     for(let k=0;k<48;k++){const need=needAt(k),have=haveAt(k);
       if(need>have){if(cur&&cur.need===need&&cur.have===have){cur.lack+=(need-have)/2}else{flush(k);cur={...meta,from:8+k/2,need,have,lack:(need-have)/2}}}else flush(k)}
@@ -895,7 +903,8 @@ function shortages(date){
 function shortMatrix(date){
   const st=set(),d=dayDoc(date),ideal=(d.ideal||[]).map(Number);
   if(!ideal.some(v=>v>0))return '';
-  const {n,pos}=slotState(d),open=k=>ideal[Math.floor(k/2)]>0,peak=k=>{const h=8+Math.floor(k/2);return h>=st.peakFrom&&h<st.peakTo};
+  const {n,pos:pos0}=slotState(d),open=k=>ideal[Math.floor(k/2)]>0,peak=k=>{const h=8+Math.floor(k/2);return h>=st.peakFrom&&h<st.peakTo};
+  const pos=freeFill(d,pos0,ideal,peak);
   let k0=48,k1=-1;for(let k=0;k<48;k++)if(open(k)){k0=Math.min(k0,k);k1=Math.max(k1,k)}
   if(k1<0)return '';
   const rows=[];
@@ -1140,10 +1149,10 @@ function genEmployees(week){
     const real=mine.some(x=>isOther(x.pos)||calcShift(x).on);d.shifts=d.shifts.filter(x=>!(x.sid===e.id&&real&&isOff(x.pos)&&x.pos!==PAID))}}
   const state={},cnt={};dates.forEach(dt=>cnt[dt]=0);
   for(const e of emps){state[e.id]={};
-    for(const dt of dates){const mine=(dayDoc(dt).shifts||[]).filter(x=>x.sid===e.id),r=mine.find(x=>isOther(x.pos)||calcShift(x).on)||mine[0];
-      state[e.id][dt]=!r?'free':r.pos===PAID?'paid':isOff(r.pos)?'wish':isOther(r.pos)||(r.start!=null&&r.end!=null)?'pin':'free';
-      if(state[e.id][dt]==='pin'&&!isOther(r.pos))cnt[dt]++}}
-  const need={};for(const e of emps){const W=Number(e.workDays??5);need[e.id]=Math.max(0,W-dates.filter(dt=>state[e.id][dt]==='pin').length)}
+    for(const dt of dates){const mine=(dayDoc(dt).shifts||[]).filter(x=>x.sid===e.id),r=mine.find(x=>isOther(x.pos)||calcShift(x).on)||mine.find(x=>!x.gen&&!isOff(x.pos))||mine[0];
+      state[e.id][dt]=!r?'free':r.pos===PAID?'paid':isOff(r.pos)?'wish':isOther(r.pos)||(r.start!=null&&r.end!=null)?'pin':!r.gen?'fill':'free';
+      if((state[e.id][dt]==='pin'&&!isOther(r.pos))||state[e.id][dt]==='fill')cnt[dt]++}}
+  const need={};for(const e of emps){const W=Number(e.workDays??5);need[e.id]=Math.max(0,W-dates.filter(dt=>state[e.id][dt]==='pin'||state[e.id][dt]==='fill').length)}
   const budgetOf=dt=>Number(dayDoc(dt).budget)||0;
   // 不足が出ないように：時間帯ごとの理想人数と、すでに入っている人（アルバイトの希望・社員の決め打ち）を比べ、
   // 社員が入ると一番多く不足が埋まる日に出勤を入れていく（休み＝公休は、不足が一番少ない日に残る）
@@ -1168,6 +1177,7 @@ function genEmployees(week){
     if(!best)break;const [e,dt]=best;state[e.id][dt]='work';cnt[dt]++;need[e.id]--;const v=vsh(e,dt);times[e.id+dt]=v;virt[dt].push(v);{const [a,b]=win(e);for(let k=a;k<b;k++)cov[dt][k]++}}
   let made=0;
   for(const e of emps)for(const dt of dates){const d=ensureDay(dt);
+    if(state[e.id][dt]==='fill'){const r=d.shifts.find(x=>x.sid===e.id&&!x.gen&&!isOff(x.pos)&&!isOther(x.pos)&&(x.start==null||x.end==null));if(r){r.start=Number(e.defStart??12);r.end=Number(e.defEnd??23.5);if(!r.pos)r.pos=e.defPos||'';made++}}
     if(state[e.id][dt]==='work'){const v=times[e.id+dt];d.shifts.push({sid:e.id,start:v?v.start:Number(e.defStart??12),end:v?v.end:Number(e.defEnd??23.5),pos:e.defPos||'',bs:null,gen:true});made++}
     else if(state[e.id][dt]==='free')d.shifts.push({sid:e.id,start:null,end:null,pos:offPos(),bs:null,gen:true})}
   // 休みに番号をつける（週の1日目の休み＝公休1、2日目＝公休2、3日目から＝公休調整）。有給はそのまま
@@ -1610,11 +1620,14 @@ function vShift(){
   const foot=`<tr><td class="lab stk">実数</td><td colspan="4"></td>${C.perHour.map(v=>`<td colspan="2">${+v.toFixed(1)}</td>`).join('')}<td>${n1(C.work)}</td><td>${n1(C.brk)}</td><td>${n1(C.labor)}</td><td>${n1(C.night)}</td><td></td><td></td></tr>
     <tr><td class="lab stk">理想</td><td colspan="4"></td>${ideal.map((v,i)=>`<td colspan="2"><input type="number" step="0.5" min="0" data-f="ideal" data-h="${i}" value="${v||0}" aria-label="${HOURS[i]}時の理想人数"></td>`).join('')}<td colspan="6"></td></tr>
     <tr><td class="lab stk">過不足</td><td colspan="4"></td>${C.perHour.map((v,i)=>{const x=+(v-(ideal[i]||0)).toFixed(1);return `<td colspan="2" class="${x<0?'neg':x>0?'pos':''}">${x}</td>`}).join('')}<td colspan="6"></td></tr>`;
-  const posRows=st.summaryOrder.map(p=>{const n=C.posCount[p]||0,id=Number(d.posIdeal?.[p]||0),x=n-id;
+  const freeP=st.positions.filter(p=>p.kind==='free').map(p=>p.name);
+  const posRows=st.summaryOrder.concat(freeP.filter(p=>!st.summaryOrder.includes(p))).map(p=>{const n=C.posCount[p]||0;
+    if(freeP.includes(p))return `<tr><td><span class="legend"><span style="${posStyle(p)}">${esc(p)}</span></span></td><td class="r num">${n}</td><td class="r muted" colspan="2" style="font-size:11px">どこにも回せる</td></tr>`;
+    const id=Number(d.posIdeal?.[p]||0),x=n-id;
     return `<tr><td><span class="legend"><span style="${posStyle(p)}">${esc(p)}</span></span></td><td class="r num">${n}</td>
     <td class="r num ${x<0?'cell-bad':x>0?'cell-warn':''}">${x}</td>
     <td class="r" style="width:80px"><input type="number" min="0" data-f="posIdeal" data-p="${esc(p)}" value="${id}" aria-label="${esc(p)}の理想人数"></td></tr>`}).join('');
-  const totN=st.summaryOrder.reduce((a,p)=>a+(C.posCount[p]||0),0), totI=st.summaryOrder.reduce((a,p)=>a+Number(d.posIdeal?.[p]||0),0);
+  const totN=st.summaryOrder.concat(freeP.filter(p=>!st.summaryOrder.includes(p))).reduce((a,p)=>a+(C.posCount[p]||0),0), totI=st.summaryOrder.reduce((a,p)=>a+Number(d.posIdeal?.[p]||0),0);
   const confirm=S.confirm==='copyWeek'?`<div class="confirm">前の週（${md(addDays(S.week,-7))}〜）のシフトをこの週にコピーします。<button class="btn sm pri" data-act="copyWeekGo">コピーする</button><button class="btn sm" data-act="cancel">やめる</button></div>`:
     S.confirm==='clearDay'?`<div class="confirm">${md(date)}のシフト行をすべて消します。<button class="btn sm pri" data-act="clearDayGo">消す</button><button class="btn sm" data-act="cancel">やめる</button></div>`:'';
   const undo=S.undo&&S.undo.date===date?`<div class="confirm">${esc(S.undo.msg)}<button class="btn sm" data-act="undo">元に戻す</button><button class="btn sm ghost" data-act="undoClose">OK</button></div>`:'';
@@ -2465,7 +2478,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.46'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.47'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3003,7 +3016,7 @@ function vSettings(){
   const st=set();
   const pos=st.positions.map((p,i)=>`<tr><td><input type="text" data-pf="name" data-i="${i}" value="${esc(p.name)}" aria-label="ポジション名"></td>
     <td><div class="swatches">${COLORS.map(c=>`<button class="sw" style="--pc:var(--p-${c})" data-act="pcolor" data-i="${i}" data-c="${c}" aria-pressed="${p.color===c}" aria-label="${c}"></button>`).join('')}</div></td>
-    <td><select data-pf="kind" data-i="${i}" aria-label="扱い"><option value="work"${p.kind==='work'?' selected':''}>人数集計に入れる</option><option value="free"${p.kind==='free'?' selected':''}>勤務（集計外）</option><option value="help"${p.kind==='help'?' selected':''}>ヘルプ（他店へ・自店に含めない）</option><option value="other"${p.kind==='other'?' selected':''}>会議・その他（決め打ち・人数に数えない）</option><option value="off"${p.kind==='off'?' selected':''}>休み</option></select></td>
+    <td><select data-pf="kind" data-i="${i}" aria-label="扱い"><option value="work"${p.kind==='work'?' selected':''}>人数集計に入れる</option><option value="free"${p.kind==='free'?' selected':''}>フリー（人数に入る・足りないポジションに回せる）</option><option value="help"${p.kind==='help'?' selected':''}>ヘルプ（他店へ・自店に含めない）</option><option value="other"${p.kind==='other'?' selected':''}>会議・その他（決め打ち・人数に数えない）</option><option value="off"${p.kind==='off'?' selected':''}>休み</option></select></td>
     <td><button class="del" data-act="delPos" data-i="${i}" aria-label="${esc(p.name)}を削除">×</button></td></tr>`).join('');
   const num=(f,l,step=1)=>`<label class="field"><span>${l}</span><input type="number" step="${step}" id="s_${f}" data-sset="${f}" value="${st[f]}"></label>`;
   const cur=S.stores[S.store]||{};
@@ -3099,7 +3112,7 @@ app.addEventListener('change',e=>{
       else if(f==='paidH'){sh.paidH=el.value===''?null:Math.max(0,Number(el.value))}
       else if(f==='helpTo'){sh.helpTo=el.value.trim()}
       else if(f==='oNote'){sh.oNote=el.value.trim().slice(0,40)}
-      else{sh[f]=el.value===''?null:Number(el.value);sh.bs=null;
+      else{sh[f]=el.value===''?null:Number(el.value);sh.bs=null;if(sh[f]!=null&&isOff(sh.pos)&&sh.pos!==PAID){sh.pos='';if(sh.req&&sh.req.off)sh.req=null} // 公休の行に時間を入れたら出勤に
         if(sh.req&&!sh.req.off&&sh.req.start===sh.start&&sh.req.end===sh.end){sh.why='';}
         else if(sh.req)sh.why=sh.why&&sh.why.startsWith('目標人件費率')?'':sh.why}
       if(!sh.req&&sh.sid&&sh.start!=null&&sh.end!=null&&sh.end>sh.start)sh.req={start:sh.start,end:sh.end};
