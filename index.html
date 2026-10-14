@@ -1135,10 +1135,13 @@ function genEmployees(week){
   const st=set(),dates=weekDates(week),emps=staffList().filter(x=>x.kind==='社員'),minE=Number(st.minEmp??2),notes=[];
   if(!emps.length)return {msg:'名簿に社員がいません'};
   for(const dt of dates){const d=ensureDay(dt);d.shifts=d.shifts.filter(r=>!(r.gen&&!r.pin&&!isOther(r.pos)&&(emps.some(e=>e.id===r.sid)||(isEmp(S.staff[r.sid])&&S.staff[r.sid].active===false))))}
+  // 同じ社員がその日に、会議・出勤の行と公休の行を両方持っていたら、公休の行を消す（2行にならないように）
+  for(const dt of dates){const d=ensureDay(dt);for(const e of emps){const mine=d.shifts.filter(x=>x.sid===e.id);if(mine.length<2)continue;
+    const real=mine.some(x=>isOther(x.pos)||calcShift(x).on);d.shifts=d.shifts.filter(x=>!(x.sid===e.id&&real&&isOff(x.pos)&&x.pos!==PAID))}}
   const state={},cnt={};dates.forEach(dt=>cnt[dt]=0);
   for(const e of emps){state[e.id]={};
-    for(const dt of dates){const r=(dayDoc(dt).shifts||[]).find(x=>x.sid===e.id);
-      state[e.id][dt]=!r?'free':r.pos===PAID?'paid':isOff(r.pos)?'wish':(r.start!=null&&r.end!=null)?'pin':'free';
+    for(const dt of dates){const mine=(dayDoc(dt).shifts||[]).filter(x=>x.sid===e.id),r=mine.find(x=>isOther(x.pos)||calcShift(x).on)||mine[0];
+      state[e.id][dt]=!r?'free':r.pos===PAID?'paid':isOff(r.pos)?'wish':isOther(r.pos)||(r.start!=null&&r.end!=null)?'pin':'free';
       if(state[e.id][dt]==='pin'&&!isOther(r.pos))cnt[dt]++}}
   const need={};for(const e of emps){const W=Number(e.workDays??5);need[e.id]=Math.max(0,W-dates.filter(dt=>state[e.id][dt]==='pin').length)}
   const budgetOf=dt=>Number(dayDoc(dt).budget)||0;
@@ -2462,7 +2465,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.45'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.46'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2785,10 +2788,11 @@ function empMonth(e,y,m){
 /* 社員の週の出勤・休み（シフト作成で日を見ながら、誰が何曜日に休みかを確認する） */
 function empWeekPanel(date){const emps=staffList().filter(isEmp);if(!emps.length)return '';
   const ds=weekDates(monday(date));
-  const cell=(e,dt)=>{const r=(dayDoc(dt).shifts||[]).find(x=>x.sid===e.id);
+  const cell=(e,dt)=>{const mine=(dayDoc(dt).shifts||[]).filter(x=>x.sid===e.id),r=mine.find(x=>isOther(x.pos)||calcShift(x).on)||mine[0];
     if(!r)return {t:'未定',cls:'muted'};
     if(r.pos===PAID)return {t:'有給',cls:'paid'};
     if(isOff(r.pos))return {t:r.pos,cls:'off'};
+    if(isOther(r.pos))return {t:r.start!=null&&r.end!=null?`${tLabel(r.start)}–${tLabel(r.end)}`:r.pos,cls:'on',sub:r.start!=null&&r.end!=null?r.pos+(r.oNote?' '+r.oNote:''):(r.oNote||'')};
     if(r.start!=null&&r.end!=null)return {t:`${tLabel(r.start)}–${tLabel(r.end)}`,cls:'on',sub:r.pos||''};
     return {t:'未定',cls:'muted'}};
   const cnt=ds.map(dt=>emps.filter(e=>cell(e,dt).cls==='on').length),minE=Number(set().minEmp??2);
@@ -3099,7 +3103,11 @@ app.addEventListener('change',e=>{
         if(sh.req&&!sh.req.off&&sh.req.start===sh.start&&sh.req.end===sh.end){sh.why='';}
         else if(sh.req)sh.why=sh.why&&sh.why.startsWith('目標人件費率')?'':sh.why}
       if(!sh.req&&sh.sid&&sh.start!=null&&sh.end!=null&&sh.end>sh.start)sh.req={start:sh.start,end:sh.end};
-      if(sh.gen&&['sid','pos','start','end','paidH'].includes(f))delete sh.gen;} // 手で直した行は、自動作成で作り直さない
+      if(sh.gen&&['sid','pos','start','end','paidH'].includes(f))delete sh.gen; // 手で直した行は、自動作成で作り直さない
+      // 同じ人の重なり：この行を決めたら、その人の自動で作った行・休み（公休）の行は消す（同じ人が2行にならないように）
+      if(sh.sid&&['sid','pos','start','end'].includes(f)&&(calcShift(sh).on||isOther(sh.pos)||isOff(sh.pos))){
+        const dup=d.shifts.filter(x=>x!==sh&&x.sid===sh.sid&&(x.gen||(isOff(x.pos)&&x.pos!==PAID)||(!calcShift(x).on&&x.pos!==PAID&&!isOther(x.pos))));
+        if(dup.length){d.shifts=d.shifts.filter(x=>!dup.includes(x));toast(`${S.staff[sh.sid]?.name||''}さんの重なっていた行（${dup.map(x=>x.pos||'未定').join('・')}）を消しました`)}}}
     saveDay(date);return render();
   }
   if(el.dataset.sf){const s=S.staff[el.dataset.id],k=el.dataset.sf;
