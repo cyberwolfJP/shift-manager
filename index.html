@@ -222,6 +222,7 @@ table.wk tr.me td{background:var(--warn-bg)}
 .emv tr.sat th{color:#1f4f8a}.emv tr.sun th{color:var(--bad)}.emv tr.sat,.emv tr.sun{background:var(--sunk)}.emv tr.td{outline:2px solid var(--accent);outline-offset:-2px}
 .emv td.ac b{color:var(--fg)}.emv td.fu b{color:var(--accent)}.emv td .cu{font-size:10px;color:var(--muted)}.emv td .pd{font-size:11px;color:var(--p-text,#6e4aa0);background:var(--p-violet);border-radius:3px;padding:0 3px;margin-left:2px}
 .emv td.of{background:var(--bad-bg);color:var(--bad);font-weight:700;font-size:12px}.emv td.un{color:var(--muted);font-size:11px}.emv td.mu{color:var(--muted);font-size:11px}
+.emv .s0{border-left:2px solid var(--muted)!important}.emv th.sub{font-size:11px;font-weight:700;color:var(--muted);padding:2px 4px}.emv td{font-size:12px}
 .emv tfoot th{text-align:left;background:var(--sunk);font-size:12px}.emv tfoot td{background:var(--sunk)}.emv tfoot tr.land th,.emv tfoot tr.land td{background:var(--good-bg)}
 .mbar{position:relative;height:14px;background:var(--sunk);border-radius:3px;overflow:visible}.mbar i{position:absolute;top:0;bottom:0;left:0}.mbar i.a{background:var(--fg)}.mbar i.p{background:var(--accent);opacity:.75}
 .mbar i.f{background:repeating-linear-gradient(45deg,var(--muted) 0 3px,transparent 3px 6px);opacity:.7}.mbar b{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--bad);margin-left:-1px}
@@ -2611,7 +2612,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.55'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.56'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3108,13 +3109,16 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
   // 1日〜月末を縦に、社員を横に並べた表
   const pre=`${y}-${pad(m)}`,days=[];for(let d=`${pre}-01`;d.slice(0,7)===pre;d=addDays(d,1))days.push(d);
   const cum={};emps.forEach(e=>cum[e.id]=0);
-  const cell=(e,d)=>{const mine=(dayDoc(d).shifts||[]).filter(x=>x.sid===e.id);let l=0,on=false,paidH=0,off='',meet='';
-    for(const r of mine){if(r.pos===PAID){paidH+=Math.max(0,Number(r.paidH)||0);continue}if(isOff(r.pos)){off=r.pos;continue}const c=calcShift(r);if(c.on){l+=c.labor;on=true}else if(isOther(r.pos))meet=r.pos}
-    if(on||paidH){cum[e.id]+=l+paidH;const fut=d>=today;
-      return `<td class="num ${fut?'fu':'ac'}">${on?`<b>${n1(l)}</b>`:''}${paidH?`<span class="pd">有${n1(paidH)}</span>`:''}<div class="cu">${n1(cum[e.id])}</div></td>`}
-    if(off)return `<td class="of">${esc(off)}</td>`;
-    if(meet)return `<td class="mu">${esc(meet)}</td>`;
-    return d>=today?'<td class="un">未定</td>':'<td class="mu">—</td>'};
+  // 社員ごとに 入・出・休・実働 の4列（実働の下に、その日までの累計）
+  const cell=(e,d)=>{const mine=(dayDoc(d).shifts||[]).filter(x=>x.sid===e.id);let l=0,on=false,paidH=0,off='',meet='',st0=null,en0=null,brk=0;
+    for(const r of mine){if(r.pos===PAID){paidH+=Math.max(0,Number(r.paidH)||0);continue}if(isOff(r.pos)){off=r.pos;continue}const c=calcShift(r);
+      if(c.on){l+=c.labor;on=true;brk+=c.brk;st0=st0==null?r.start:Math.min(st0,r.start);en0=en0==null?r.end:Math.max(en0,r.end)}else if(isOther(r.pos))meet=r.pos}
+    const fut=d>=today,f=fut?'fu':'ac';
+    if(on||paidH){cum[e.id]+=l+paidH;
+      return `<td class="num ${f} s0">${on?tLabel(st0):''}</td><td class="num ${f}">${on?tLabel(en0):''}</td><td class="num ${f}">${on?(brk?Math.round(brk*60)+'分':'0'):''}</td><td class="num ${f} s1">${on?`<b>${n1(l)}</b>`:''}${paidH?`<span class="pd">有${n1(paidH)}</span>`:''}<div class="cu">${n1(cum[e.id])}</div></td>`}
+    if(off)return `<td class="of s0 s1" colspan="4">${esc(off)}</td>`;
+    if(meet)return `<td class="mu s0 s1" colspan="4">${esc(meet)}</td>`;
+    return fut?'<td class="un s0 s1" colspan="4">未定</td>':'<td class="mu s0 s1" colspan="4">—</td>'};
   const body=days.map(d=>{const w=wd(d);return `<tr class="${d===today?'td':''} ${w===0?'sun':w===6?'sat':''}"><th class="num">${+d.slice(8)}<span>${WD[w]}</span></th>${emps.map(e=>cell(e,d)).join('')}</tr>`}).join('');
   const foot=[['所定労働時間',r=>`<b>${n1(r.shotei)}h</b>`],['実績（昨日まで）',r=>`${n1(r.act)}h`],['予定（シフト済み）＋有給',r=>`${n1(r.plan+r.paid)}h`],['未定の日の見込み',r=>r.und?`${n1(r.fore-r.act-r.plan-r.paid)}h<div class="muted" style="font-size:11px">${r.und}日中${n1(r.addDays)}日出勤</div>`:'—'],
     ['着地予測',r=>`<b style="font-size:16px">${n1(r.fore)}h</b>`],['所定との差',r=>{const d=r.diff;return `<b class="${d>8?'cell-bad':d<-8?'cell-warn':''}">${d>0?'+':''}${n1(d)}h</b><div style="font-size:11px">${d>8?'超える見込み':d<-8?'届かない見込み':'ほぼ所定どおり'}</div>`}],
@@ -3123,9 +3127,10 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
       <div class="weeknav"><button class="btn sm" data-act="empYm" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${y}年${m}月</span><button class="btn sm" data-act="empYm" data-n="1" aria-label="次の月">›</button><button class="btn sm ghost" data-act="empYmNow">今月</button></div>
       <span class="hint">${past?'終わった月：実績で確定しています':fut?'これからの月：シフトと見込みで予測しています':`${md(today)}時点`}</span></div>
     <div class="legend" style="font-size:12px"><span style="--pc:var(--sunk)">黒い数字＝働いた時間（実績）</span><span style="--pc:var(--sunk);color:var(--accent)">赤い数字＝シフト済みの予定</span><span style="--pc:var(--sunk)">小さい数字＝その日までの累計</span><span style="--pc:var(--bad-bg);color:var(--bad)">公休</span><span style="--pc:var(--sunk);color:var(--muted)">未定＝まだシフトなし</span></div>
-    <div class="scroll" style="max-height:none"><table class="t emv"><thead><tr><th>日</th>${emps.map(e=>`<th>${esc(e.name)}<div class="muted" style="font-size:10px;font-weight:400">週${e.workDays??5}日</div></th>`).join('')}</tr></thead>
+    <div class="scroll" style="max-height:none"><table class="t emv"><thead><tr><th rowspan="2">日</th>${emps.map(e=>`<th colspan="4" class="s0 s1">${esc(e.name)}<span class="muted" style="font-size:10px;font-weight:400;margin-left:4px">週${e.workDays??5}日</span></th>`).join('')}</tr>
+      <tr>${emps.map(()=>'<th class="sub s0">入</th><th class="sub">出</th><th class="sub">休</th><th class="sub s1">実働</th>').join('')}</tr></thead>
       <tbody>${body}</tbody>
-      <tfoot>${foot.map(([lab,f],i)=>`<tr class="${i===4?'land':''}"><th>${lab}</th>${R.map(({r})=>`<td class="num">${f(r)}</td>`).join('')}</tr>`).join('')}</tfoot></table></div>
+      <tfoot>${foot.map(([lab,f],i)=>`<tr class="${i===4?'land':''}"><th>${lab}</th>${R.map(({r})=>`<td class="num s0 s1" colspan="4">${f(r)}</td>`).join('')}</tr>`).join('')}</tfoot></table></div>
     <p class="hint">着地予測＝実績＋予定＋有給＋「未定の日」×（週の出勤日数÷7）×その人のこの月の1日平均労働時間。所定労働時間・週の出勤日数は「マスタ → 名簿 → 社員の勤務ルール」で変えられます。</p></section>`}
 function vEmp(){
   const st=set(), emps=staffList(true).filter(s=>s.kind==='社員');
