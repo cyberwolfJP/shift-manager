@@ -2011,7 +2011,7 @@ function drawReport(week,comment){
   const wrap=(c,t,maxW,px,b)=>{c.font=F(px,b);const out=[];let line='';for(const ch of t){if(c.measureText(line+ch).width>maxW){out.push(line);line=ch}else line+=ch}if(line)out.push(line);return out};
   const pc=v=>v==null?'—':(v*100).toFixed(1)+'%';
   const {W,P,out}=reportFindings(week),E=evalPeriod(weekDates(week));
-  const dayList=weekDates(week).filter(dt=>(dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on)),TOT=2+dayList.length;
+  const dayList=weekDates(week).filter(dt=>(dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on)),hasEmp=staffList(true).some(s=>s.kind==='社員'),EP=hasEmp?2:0,TOT=2+EP+dayList.length;
   const head=(c,title,pg)=>{T(c,title,M,M+20,58,{b:1});T(c,`${store}　${parse(week).getFullYear()}年 ${md(week)}（月）〜${md(addDays(week,6))}（日）`,M,M+92,34,{col:'#3d3a33'});
     T(c,`作成 ${md(today)}　${pg}/${TOT}`,pg===1?W0-M-170:W0-M,M+20,26,{al:'right',col:'#6b655a'});c.fillStyle='#1d1b16';c.fillRect(M,M+140,W0-2*M,4)};
   // ---- 1枚目
@@ -2063,9 +2063,60 @@ function drawReport(week,comment){
   const cy=H0-M-330;c.strokeStyle='#8a8478';c.lineWidth=2;c.strokeRect(rx,cy,rw,330);T(c,'店長コメント',rx+24,cy+40,28,{b:1});
   const cm=(comment||'').trim();let yy=cy+96;for(const para of (cm||'（なし）').split('\n'))for(const ln of wrap(c,para,rw-48,26)){if(yy>cy+310)break;T(c,ln,rx+24,yy,26,{col:cm?'#1d1b16':'#6b655a'});yy+=40}
   // ---- 3枚目から：日ごとのページ（バーのシフト・理想と実数・過不足・売上予算と人件費率）
-  dayList.forEach((dt,i)=>drawReportDay(mk(),dt,{W0,H0,M,T,F,wrap,pc,head:(c,t)=>head(c,t,3+i)}));
+  if(hasEmp){const K={W0,H0,M,T,F,wrap,pc};drawEmpWeekPage(mk(),week,{...K,head:(c,t)=>head(c,t,3)});drawEmpMonthPage(mk(),week,{...K,head:(c,t)=>head(c,t,4)})}
+  dayList.forEach((dt,i)=>drawReportDay(mk(),dt,{W0,H0,M,T,F,wrap,pc,head:(c,t)=>head(c,t,3+EP+i)}));
   return pages;
 }
+// キャンバスに表を描く（cols=[{w,al}]、rows=[{cells:[...],bg,b,col:[...]}]）
+function drawTbl(c,K,x,y,cols,rows,rh,fs){const {T}=K;let yy=y;const W=cols.reduce((a,b)=>a+b.w,0);
+  rows.forEach((r,i)=>{if(r.bg){c.fillStyle=r.bg;c.fillRect(x,yy,W,rh)}else if(i%2===0&&!r.head){c.fillStyle='#faf8f4';c.fillRect(x,yy,W,rh)}
+    let xx=x;cols.forEach((cl,j)=>{const v=r.cells[j];if(r.cbg&&r.cbg[j]){c.fillStyle=r.cbg[j];c.fillRect(xx,yy,cl.w,rh)}
+      if(v!=null&&v!=='')T(c,String(v),cl.al==='r'?xx+cl.w-12:cl.al==='c'?xx+cl.w/2:xx+12,yy+rh/2,r.fs||fs,{b:r.b||cl.b,al:cl.al==='r'?'right':cl.al==='c'?'center':'left',max:cl.w-16,col:(r.col&&r.col[j])||r.color||'#1d1b16'});
+      if(cl.sep){c.fillStyle='#8a8478';c.fillRect(xx,yy,2,rh)}xx+=cl.w});
+    c.strokeStyle='#e4dfd5';c.lineWidth=1;c.beginPath();c.moveTo(x,yy+rh);c.lineTo(x+W,yy+rh);c.stroke();yy+=rh});
+  c.strokeStyle='#8a8478';c.lineWidth=2;c.strokeRect(x,y,W,yy-y);return yy}
+// 週報：社員勤務時間（週ごとの労働時間と、この週の残業・深夜）
+function drawEmpWeekPage(c,week,K){const {W0,H0,M,T}=K;K.head(c,'社員勤務時間');const D=empWeeksData(week),st=D.st,emps=D.emps;
+  let y=M+190;T(c,`週ごとの労働時間（ボーダー${st.border}時間未満は赤）`,M,y,32,{b:1});y+=36;
+  const nW=300,bW=180,tW=200,ew=Math.max(140,(W0-2*M-nW-bW-tW)/Math.max(1,emps.length));
+  const cols=[{w:nW},...emps.map((_,i)=>({w:ew,al:'r',sep:i===0})),{w:bW,al:'r',sep:1},{w:tW,al:'r',b:1}];
+  const rows=[{head:1,bg:'#ebe7de',b:1,cells:['週',...emps.map(e=>e.name),'ボーダー','合計']},
+    ...D.rows.map(r=>({bg:r.m===week?'#fff4cf':null,b:r.m===week,cells:[`${md(r.m)}〜${md(addDays(r.m,6))}`,...r.hs.map(n1),String(st.border),n1(r.tot)],cbg:[null,...r.hs.map(h=>h<st.border?'#f8dcd8':null)]})),
+    {bg:'#ebe7de',b:1,cells:['合計',...D.colTot.map(n1),'',n1(D.all)]}];
+  const rh=Math.min(64,Math.max(44,(H0*0.42)/rows.length));y=drawTbl(c,K,M,y+20,cols,rows,rh,26)+60;
+  // この週の残業・深夜
+  T(c,`${md(week)}〜${md(addDays(week,6))}の残業・深夜（${otRuleText()}）`,M,y,30,{b:1,max:W0-2*M});y+=30;
+  const act=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false),R=act.map(e=>({e,r:otWeek(e,week)})),lk=moneyLocked();
+  const c2=[{w:360},{w:230,al:'r'},{w:230,al:'r'},{w:230,al:'r'},{w:230,al:'r'},{w:230,al:'r'},{w:260,al:'r'},{w:260,al:'r'},{w:260,al:'r',b:1}];const sc=(W0-2*M)/c2.reduce((a,b)=>a+b.w,0);c2.forEach(x=>x.w*=sc);
+  const tot=R.reduce((a,x)=>({l:a.l+x.r.labor,o:a.o+x.r.ot,n:a.n+x.r.night,no:a.no+x.r.nightOT,p1:a.p1+x.r.otPay,p2:a.p2+x.r.nightOTPay,p3:a.p3+x.r.nightPay,t:a.t+x.r.total}),{l:0,o:0,n:0,no:0,p1:0,p2:0,p3:0,t:0});
+  const rows2=[{head:1,bg:'#ebe7de',b:1,cells:['社員','労働','残業','深夜','うち深夜残業','残業代','深夜残業代','深夜手当','合計']},
+    ...R.map(({e,r})=>({cells:[e.name,n1(r.labor)+'h',n1(r.ot)+'h',n1(r.night)+'h',n1(r.nightOT)+'h',yen(r.otPay),yen(r.nightOTPay),yen(r.nightPay),yen(r.total)]})),
+    {bg:'#ebe7de',b:1,cells:['合計',n1(tot.l)+'h',n1(tot.o)+'h',n1(tot.n)+'h',n1(tot.no)+'h',yen(tot.p1),yen(tot.p2),yen(tot.p3),yen(tot.t)]}];
+  const rh2=Math.min(60,Math.max(40,(H0-M-y-80)/rows2.length));drawTbl(c,K,M,y+16,c2,rows2,rh2,24);
+  T(c,`残業代＝時給×${st.otRate}、深夜残業代＝時給×（${st.otRate}＋${st.nightRate??0.25}）、深夜手当＝時給×${st.nightRate??0.25}。${lk?'金額は閲覧用パスワードで解除すると表示されます。':''}`,M,H0-M+30,20,{col:'#6b655a'})}
+// 週報：社員の月間実績と着地予測（1日〜月末を縦に。社員ごとに入・出・実働）
+function drawEmpMonthPage(c,week,K){const {W0,H0,M,T}=K,ym=week.slice(0,7),y0=+ym.slice(0,4),m0=+ym.slice(5,7);K.head(c,`社員の月間実績と着地予測（${y0}年${m0}月）`);
+  const emps=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false),R=emps.map(e=>({e,r:empMonthStat(e,y0,m0)}));
+  const days=[];for(let d=`${ym}-01`;d.slice(0,7)===ym;d=addDays(d,1))days.push(d);
+  const dW=150,ew=(W0-2*M-dW)/Math.max(1,emps.length),sub=[0.32,0.32,0.36];
+  const cols=[{w:dW},...emps.flatMap(()=>[{w:ew*sub[0],al:'c',sep:1},{w:ew*sub[1],al:'c'},{w:ew*sub[2],al:'r',b:1}])];
+  const cum={};emps.forEach(e=>cum[e.id]=0);
+  const rowsD=days.map(d=>{const w=wd(d),cells=[`${+d.slice(8)}（${WD[w]}）`],col=[w===0?'#b3261e':w===6?'#1f4f8a':'#1d1b16'],cbg=[null];
+    for(const e of emps){const mine=(dayDoc(d).shifts||[]).filter(x=>x.sid===e.id);let l=0,on=false,st0=null,en0=null,paidH=0,off='';
+      for(const r of mine){if(r.pos===PAID){paidH+=Number(r.paidH)||0;continue}if(isOff(r.pos)){off=r.pos;continue}const c2=calcShift(r);if(c2.on){l+=c2.labor;on=true;st0=st0==null?r.start:Math.min(st0,r.start);en0=en0==null?r.end:Math.max(en0,r.end)}}
+      const fut=d>=today,fc=fut?'#b8432a':'#1d1b16';
+      if(on||paidH){cum[e.id]+=l+paidH;cells.push(on?tLabel(st0):'有給',on?tLabel(en0):'',`${on?n1(l):''}${paidH?(on?'+':'')+'有'+n1(paidH):''}（${n1(cum[e.id])}）`);col.push(fc,fc,fc);cbg.push(null,null,null)}
+      else if(off){cells.push(off,'','');col.push('#b3261e','','');cbg.push('#f8dcd8','#f8dcd8','#f8dcd8')}
+      else{cells.push(fut?'未定':'—','','');col.push('#9a9488','','');cbg.push(null,null,null)}}
+    return {cells,col,cbg,bg:w===0||w===6?'#f1eee8':null}});
+  const head=[{head:1,bg:'#ebe7de',b:1,cells:['日',...emps.flatMap(e=>[e.name,'',''])]},{head:1,bg:'#ebe7de',b:1,fs:18,cells:['',...emps.flatMap(()=>['入','出','実働（累計）'])]}];
+  const foot=[['所定',r=>n1(r.shotei)+'h'],['実績＋予定＋有給',r=>n1(r.act+r.plan+r.paid)+'h'],['着地予測',r=>n1(r.fore)+'h'],['所定との差',r=>(r.diff>0?'+':'')+n1(r.diff)+'h'],['残業／深夜',r=>`${n1(r.ot)}h／${n1(r.night)}h`]].map(([lab,f],i)=>({bg:i===2?'#dcefe2':'#ebe7de',b:1,cells:[lab,...R.flatMap(({r})=>[f(r),'',''])]}));
+  const all=[...head,...rowsD,...foot],rh=Math.max(30,Math.min(46,(H0-M-(M+190)-60)/all.length));
+  // 社員名・下の集計は3列分をまとめて書く：先に表を描いてから上書き
+  const y=M+190,end=drawTbl(c,K,M,y,cols,all.map(r=>({...r,cells:r.cells.map((v,j)=>j>0&&(r===all[0]||foot.includes(r))&&(j-1)%3!==0?'':v)})),rh,Math.min(20,rh*0.55));
+  const merge=(ri,txtF)=>{const yy=y+ri*rh;emps.forEach((e,i)=>{const x=M+dW+i*ew;c.fillStyle=all[ri].bg||'#fff';c.fillRect(x+2,yy+1,ew-3,rh-2);T(c,txtF(i),x+ew/2,yy+rh/2,Math.min(22,rh*0.6),{b:1,al:'center',max:ew-12,col:ri>=head.length+rowsD.length&&ri-head.length-rowsD.length===3?(R[i].r.diff>8?'#b3261e':R[i].r.diff<-8?'#a46a00':'#1d1b16'):'#1d1b16'})})};
+  merge(0,i=>emps[i].name);foot.forEach((r,k)=>merge(head.length+rowsD.length+k,i=>r.cells[1+i*3]));
+  T(c,'黒＝実績、赤＝これからの予定、（ ）内はその日までの累計。着地予測＝実績＋予定＋有給＋未定の日×（週の出勤日数÷7）×1日平均。',M,H0-M+30,20,{col:'#6b655a'})}
 function drawReportDay(c,dt,K){
   const {W0,H0,M,T,F,wrap,pc}=K,st=set(),d=dayDoc(dt),C=calcDay(dt),w=wd(dt),tr=targetRateOf(dt),cap=C.budget*tr/100,ideal=(d.ideal||[]).map(Number);
   K.head(c,'日別シフト詳細');
@@ -2169,7 +2220,7 @@ function vReport(){
   if(S.reportNoteWeek!==S.week){S.reportNote=k('shiftapp:report:'+S.store+':'+S.week)||'';S.reportNoteWeek=S.week}
   const {out}=reportFindings(S.week);
   return `<div class="bar"><button class="btn pri" data-act="reportShare"${S.reportBusy?' disabled':''}>${S.reportBusy?'作成中…':'PDFを作って共有'}</button><button class="btn" data-act="reportSave"${S.reportBusy?' disabled':''}>PDFを保存</button><button class="btn" data-act="reportJpeg"${S.reportBusy?' disabled':''}>画像（JPEG）で保存・共有</button>
-      <span class="hint">週のまとめ・評価と分析に続けて、日ごとのページ（バーのシフト・理想と実数の過不足・売上予算と人件費率）を入れたPDFを作ります。スマホでは「共有」からLINEやメールで送れます。</span></div>
+      <span class="hint">週のまとめ・評価と分析・社員勤務時間（週と月間）に続けて、日ごとのページ（バーのシフト・理想と実数の過不足・売上予算と人件費率）を入れたPDFを作ります。スマホでは「共有」からLINEやメールで送れます。</span></div>
     <div class="kpis"><div class="kpi"><span class="k">売上予算（週）</span><span class="v">${W.bud?yen(W.bud):'—'}</span></div><div class="kpi hi"><span class="k">人件費（週）</span><span class="v">${yen(W.cost)}</span></div>
       <div class="kpi"><span class="k">人件費率（目標）</span><span class="v">${W.rate!=null?(W.rate*100).toFixed(1)+'%':'—'}<small class="muted" style="font-size:13px"> ${W.target!=null?(W.target*100).toFixed(1)+'%':''}</small></span></div>
       <div class="kpi"><span class="k">人時生産性</span><span class="v">${W.prod?Math.round(W.prod).toLocaleString():'—'}</span></div><div class="kpi"><span class="k">評価</span><span class="v">${E?`${E.score}点（${E.grade}）`:'—'}</span></div>
@@ -2617,7 +2668,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.58'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.59'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3144,17 +3195,19 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
       <tbody>${body}</tbody>
       <tfoot>${foot.map(([lab,f],i)=>`<tr class="${i===4?'land':''}"><th>${lab}</th>${R.map(({r})=>`<td class="num s0 s1" colspan="4">${f(r)}</td>`).join('')}</tr>`).join('')}</tfoot></table></div>
     <p class="hint">着地予測＝実績＋予定＋有給＋「未定の日」×（週の出勤日数÷7）×その人のこの月の1日平均労働時間。所定労働時間・週の出勤日数は「マスタ → 名簿 → 社員の勤務ルール」で変えられます。</p></section>`}
+// 社員の週ごとの労働時間（週×社員、ボーダーと合計つき）
+function empWeeksData(week){const st=set(),emps=staffList(true).filter(s=>s.kind==='社員'),weeks=[];
+  const start=monday(st.monthStart||week);for(let m=start;m<=(st.monthEnd||addDays(start,34));m=addDays(m,7))weeks.push(m);
+  if(!weeks.includes(week)&&weeks.length<8)weeks.push(week);
+  const rows=weeks.map(m=>{const hs=emps.map(e=>weekDates(m).reduce((a,dt)=>a+laborOf(dt,e.id),0));return {m,hs,tot:hs.reduce((a,b)=>a+b,0)}});
+  const colTot=emps.map((_,i)=>rows.reduce((a,r)=>a+r.hs[i],0));
+  return {st,emps,weeks,rows,colTot,all:colTot.reduce((a,b)=>a+b,0)}}
 function vEmp(){
-  const st=set(), emps=staffList(true).filter(s=>s.kind==='社員');
-  const start=monday(st.monthStart||S.week), weeks=[];
-  for(let m=start;m<=(st.monthEnd||addDays(start,34));m=addDays(m,7))weeks.push(m);
-  if(!weeks.includes(S.week)&&weeks.length<8)weeks.push(S.week);
-  const rows=weeks.map(m=>{
-    const cells=emps.map(e=>{const h=weekDates(m).reduce((a,dt)=>a+laborOf(dt,e.id),0);
-      return `<td class="num ${h<st.border?'cell-bad':''}">${n1(h)}</td>`}).join('');
-    return `<tr${m===S.week?' style="outline:2px solid var(--accent);outline-offset:-2px"':''}><td class="num">${md(m)}–${md(addDays(m,6))}</td>${cells}<td class="num">${st.border}</td></tr>`}).join('');
+  const st=set(),D=empWeeksData(S.week),emps=D.emps;
+  const rows=D.rows.map(r=>`<tr${r.m===S.week?' style="outline:2px solid var(--accent);outline-offset:-2px"':''}><td class="num">${md(r.m)}–${md(addDays(r.m,6))}</td>${r.hs.map(h=>`<td class="num ${h<st.border?'cell-bad':''}">${n1(h)}</td>`).join('')}<td class="num">${st.border}</td><td class="num"><b>${n1(r.tot)}</b></td></tr>`).join('')
+    +`<tr class="tot"><td><b>合計</b></td>${D.colTot.map(h=>`<td class="num"><b>${n1(h)}</b></td>`).join('')}<td></td><td class="num"><b>${n1(D.all)}</b></td></tr>`;
   return empMonthPanel()+`<section class="panel"><div class="bar"><h2>社員勤務時間</h2><span class="hint">週（月〜日）の労働時間。ボーダー（${st.border}時間）未満は赤で表示</span></div>
-  ${emps.length?`<div class="scroll"><table class="t"><thead><tr><th>週</th>${emps.map(e=>`<th class="r">${esc(e.name)}</th>`).join('')}<th class="r">ボーダー</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">名簿に「社員」区分のスタッフがいません。</div>'}
+  ${emps.length?`<div class="scroll"><table class="t"><thead><tr><th>週</th>${emps.map(e=>`<th class="r">${esc(e.name)}</th>`).join('')}<th class="r">ボーダー</th><th class="r">合計</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">名簿に「社員」区分のスタッフがいません。</div>'}
   <p class="hint">期間は「集計 → 週間・月間」の月間見込みの開始日〜終了日に合わせています。ボーダーは「マスタ → 設定」で変更できます。</p></section>
   ${empOT()}`;
 }
