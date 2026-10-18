@@ -2681,7 +2681,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.63'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.64'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2691,22 +2691,22 @@ function vPaid(){
     const past=u.days.filter(d=>d<today),fut=u.days.filter(d=>d>=today),hOf=ds=>ds.reduce((a,d)=>a+paidOf(d,s.id),0);
     const usedH=hOf(past),planH=hOf(fut),left=grant-u.h,exp=from?addDays(from,730):'',mon=hOf(u.days.filter(d=>d.slice(0,7)===ym));
     return {s,from,grant,dayH,past,fut,usedH,planH,left,exp,mon,total:u.h}};
-  const I=list.map(info),withG=I.filter(x=>x.grant>0||x.total>0).sort((a,b)=>(a.grant?a.left:1e9)-(b.grant?b.left:1e9)),noG=I.filter(x=>!(x.grant>0)&&!(x.total>0));
+  const I=list.map(info),withG=I.slice().sort((a,b)=>(a.grant?a.left:1e9)-(b.grant?b.left:1e9)||staffRank(a.s)-staffRank(b.s)),noG=[];
   const lvl=x=>!x.grant?'':x.left<0?'bad':x.left<=x.dayH?'warn':'good';
   const sumMon=I.reduce((a,x)=>a+x.mon,0),sumPlan=I.reduce((a,x)=>a+x.planH,0),few=I.filter(x=>x.grant&&x.left<=x.dayH).length;
   const edit=x=>`<div class="pedit"><label>付与日<input type="date" data-sf="paidGrantDate" data-id="${x.s.id}" value="${esc(x.from)}"></label><label>付与（時間）<input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${x.s.id}" value="${x.s.paidGrant??''}" style="width:80px"></label><label>1日あたり（時間）<input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${x.s.id}" value="${x.s.paidDayH??''}" style="width:70px"></label></div>`;
   const card=x=>{const c=lvl(x),pct=x.grant?Math.min(100,x.total/x.grant*100):0,pu=x.grant?Math.min(100,x.usedH/x.grant*100):0;
     return `<div class="h28c ${c}"><div class="h28top"><b>${esc(x.s.name)}</b><span class="pill ${c}">${!x.grant?'付与が未入力':x.left<0?'使いすぎ':x.left<=x.dayH?'残りわずか':'残りあり'}</span></div>
-      <div class="h28big"><span class="k">残り</span><span class="v">${x.grant?n1(x.left):'—'}<small>時間</small></span>${x.grant?`<span class="muted" style="font-size:13px">約${n1(x.left/x.dayH)}日分</span>`:''}</div>
+      <div class="h28big"><span class="k">残り</span><span class="v">${x.grant?n1(x.left):'—'}<small>${x.grant?'時間':''}</small></span>${x.grant?`<span class="muted" style="font-size:13px">約${n1(x.left/x.dayH)}日分</span>`:''}</div>
       ${x.grant?`<div class="h28bar"><i style="width:${pct}%;opacity:.45"></i><i style="width:${pu}%"></i></div>`:''}
       <div style="font-size:13px">使った <b>${n1(x.usedH)}h</b>（${x.past.length}日）／ 予定 <b>${n1(x.planH)}h</b>（${x.fut.length}日）${x.grant?` ／ 付与 ${n1(x.grant)}h`:''}</div>
       ${x.from?`<div class="muted" style="font-size:12px">付与日 ${x.from.replace(/-/g,'/')}　有効期限の目安 ${x.exp.replace(/-/g,'/')}</div>`:''}
       ${x.past.length||x.fut.length?`<div class="pdays">${[...x.past.slice(-6).map(d=>`<span>${md(d)}</span>`),...x.fut.map(d=>`<span class="f">${md(d)}予定</span>`)].join('')}</div>`:''}
-      <details><summary style="cursor:pointer;font-size:12px;color:var(--muted)">付与を直す</summary>${edit(x)}</details></div>`};
+      ${x.grant?`<details><summary style="cursor:pointer;font-size:12px;color:var(--muted)">付与を直す</summary>${edit(x)}</details>`:`<div class="hint" style="margin:0">付与日と時間を入れると、残りが出ます</div>${edit(x)}`}</div>`};
   return `<section class="panel"><div class="bar"><h2>有給の管理</h2><span class="hint">時間で管理します。シフト表（またはカレンダー）でポジションを「有給」にすると、ここに数えられます</span></div>
     <div class="kpis"><div class="kpi"><span class="k">今月使った・使う有給</span><span class="v">${n1(sumMon)}h</span></div><div class="kpi"><span class="k">これからの予定</span><span class="v">${n1(sumPlan)}h</span></div>
       <div class="kpi"><span class="k">残りが1日分以下の人</span><span class="v" style="color:${few?'var(--warn)':'inherit'}">${few}人</span></div></div>
-    ${withG.length?`<div class="h28grid">${withG.map(card).join('')}</div>`:'<p class="hint">まだ有給の付与が入っていません。下の表で付与日と時間を入れてください。</p>'}
+    ${withG.length?`<div class="h28grid">${withG.map(card).join('')}</div>`:'<div class="empty">在籍しているスタッフがいません。</div>'}
     ${noG.length?`<details${S.paidNoOpen||!withG.length?' open':''} id="paidNoDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">付与がまだ入っていない人（${noG.length}人）</summary>
       <div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>スタッフ</th><th>付与日</th><th class="r">付与（時間）</th><th class="r">1日あたり（時間）</th></tr></thead><tbody>
       ${noG.map(x=>`<tr><td><b>${esc(x.s.name)}</b>${x.s.limit28?' <span class="tag28 near">留学生</span>':''}</td><td><input type="date" data-sf="paidGrantDate" data-id="${x.s.id}" value="${esc(x.from)}"></td><td class="r"><input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${x.s.id}" value="${x.s.paidGrant??''}" style="width:80px"></td><td class="r"><input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${x.s.id}" value="${x.s.paidDayH??''}" style="width:70px"></td></tr>`).join('')}</tbody></table></div></details>`:''}
@@ -3748,7 +3748,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v75';
+  const APP_SW='v76';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
