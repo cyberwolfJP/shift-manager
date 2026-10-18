@@ -226,6 +226,14 @@ table.wk tr.me td{background:var(--warn-bg)}
 .emv tfoot th{text-align:left;background:var(--sunk);font-size:12px}.emv tfoot td{background:var(--sunk)}.emv tfoot tr.land th,.emv tfoot tr.land td{background:var(--good-bg)}
 .mbar{position:relative;height:14px;background:var(--sunk);border-radius:3px;overflow:visible}.mbar i{position:absolute;top:0;bottom:0;left:0}.mbar i.a{background:var(--fg)}.mbar i.p{background:var(--accent);opacity:.75}
 .mbar i.f{background:repeating-linear-gradient(45deg,var(--muted) 0 3px,transparent 3px 6px);opacity:.7}.mbar b{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--bad);margin-left:-1px}
+.h28grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.h28c{border:2px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--surface)}.h28c.bad{border-color:var(--bad);background:var(--bad-bg)}.h28c.warn{border-color:var(--warn)}
+.h28top{display:flex;justify-content:space-between;align-items:center;gap:6px}.h28big{display:flex;align-items:baseline;gap:8px}.h28big .k{font-size:12px;color:var(--muted);font-weight:700}
+.h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
+.h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
+.h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
+.h28days span.on{color:var(--fg)}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
+.ewk td.w28{background:var(--warn-bg)}
 .updbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:999;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;display:flex;gap:10px;align-items:center;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .cgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 64px;gap:3px}
 .ccell{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:4px;min-height:86px;display:flex;flex-direction:column;gap:2px;background:var(--surface);min-width:0;font-size:11px;overflow:hidden}
@@ -2669,7 +2677,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.60'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.61'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3250,22 +3258,30 @@ function empOT(){
 
 /* --- 28h --- */
 function v28(){
-  const st=set(), start=S.h28Start||addDays(S.week,-7), list=staffList(true).filter(s=>s.limit28);
-  const dates=Array.from({length:28},(_,i)=>addDays(start,i));
-  const rows=list.map(s=>{
-    let max=0,maxEnd=null;
-    const cells=dates.map(dt=>{const h=laborOf(dt,s.id),ph=paidOf(dt,s.id);
-      const roll=roll7(s.id,dt);
-      if(roll>max){max=roll;maxEnd=dt}
-      const over=roll>st.limit28,cap=capOn(s.id,dt);
-      return `<td class="num ${over?'cell-bad':''}" title="${md(addDays(dt,-6))}〜${md(dt)} の7日間合計 ${n1(roll)}h／この日にあと${n1(Math.max(0,cap))}h入れられます">${h?n1(h):ph?`<span style="color:var(--ink)">有${n1(ph)}</span>`:'<span class="muted">0</span>'}<div style="font-size:10px;font-weight:400;color:var(--${cap<0?'bad':'muted'})">${cap<0?'超過':'+'+n1(cap)}</div></td>`}).join('');
-    const state=max>st.limit28?`<span class="pill bad">超過 ${n1(max)}h</span>`:max>st.limit28-3?`<span class="pill warn">残り${n1(st.limit28-max)}h</span>`:`<span class="pill good">${n1(max)}h</span>`;
-    return `<tr><td style="white-space:nowrap"><b>${esc(s.name)}</b></td><td>${state}<div class="muted" style="font-size:11px">${maxEnd?md(addDays(maxEnd,-6))+'〜'+md(maxEnd):''}</div></td>${cells}</tr>`}).join('');
-  return `<section class="panel"><div class="bar"><h2>28時間管理</h2>
-    <label class="field"><span>開始日</span><input type="date" id="h28s" data-f="h28Start" value="${start}"></label>
-    <span class="hint">月をまたいでも、どの日から数えた連続7日間でも${st.limit28}時間以内かを確認します。上の数字がその日の労働時間、下の「+」がその日にあと入れられる時間（その日を含むどの7日間も${st.limit28}時間に収まる範囲）です。赤は7日間合計が超えている日です。</span></div>
-  ${list.length?`<div class="scroll"><table class="t"><thead><tr><th>名前</th><th>最大7日合計</th>${dates.map((dt,i)=>`<th class="r" style="${i%7===0?'border-left:2px solid var(--muted)':''}">${WD[wd(dt)]}<br>${md(dt)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`:
-  '<div class="empty">28時間管理の対象者がいません。「マスタ → 名簿」で「留学生」にチェックを入れてください。</div>'}</section>`;
+  const st=set(),lim=Number(st.limit28),list=staffList().filter(s=>s.limit28),wk=S.week,ds=weekDates(wk),nx=weekDates(addDays(wk,7)),all=[...ds,...nx];
+  const head=`<div class="bar"><h2>28時間管理</h2>${weekNav()}<span class="hint">留学生は、どの連続7日間でも${lim}時間まで（月や週をまたいでも）。${st.paid28?'有給も含めて':'労働時間（休憩を除く）で'}数えています</span></div>`;
+  if(!list.length)return `<section class="panel">${head}<div class="empty">28時間管理の対象者がいません。「マスタ → 名簿」で「留学生」にチェックを入れてください。</div></section>`;
+  const f=sid=>hoursFn(sid);
+  const D=list.map(s=>{const h=all.map(dt=>f(s.id)(dt)),R=rollMax(s.id,ds[0],addDays(ds[6],6)),left=lim-R.m,wkH=h.slice(0,7).reduce((a,b)=>a+b,0),nxH=h.slice(7).reduce((a,b)=>a+b,0);
+    const win=R.at?new Set(Array.from({length:7},(_,k)=>addDays(R.at,-k))):new Set();return {s,h,R,left,wkH,nxH,win}}).sort((a,b)=>a.left-b.left);
+  const lvl=x=>x.left<0?'bad':x.left<=3?'warn':'good',word=x=>x.left<0?`${n1(-x.left)}時間オーバー`:x.left<=3?'あとわずか':'余裕あり';
+  const nOver=D.filter(x=>x.left<0).length,nNear=D.filter(x=>x.left>=0&&x.left<=3).length;
+  const sum=`<div class="kpis"><div class="kpi"><span class="k">対象の留学生</span><span class="v">${D.length}人</span></div>
+    <div class="kpi ${nOver?'bad':''}"><span class="k">28時間を超えている</span><span class="v" style="color:${nOver?'var(--bad)':'inherit'}">${nOver}人</span></div>
+    <div class="kpi"><span class="k">残り3時間以下</span><span class="v" style="color:${nNear?'var(--warn)':'inherit'}">${nNear}人</span></div></div>`;
+  const card=x=>{const c=lvl(x),pct=Math.min(100,x.R.m/lim*100);
+    return `<div class="h28c ${c}"><div class="h28top"><b>${esc(x.s.name)}</b><span class="pill ${c}">${word(x)}</span></div>
+      <div class="h28big"><span class="k">残り</span><span class="v">${x.left<0?'−'+n1(-x.left):n1(x.left)}<small>時間</small></span></div>
+      <div class="h28bar"><i style="width:${pct}%"></i><b style="left:100%"></b></div>
+      <div class="muted" style="font-size:12px">一番多い7日間：<b style="color:var(--fg)">${n1(x.R.m)}h</b>${x.R.at?`（${md(addDays(x.R.at,-6))}〜${md(x.R.at)}）`:''}</div>
+      <div class="h28days">${ds.map((dt,i)=>`<span class="${x.h[i]?'on':''}${x.win.has(dt)?' w':''}" title="${md(dt)} ${n1(x.h[i])}h／この日にあと${n1(Math.max(0,capOn(x.s.id,dt)))}h入れられます"><i>${WD[wd(dt)]}</i>${x.h[i]?n1(x.h[i]):'—'}</span>`).join('')}</div>
+      <div class="muted" style="font-size:12px">この週 ${n1(x.wkH)}h ／ 次の週 ${n1(x.nxH)}h</div></div>`};
+  const tbl=`<details${S.h28Open?' open':''} id="h28Det"><summary style="cursor:pointer;font-weight:700;font-size:13px">2週間の表で見る（${md(ds[0])}〜${md(nx[6])}）</summary>
+    <div class="scroll" style="margin-top:6px"><table class="t ewk"><thead><tr><th>名前</th>${all.map((dt,i)=>`<th style="${i===7?'border-left:2px solid var(--muted)':''}">${WD[wd(dt)]}<br>${md(dt)}</th>`).join('')}<th class="r">この週</th><th class="r">次の週</th><th class="r">残り</th></tr></thead><tbody>
+    ${D.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${x.win.has(all[i])?' w28':''}" style="${i===7?'border-left:2px solid var(--muted)':''}">${v?n1(v):'<span class="muted">—</span>'}</td>`).join('')}<td class="num"><b>${n1(x.wkH)}</b></td><td class="num">${n1(x.nxH)}</td><td class="num" style="font-weight:700;color:var(--${lvl(x)})">${x.left<0?'−'+n1(-x.left):n1(x.left)}h</td></tr>`).join('')}</tbody></table></div>
+    <p class="hint">色のついたマスは、その人の「一番多い7日間」です。マスに指を乗せると、その日にあと何時間入れられるかが出ます。</p></details>`;
+  return `<section class="panel">${head}${sum}<div class="h28grid">${D.map(card).join('')}</div>${tbl}
+    <p class="hint">残り＝${lim}時間 −（この週を含む、一番多い連続7日間の合計）。緑＝余裕あり、黄＝残り3時間以下、赤＝超えています。超えている人は「シフト作成 → 3 28時間の修正」で自動で短くできます。</p></section>`;
 }
 
 /* --- 交通費算出 --- */
@@ -3673,7 +3689,7 @@ app.addEventListener('change',e=>{if(e.target.id!=='importFile')return;const f=e
     if(d.format!=='shift-app-backup')return toast('このアプリのバックアップファイルではありません');
     S.importInfo={data:d,msg:`「${d.store?.name||''}」のバックアップ（スタッフ${(d.staff||[]).length}人・${Object.keys(d.days||{}).length}日分）を、今の店舗「${S.stores[S.store]?.name||''}」に取り込みます。`};render()})});
 app.addEventListener('input',e=>{if(e.target.id!=='reportNote')return;S.reportNote=e.target.value;try{localStorage.setItem('shiftapp:report:'+S.store+':'+S.week,S.reportNote)}catch(_){}});
-app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
+app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
 document.getElementById('who').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
   if(b.dataset.act==='logout')logout();
   if(b.dataset.act==='changeMe'){S.me='';try{localStorage.removeItem('shiftapp:me:'+S.store)}catch(_){};S.draft=null;render()}});
@@ -3703,7 +3719,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v72';
+  const APP_SW='v73';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
