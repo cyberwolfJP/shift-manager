@@ -233,6 +233,8 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
 .h28days span.on{color:var(--fg)}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
+.pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span.f{background:var(--p-violet);font-weight:700}
+.pedit{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:12px}.pedit label{display:grid;gap:2px}
 .ewk td.w28{background:var(--warn-bg)}
 .updbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:999;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;display:flex;gap:10px;align-items:center;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .cgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 64px;gap:3px}
@@ -2410,16 +2412,18 @@ async function decPay(){const m={};
   S.pay=m;mergeStaff()}
 async function decDays(){if(!S.dek)return;let ch=false;
   for(const d of Object.values(S.days))if(d&&d.budgetEnc&&d._bEnc!==d.budgetEnc){try{d.budget=Number(await aesDec(S.dek,d.budgetEnc))||0;d._bEnc=d.budgetEnc;ch=true}catch(_){}}
+  for(const d of Object.values(S.days))if(d&&d.goalEnc&&d._gEnc!==d.goalEnc){try{d.goal=Number(await aesDec(S.dek,d.goalEnc))||0;d._gEnc=d.goalEnc;ch=true}catch(_){}}
   return ch}
 // 保存の直前に、売上予算を暗号化する（平文の budget は保存しない）
-async function encDayPayload(d){const x=JSON.parse(JSON.stringify(d));delete x._bEnc;
-  if(S.crypt){if(S.dek)x.budgetEnc=await aesEnc(S.dek,Number(x.budget)||0);delete x.budget}
+async function encDayPayload(d){const x=JSON.parse(JSON.stringify(d));delete x._bEnc;delete x._gEnc;
+  if(S.crypt){if(S.dek)x.budgetEnc=await aesEnc(S.dek,Number(x.budget)||0);delete x.budget;
+    if(x.goal!=null){if(S.dek)x.goalEnc=await aesEnc(S.dek,Number(x.goal)||0);delete x.goal}}
   return x}
 async function encPayDoc(wage,fare){return S.crypt?(S.dek?{enc:await aesEnc(S.dek,{wage:wage??null,fare:fare??null})}:null):{wage:wage??null,fare:fare??null}}
 async function unlockMoney(pw){
   if(!S.crypt)return;let raw;try{raw=await unwrapDek(S.crypt.pw,pw)}catch(_){throw '閲覧用パスワードが違います'}
   S.dek=await importDek(raw);S.dekRaw=raw;await decPay();await decDays();S.unlockAsk=false;render()}
-function lockMoney(){S.dek=null;S.dekRaw=null;encCache.clear();for(const d of Object.values(S.days))if(d&&d.budgetEnc){delete d.budget;delete d._bEnc}decPay().then(render)}
+function lockMoney(){S.dek=null;S.dekRaw=null;encCache.clear();for(const d of Object.values(S.days)){if(d&&d.budgetEnc){delete d.budget;delete d._bEnc}if(d&&d.goalEnc){delete d.goal;delete d._gEnc}}decPay().then(render)}
 // はじめて閲覧用パスワードを設定する：鍵を作り、今ある時給・交通費・売上予算をすべて暗号化して保存し直す
 async function enableCrypt(pw){
   if(S.crypt)throw 'すでに設定されています';if(!pw||pw.length<6)throw '閲覧用パスワードは6文字以上にしてください';
@@ -2431,8 +2435,8 @@ async function enableCrypt(pw){
   for(const [id,st] of Object.entries(S.staff)){if(st.wage==null&&st.fare==null&&!S.payRaw?.[id])continue;
     await S.db.doc(P('pay/'+id)).set({enc:await aesEnc(key,{wage:st.wage??null,fare:st.fare??null})})}
   const all=await S.db.collection(P('days')).get();
-  for(const dd of all.docs){const d=dd.data();if(d.budgetEnc||d.budget==null)continue;
-    const x={...d,budgetEnc:await aesEnc(key,Number(d.budget)||0)};delete x.budget;await S.db.doc(P('days/'+dd.id)).set(x)}
+  for(const dd of all.docs){const d=dd.data();const nb=!d.budgetEnc&&d.budget!=null,ng=!d.goalEnc&&d.goal!=null;if(!nb&&!ng)continue;
+    const x={...d};if(nb){x.budgetEnc=await aesEnc(key,Number(d.budget)||0);delete x.budget}if(ng){x.goalEnc=await aesEnc(key,Number(d.goal)||0);delete x.goal}await S.db.doc(P('days/'+dd.id)).set(x)}
   await S.db.doc(P('config/crypt')).set(doc);
   return !!doc.admin}
 async function changeViewPw(cur,nw){if(!S.crypt)return;if(!nw||nw.length<6)throw '新しい閲覧用パスワードは6文字以上にしてください';
@@ -2677,24 +2681,37 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.61'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.62'}</p></section>`;
 }
 
 /* --- 有給 --- */
 function vPaid(){
-  const st=set(),list=staffList(true).filter(s=>s.active!==false);
-  const y0=`${parse(today).getFullYear()}-${pad(parse(today).getMonth()+1)}-01`;
-  const rows=list.map(s=>{const from=s.paidGrantDate||'',u=paidUsed(s,from||null,null),grant=Number(s.paidGrant)||0,left=grant-u.h,mon=paidUsed(s,y0,null).h;
-    return `<tr><td style="white-space:nowrap"><b>${esc(s.name)}</b>${s.limit28?' <span class="tag28 near">留学生</span>':''}</td>
-      <td><input type="date" data-sf="paidGrantDate" data-id="${s.id}" value="${esc(from)}" aria-label="付与日"></td>
-      <td><input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${s.id}" value="${s.paidGrant??''}" style="width:80px" aria-label="付与時間"></td>
-      <td><input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${s.id}" value="${s.paidDayH??''}" style="width:70px" aria-label="1日あたりの時間"></td>
-      <td class="num">${n1(u.h)}</td><td class="num ${grant&&left<0?'cell-bad':grant&&left<=Math.max(8,Number(s.paidDayH)||0)?'cell-warn':''}">${grant?n1(left):'—'}</td><td class="num">${mon?n1(mon):'—'}</td>
-      <td style="font-size:12px;color:var(--muted)">${u.days.slice(-6).map(md).join('、')}${u.days.length>6?' ほか':''}</td></tr>`}).join('');
-  return `<section class="panel"><div class="bar"><h2>有給の管理</h2><span class="hint">時間単位で管理します。シフト表でポジションを「有給」にして時間を入れると、ここに使った時間が加算されます。</span></div>
-    ${list.length?`<div class="scroll"><table class="t"><thead><tr><th>スタッフ</th><th>付与日</th><th class="r">付与（h）</th><th class="r">1日あたり（h）</th><th class="r">使用（h）</th><th class="r">残り（h）</th><th class="r">今月（h）</th><th>最近使った日</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">名簿にスタッフがいません。</div>'}
+  const st=set(),list=staffList(true).filter(s=>s.active!==false),ym=today.slice(0,7);
+  const info=s=>{const from=s.paidGrantDate||'',u=paidUsed(s,from||null,null),grant=Number(s.paidGrant)||0,dayH=Number(s.paidDayH)||8;
+    const past=u.days.filter(d=>d<today),fut=u.days.filter(d=>d>=today),hOf=ds=>ds.reduce((a,d)=>a+paidOf(d,s.id),0);
+    const usedH=hOf(past),planH=hOf(fut),left=grant-u.h,exp=from?addDays(from,730):'',mon=hOf(u.days.filter(d=>d.slice(0,7)===ym));
+    return {s,from,grant,dayH,past,fut,usedH,planH,left,exp,mon,total:u.h}};
+  const I=list.map(info),withG=I.filter(x=>x.grant>0||x.total>0).sort((a,b)=>(a.grant?a.left:1e9)-(b.grant?b.left:1e9)),noG=I.filter(x=>!(x.grant>0)&&!(x.total>0));
+  const lvl=x=>!x.grant?'':x.left<0?'bad':x.left<=x.dayH?'warn':'good';
+  const sumMon=I.reduce((a,x)=>a+x.mon,0),sumPlan=I.reduce((a,x)=>a+x.planH,0),few=I.filter(x=>x.grant&&x.left<=x.dayH).length;
+  const edit=x=>`<div class="pedit"><label>付与日<input type="date" data-sf="paidGrantDate" data-id="${x.s.id}" value="${esc(x.from)}"></label><label>付与（時間）<input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${x.s.id}" value="${x.s.paidGrant??''}" style="width:80px"></label><label>1日あたり（時間）<input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${x.s.id}" value="${x.s.paidDayH??''}" style="width:70px"></label></div>`;
+  const card=x=>{const c=lvl(x),pct=x.grant?Math.min(100,x.total/x.grant*100):0,pu=x.grant?Math.min(100,x.usedH/x.grant*100):0;
+    return `<div class="h28c ${c}"><div class="h28top"><b>${esc(x.s.name)}</b><span class="pill ${c}">${!x.grant?'付与が未入力':x.left<0?'使いすぎ':x.left<=x.dayH?'残りわずか':'残りあり'}</span></div>
+      <div class="h28big"><span class="k">残り</span><span class="v">${x.grant?n1(x.left):'—'}<small>時間</small></span>${x.grant?`<span class="muted" style="font-size:13px">約${n1(x.left/x.dayH)}日分</span>`:''}</div>
+      ${x.grant?`<div class="h28bar"><i style="width:${pct}%;opacity:.45"></i><i style="width:${pu}%"></i></div>`:''}
+      <div style="font-size:13px">使った <b>${n1(x.usedH)}h</b>（${x.past.length}日）／ 予定 <b>${n1(x.planH)}h</b>（${x.fut.length}日）${x.grant?` ／ 付与 ${n1(x.grant)}h`:''}</div>
+      ${x.from?`<div class="muted" style="font-size:12px">付与日 ${x.from.replace(/-/g,'/')}　有効期限の目安 ${x.exp.replace(/-/g,'/')}</div>`:''}
+      ${x.past.length||x.fut.length?`<div class="pdays">${[...x.past.slice(-6).map(d=>`<span>${md(d)}</span>`),...x.fut.map(d=>`<span class="f">${md(d)}予定</span>`)].join('')}</div>`:''}
+      <details><summary style="cursor:pointer;font-size:12px;color:var(--muted)">付与を直す</summary>${edit(x)}</details></div>`};
+  return `<section class="panel"><div class="bar"><h2>有給の管理</h2><span class="hint">時間で管理します。シフト表（またはカレンダー）でポジションを「有給」にすると、ここに数えられます</span></div>
+    <div class="kpis"><div class="kpi"><span class="k">今月使った・使う有給</span><span class="v">${n1(sumMon)}h</span></div><div class="kpi"><span class="k">これからの予定</span><span class="v">${n1(sumPlan)}h</span></div>
+      <div class="kpi"><span class="k">残りが1日分以下の人</span><span class="v" style="color:${few?'var(--warn)':'inherit'}">${few}人</span></div></div>
+    ${withG.length?`<div class="h28grid">${withG.map(card).join('')}</div>`:'<p class="hint">まだ有給の付与が入っていません。下の表で付与日と時間を入れてください。</p>'}
+    ${noG.length?`<details${S.paidNoOpen||!withG.length?' open':''} id="paidNoDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">付与がまだ入っていない人（${noG.length}人）</summary>
+      <div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>スタッフ</th><th>付与日</th><th class="r">付与（時間）</th><th class="r">1日あたり（時間）</th></tr></thead><tbody>
+      ${noG.map(x=>`<tr><td><b>${esc(x.s.name)}</b>${x.s.limit28?' <span class="tag28 near">留学生</span>':''}</td><td><input type="date" data-sf="paidGrantDate" data-id="${x.s.id}" value="${esc(x.from)}"></td><td class="r"><input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${x.s.id}" value="${x.s.paidGrant??''}" style="width:80px"></td><td class="r"><input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${x.s.id}" value="${x.s.paidDayH??''}" style="width:70px"></td></tr>`).join('')}</tbody></table></div></details>`:''}
     <label style="font-size:13px;font-weight:700"><input type="checkbox" id="paid28"${st.paid28?' checked':''}> 留学生の28時間チェックに有給の時間も含める</label>
-    <p class="hint">「使用」は付与日以降に登録した有給の合計です。「1日あたり」を入れておくと、シフト表で有給を選んだときにその時間が自動で入ります。有給の時間は人件費（時給×時間）に含め、労働時間・人時生産性には含めません。28時間の数え方は、在留資格の扱いに合わせて上のチェックで切り替えてください。</p></section>`;
+    <p class="hint">残り＝付与 −（付与日以降に登録した有給。使った分＋予定）。黄は残りが1日分以下、赤は付与より多く登録しています。「1日あたり」を入れておくと、有給を選んだときにその時間が自動で入ります。有効期限の目安は付与日から2年です。有給の時間は人件費に含め、労働時間・人時生産性には含めません。</p></section>`;
 }
 
 /* --- 個人別まとめ入力（LINEで回収した希望を1人ずつ一気に） --- */
@@ -2868,6 +2885,8 @@ function addPaid(sid,from,to,h){const s=S.staff[sid];if(!s)throw 'スタッフ�
 const ymOf=d=>d.slice(0,7);
 function monthDays(ym){const n=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();return Array.from({length:n},(_,i)=>ym+'-'+pad(i+1))}
 const budOf=dt=>Number(S.days[dt]?.budget)||0;
+// 月間の売上目標：その月の1日のデータに保存（売上予算と同じく、閲覧用パスワードがあれば暗号化）
+const goalOf=ym=>Number(S.days[ym+'-01']?.goal)||0;
 function newDay(dt){if(!S.days[dt])S.days[dt]={budget:0,note:'',memo:'',ideal:Array(24).fill(0),posIdeal:{},shifts:[]};return S.days[dt]}
 function setBudget(dt,v){newDay(dt).budget=Math.max(0,Math.round(Number(v)||0));saveDay(dt)}
 // 月の合計を曜日の比率で振り分ける（1,000円単位。端数は一番大きい日で合わせる）
@@ -2894,8 +2913,11 @@ function vBudget(){const st=set(),ym=S.bym||ymOf(S.week),ds=monthDays(ym),y=+ym.
       <input type="number" step="1000" min="0" inputmode="numeric" id="bd_${d}" data-bud="${d}" value="${b||''}" placeholder="0" aria-label="${md(d)}の売上予算">
       <input type="text" id="bn_${d}" data-bnote="${d}" value="${esc(note)}" placeholder="メモ" maxlength="30" aria-label="${md(d)}のメモ"></div>`}
   const wdAvg=order.map(w=>{const v=ds.filter(d=>wd(d)===w&&budOf(d)>0);return v.length?v.reduce((a,d)=>a+budOf(d),0)/v.length:0});
+  const G=goalOf(ym),gd=tot-G;
   return `<section class="panel"><div class="bar"><h2>月間予算</h2>${nav}</div>
-    <div class="kpis"><div class="kpi"><span class="k">月間予算（合計）</span><span class="v">${yen(tot)}</span></div>
+    <div class="autobar" style="flex-wrap:wrap;align-items:flex-end"><label class="field" style="margin:0"><span><b>月間の売上目標（円）</b></span><input type="number" step="10000" min="0" id="mGoal" data-mgoal="${ym}" value="${G||''}" placeholder="例 12000000" style="width:170px"></label>
+      ${G?`<span>日別予算の合計との差 <b class="${gd<0?'cell-bad':'cell-good'}" style="padding:2px 6px;border-radius:4px">${gd<0?'−':'+'}${yen(Math.abs(gd))}</b>${gd<0?'（日別の予算が目標に届いていません）':''}</span><button class="btn sm pri" data-act="goalSpread">目標を曜日の比率で日別に振り分ける</button>`:'<span class="hint">目標を入れると、日別の予算の合計と比べたり、日別に振り分けたりできます</span>'}</div>
+    <div class="kpis"><div class="kpi"><span class="k">月間の売上目標</span><span class="v">${G?yen(G):'—'}</span></div><div class="kpi"><span class="k">日別予算の合計</span><span class="v">${yen(tot)}</span>${G?`<span class="muted" style="font-size:11px">目標の${Math.round(tot/G*100)}%</span>`:''}</div>
       <div class="kpi"><span class="k">入力済み</span><span class="v">${filled}／${ds.length}日</span></div>
       <div class="kpi"><span class="k">人件費の枠（×${MR}%）</span><span class="v">${yen(tot*MR/100)}</span></div>
       <div class="kpi"><span class="k">シフト済みの人件費</span><span class="v">${yen(cost)}</span><span class="muted" style="font-size:11px">${costDays}日分${tot?`・枠の${Math.round(cost/(tot*MR/100)*100)}%`:''}</span></div></div>
@@ -2922,7 +2944,7 @@ function vYear(){
   const T=months.reduce((a,x)=>({b:a.b+x.b,c:a.c+x.c,pa:a.pa+x.pa,l:a.l+x.l,fare:a.fare+x.fare}),{b:0,c:0,pa:0,l:0,fare:0});
   const mx=Math.max(1,...months.map(x=>Math.max(x.c,x.b)));
   const yrows=months.map(x=>`<tr${x.M===m?' style="outline:2px solid var(--accent);outline-offset:-2px"':''}><td><button class="btn sm ghost" data-act="pickMonth" data-m="${x.M}">${x.M}月</button></td>
-    <td class="num">${x.b?yen(x.b):'—'}</td><td class="num">${x.c?yen(x.c):'—'}</td><td class="num ${x.b&&x.c/x.b>0.25?'cell-bad':''}">${pc(x.c,x.b)}</td><td class="num">${x.pa?yen(x.pa):'—'}</td><td class="num">${x.l?n1(x.l):'—'}</td><td class="num">${x.l?Math.round(x.b/x.l).toLocaleString():'—'}</td><td class="num">${x.fare?yen(x.fare):'—'}</td>
+    <td class="num">${goalOf(`${y}-${pad(x.M)}`)?yen(goalOf(`${y}-${pad(x.M)}`)):'—'}</td><td class="num ${goalOf(`${y}-${pad(x.M)}`)&&x.b<goalOf(`${y}-${pad(x.M)}`)?'cell-warn':''}">${x.b?yen(x.b):'—'}</td><td class="num">${x.c?yen(x.c):'—'}</td><td class="num ${x.b&&x.c/x.b>0.25?'cell-bad':''}">${pc(x.c,x.b)}</td><td class="num">${x.pa?yen(x.pa):'—'}</td><td class="num">${x.l?n1(x.l):'—'}</td><td class="num">${x.l?Math.round(x.b/x.l).toLocaleString():'—'}</td><td class="num">${x.fare?yen(x.fare):'—'}</td>
     <td style="min-width:120px"><div style="height:8px;background:var(--sunk);border-radius:2px;position:relative"><div style="position:absolute;inset:0 auto 0 0;width:${x.c/mx*100}%;background:var(--accent);border-radius:2px"></div></div></td></tr>`).join('');
   // 月間（日別）
   const md_=monthDates(y,m);const M=agg(md_);
@@ -2932,10 +2954,10 @@ function vYear(){
   const per=staffList(true).map(s=>{let h=0,c=0,n=0,ph=0;for(const dt of md_){const l=laborOf(dt,s.id),pd=paidOf(dt,s.id);if(l>0){h+=l;n++}if(l>0||pd>0)c+=costOf(dt,s.id);ph+=pd}return {s,h,c,n,ph,fare:s.kind==='社員'?0:n*(Number(s.fare)||0)}}).filter(x=>x.n||x.ph);
   const prows=per.map(x=>`<tr><td><b>${esc(x.s.name)}</b></td><td class="num">${x.n}日</td><td class="num">${n1(x.h)}</td><td class="num">${x.ph?n1(x.ph):'—'}</td><td class="num">${yen(x.c)}</td><td class="num">${x.fare?yen(x.fare):'—'}</td><td class="num">${yen(x.c+x.fare)}</td></tr>`).join('');
   return `<section class="panel"><div class="bar"><h2>${y}年の月別</h2><div class="weeknav"><button class="btn sm" data-act="yr" data-n="-1" aria-label="前の年">‹</button><span class="lbl">${y}年</span><button class="btn sm" data-act="yr" data-n="1" aria-label="次の年">›</button></div></div>
-    <div class="kpis"><div class="kpi"><span class="k">年間売上予算</span><span class="v">${yen(T.b)}</span></div><div class="kpi hi"><span class="k">年間人件費</span><span class="v">${yen(T.c)}</span></div>
+    <div class="kpis">${(()=>{const g=Array.from({length:12},(_,i)=>goalOf(`${y}-${pad(i+1)}`)).reduce((a,b)=>a+b,0);return g?`<div class="kpi"><span class="k">年間売上目標</span><span class="v">${yen(g)}</span></div>`:''})()}<div class="kpi"><span class="k">年間売上予算</span><span class="v">${yen(T.b)}</span></div><div class="kpi hi"><span class="k">年間人件費</span><span class="v">${yen(T.c)}</span></div>
       <div class="kpi"><span class="k">人件費率</span><span class="v">${pc(T.c,T.b)}</span></div><div class="kpi"><span class="k">P/A人件費率</span><span class="v">${pc(T.pa,T.b)}</span></div>
       <div class="kpi"><span class="k">総労働時間</span><span class="v">${n1(T.l)}h</span></div><div class="kpi"><span class="k">交通費合計</span><span class="v">${yen(T.fare)}</span></div></div>
-    <div class="scroll"><table class="t"><thead><tr><th>月</th><th class="r">売上予算</th><th class="r">人件費</th><th class="r">人件費率</th><th class="r">P/A人件費</th><th class="r">労働h</th><th class="r">人時生産性</th><th class="r">交通費</th><th>人件費</th></tr></thead><tbody>${yrows}</tbody></table></div>
+    <div class="scroll"><table class="t"><thead><tr><th>月</th><th class="r">売上目標</th><th class="r">売上予算</th><th class="r">人件費</th><th class="r">人件費率</th><th class="r">P/A人件費</th><th class="r">労働h</th><th class="r">人時生産性</th><th class="r">交通費</th><th>人件費</th></tr></thead><tbody>${yrows}</tbody></table></div>
     <p class="hint">月を押すと下に日別の明細が出ます。人件費率が25%を超えた月は赤で表示します。</p></section>
   <section class="panel"><div class="bar"><h2>${y}年${m}月の日別</h2><div class="weeknav"><button class="btn sm" data-act="mo" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${m}月</span><button class="btn sm" data-act="mo" data-n="1" aria-label="次の月">›</button></div></div>
     <div class="kpis"><div class="kpi"><span class="k">売上予算</span><span class="v">${yen(M.b)}</span></div><div class="kpi hi"><span class="k">人件費</span><span class="v">${yen(M.c)}</span></div>
@@ -3380,6 +3402,7 @@ app.addEventListener('change',e=>{
   if(el.dataset.tdone){const dt=el.dataset.tdt||S.cday,d=newDay(dt);d.done={...(d.done||{})};if(el.checked)d.done[el.dataset.tdone]=true;else delete d.done[el.dataset.tdone];saveDay(dt);return render()}
   if(el.dataset.ctwd!=null)return;
   if(el.dataset.trep){S.trepTitle=document.getElementById('ctTitle')?.value||'';S.trep=el.value;document.activeElement?.blur?.();return render()}
+  if(el.dataset.mgoal){const dt=el.dataset.mgoal+'-01';newDay(dt).goal=Math.max(0,Math.round(Number(el.value)||0));saveDay(dt);toast('月間の売上目標を保存しました');el.blur();return render()}
   if(el.dataset.bud){setBudget(el.dataset.bud,el.value);return render()}
   if(el.dataset.bnote){const dt=el.dataset.bnote;newDay(dt).note=el.value.slice(0,30);saveDay(dt);return render()}
   if(el.dataset.bw!=null){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.budgetWeights={...(S.settings.budgetWeights||DEFAULT_SETTINGS.budgetWeights),[el.dataset.bw]:Math.max(0,Number(el.value)||0)};saveSettings();return render()}
@@ -3544,6 +3567,9 @@ app.addEventListener('click',e=>{
   if(a==='tDel'){const t=(set().tasks||[]).find(x=>x.id===b.dataset.id);if(!t)return;if(t.rep!=='once'&&!confirm(`「${t.title}」（${repLabel(t)}）を削除しますか？`))return;
     S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.tasks=(S.settings.tasks||[]).filter(x=>x.id!==t.id);saveSettings();toast('タスクを削除しました');return render()}
   if(a==='cPaidDel'){if(dayLocked(S.cday))return toast('この日は確定しています（シフト作成で確定を解除してください）');const d=newDay(S.cday);d.shifts=(d.shifts||[]).filter(x=>!(x.sid===b.dataset.sid&&x.pos===PAID));saveDay(S.cday);toast('有給の予定を消しました');return render()}
+  if(a==='goalSpread'){if(moneyGate())return;const ym=S.bym||ymOf(S.week),G=goalOf(ym);if(!G)return toast('先に月間の売上目標を入れてください');
+    const has=monthDays(ym).some(d=>budOf(d)>0);if(has&&!confirm('入力済みの日別予算も、目標から振り分け直しますか？'))return;
+    try{const n=spreadBudget(ym,G,true);toast(`目標を${n}日に振り分けました`)}catch(e){toast(typeof e==='string'?e:'振り分けできませんでした')}return render()}
   if(a==='bym'){const [Y,M]=(S.bym||ymOf(S.week)).split('-').map(Number),d=new Date(Y,M-1+ +b.dataset.n,1);S.bym=d.getFullYear()+'-'+pad(d.getMonth()+1);return render()}
   if(a==='bymNow'){S.bym=ymOf(today);return render()}
   if(a==='bwPast'){const W=weightsFromPast();if(!W)return toast('過去の売上予算がまだありません');S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.budgetWeights=W;saveSettings();toast('直近の売上予算から曜日の比率を出しました');return render()}
@@ -3689,7 +3715,7 @@ app.addEventListener('change',e=>{if(e.target.id!=='importFile')return;const f=e
     if(d.format!=='shift-app-backup')return toast('このアプリのバックアップファイルではありません');
     S.importInfo={data:d,msg:`「${d.store?.name||''}」のバックアップ（スタッフ${(d.staff||[]).length}人・${Object.keys(d.days||{}).length}日分）を、今の店舗「${S.stores[S.store]?.name||''}」に取り込みます。`};render()})});
 app.addEventListener('input',e=>{if(e.target.id!=='reportNote')return;S.reportNote=e.target.value;try{localStorage.setItem('shiftapp:report:'+S.store+':'+S.week,S.reportNote)}catch(_){}});
-app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
+app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='paidNoDet')S.paidNoOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
 document.getElementById('who').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
   if(b.dataset.act==='logout')logout();
   if(b.dataset.act==='changeMe'){S.me='';try{localStorage.removeItem('shiftapp:me:'+S.store)}catch(_){};S.draft=null;render()}});
@@ -3719,7 +3745,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v73';
+  const APP_SW='v74';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
