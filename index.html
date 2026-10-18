@@ -470,7 +470,7 @@ const DEFAULT_SETTINGS = {
   peakFrom: 16, peakTo: 23,
   targetRate: {1:22,2:22,3:22,4:22,5:22,6:22,0:22}, rateMode: 'month', monthRate: 24, budgetWeights: {1:1,2:1,3:1,4:1,5:1.27,6:1.27,0:1.18},
   minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: false, minEmp: 2,
-  dailyOT: 8, weeklyOT: 40, nightRate: 0.25
+  dailyOT: 8, weeklyOT: 40, nightRate: 0.25, otMode: 'dw'
 };
 const COLORS = ['yellow','blue','green','teal','pink','red','violet','gray','orange'];
 const WD = ['日','月','火','水','木','金','土'];
@@ -731,6 +731,11 @@ const hidePAoff=sh=>{const s=S.staff[sh.sid];return s&&!isEmp(s)&&sh.pos!==PAID&
 const newTag=s=>isNew(s)?'<span class="tagnew" title="新人">新人</span>':'';
 const staffList=(all)=>Object.values(S.staff).filter(s=>all||s.active!==false).sort((a,b)=>(a.order??999)-(b.order??999));
 
+/* 残業の数え方（設定で変更）：dw＝1日○時間超＋週○時間超（法定）、d＝1日だけ、w＝週だけ、m＝月の所定労働時間を超えた分、none＝数えない */
+const OT_MODES={dw:'1日の基準超＋週の基準超（労働基準法どおり）',d:'1日の基準を超えた分だけ',w:'週の基準を超えた分だけ',m:'月の所定労働時間を超えた分（変形労働時間制など）',none:'残業を計算しない'};
+const otMode=()=>{const m=set().otMode;return OT_MODES[m]?m:'dw'};
+const otDaily=()=>['dw','d'].includes(otMode()),otWeekly=()=>['dw','w'].includes(otMode()),otMonthly=()=>otMode()==='m';
+function otRuleText(){const st=set(),m=otMode();return m==='dw'?`1日${st.otAfter??8}時間を超えた分＋週${st.weeklyOT??40}時間を超えた分（1日で数えた分は除く）`:m==='d'?`1日${st.otAfter??8}時間を超えた分`:m==='w'?`週${st.weeklyOT??40}時間を超えた分`:m==='m'?'月の所定労働時間を超えた分（社員ごとの所定。月の表で計算し、週の表では数えません）':'計算しない'}
 function breakHours(work){const st=set();if(work>st.brk2Over)return st.brk2;if(work>=st.brk1At)return st.brk1;return 0}
 function calcShift(sh){
   const st=set(), staff=S.staff[sh.sid];
@@ -740,7 +745,7 @@ function calcShift(sh){
   const work=sh.end-sh.start, brk=breakHours(work), labor=work-brk;
   const night=Math.max(0,Math.min(sh.end,st.nightTo)-Math.max(sh.start,st.nightFrom));
   const wage=Number(staff.wage)||0;
-  const cost=wage*Math.min(labor,st.otAfter)+wage*st.otRate*Math.max(0,labor-st.otAfter);
+  const oa=otDaily()?Number(st.otAfter):Infinity,cost=wage*Math.min(labor,oa)+wage*st.otRate*Math.max(0,labor-oa);
   return {work,brk,labor,night,cost,on:true,help:isHelp(sh.pos),edu:!!sh.edu&&!isHelp(sh.pos),other:isOther(sh.pos)};
 }
 function breakStart(sh,c){
@@ -2612,7 +2617,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.56'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.57'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3081,13 +3086,15 @@ function empMonthStat(e,y,m){const st=set(),pre=`${y}-${pad(m)}`,days=[];
     for(const r of mine){if(r.pos===PAID){paid+=Math.max(0,Number(r.paidH)||0);paidD++;hasPaid=true;continue}if(isOff(r.pos)){isOffDay=true;continue}
       const c=calcShift(r);if(c.on){l+=c.labor;n+=c.night;on=true}else if(isOther(r.pos))meet=true}
     if(!on&&!isOffDay&&!hasPaid&&!meet&&d>=today)und++;
-    if(on){if(d<today){act+=l;actD++}else{plan+=l;planD++}night+=n;dOT+=Math.max(0,l-Number(st.otAfter??8));lab.push(l)}
+    if(on){if(d<today){act+=l;actD++}else{plan+=l;planD++}night+=n;if(otDaily())dOT+=Math.max(0,l-Number(st.otAfter??8));lab.push(l)}
     else if(isOffDay)off++}
   // 週40時間超（1日8時間超の分を除く）：月曜がこの月にある週で数える
   let wOT=0;for(let w=monday(days[0]);w<=days[days.length-1];w=addDays(w,7)){if(w.slice(0,7)!==pre&&w<days[0])continue;const r=otWeek(e,w);wOT+=r.wOT}
   const avg=lab.length?lab.reduce((a,b)=>a+b,0)/lab.length:Math.max(0,Number(e.defEnd??23.5)-Number(e.defStart??12)-breakHours(Number(e.defEnd??23.5)-Number(e.defStart??12)));
   const rate=Math.min(1,Number(e.workDays??5)/7),fore=act+plan+paid+und*rate*avg,shotei=Number(e.shotei??173);
-  return {act,actD,plan,planD,paid,paidD,off,und,night,dOT,wOT,avg,rate,fore,shotei,diff:fore-shotei,addDays:und*rate,total:days.length}}
+  // 月単位：所定を超えた労働時間（有給は含めない）。実績＋予定＋見込みで
+  const laborFore=act+plan+und*rate*avg,mOT=otMonthly()?Math.max(0,laborFore-shotei):0,ot=otMonthly()?mOT:dOT+wOT;
+  return {e,act,actD,plan,planD,paid,paidD,off,und,night,dOT,wOT,mOT,ot,avg,rate,fore,shotei,diff:fore-shotei,addDays:und*rate,total:days.length}}
 function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false);if(!emps.length)return '';
   const ym=S.empYm||today.slice(0,7),y=+ym.slice(0,4),m=+ym.slice(5,7),past=ym<today.slice(0,7),fut=ym>today.slice(0,7);
   const R=emps.map(e=>({e,r:empMonthStat(e,y,m)}));
@@ -3122,7 +3129,7 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
   const body=days.map(d=>{const w=wd(d);return `<tr class="${d===today?'td':''} ${w===0?'sun':w===6?'sat':''}"><th class="num">${+d.slice(8)}<span>${WD[w]}</span></th>${emps.map(e=>cell(e,d)).join('')}</tr>`}).join('');
   const foot=[['所定労働時間',r=>`<b>${n1(r.shotei)}h</b>`],['実績（昨日まで）',r=>`${n1(r.act)}h`],['予定（シフト済み）＋有給',r=>`${n1(r.plan+r.paid)}h`],['未定の日の見込み',r=>r.und?`${n1(r.fore-r.act-r.plan-r.paid)}h<div class="muted" style="font-size:11px">${r.und}日中${n1(r.addDays)}日出勤</div>`:'—'],
     ['着地予測',r=>`<b style="font-size:16px">${n1(r.fore)}h</b>`],['所定との差',r=>{const d=r.diff;return `<b class="${d>8?'cell-bad':d<-8?'cell-warn':''}">${d>0?'+':''}${n1(d)}h</b><div style="font-size:11px">${d>8?'超える見込み':d<-8?'届かない見込み':'ほぼ所定どおり'}</div>`}],
-    ['残業（8h・40h超）',r=>`${n1(r.dOT+r.wOT)}h`],['深夜',r=>`${n1(r.night)}h`]];
+    [otMode()==='none'?'残業（計算しない）':otMonthly()?'残業（所定超・見込み）':'残業',r=>otMode()==='none'?'—':`${n1(r.ot)}h${otMode()==='dw'?`<div class="muted" style="font-size:11px">日${n1(r.dOT)}・週${n1(r.wOT)}</div>`:''}`],['深夜',r=>`${n1(r.night)}h`],['残業代・深夜手当の目安',r=>{const e=r.e,w=Number(e?.wage)||0;return w?yen(Math.round(w*Number(set().otRate??1.25)*r.ot+w*Number(set().nightRate??0.25)*r.night)):'—'}]];
   return `<section class="panel"><div class="bar"><h2>社員の月間実績と着地予測</h2>
       <div class="weeknav"><button class="btn sm" data-act="empYm" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${y}年${m}月</span><button class="btn sm" data-act="empYm" data-n="1" aria-label="次の月">›</button><button class="btn sm ghost" data-act="empYmNow">今月</button></div>
       <span class="hint">${past?'終わった月：実績で確定しています':fut?'これからの月：シフトと見込みで予測しています':`${md(today)}時点`}</span></div>
@@ -3149,8 +3156,8 @@ function vEmp(){
 /* 社員の残業・深夜（週）：1日8時間超＋週40時間超（1日で数えた分を除く）。深夜は22時〜翌5時 */
 function otWeek(e,week){
   const st=set(),days=weekDates(week).map(dt=>{let l=0,n=0,w=0,help=[];for(const sh of dayDoc(dt).shifts||[]){if(sh.sid!==e.id)continue;const c=calcShift(sh);if(!c.on)continue;l+=c.labor;n+=c.night;w+=c.work;if(c.help)help.push(sh.helpTo||'他店')}
-    const dOT=Math.max(0,l-Number(st.otAfter??8));return {dt,l,n,dOT,help}});
-  const labor=days.reduce((a,d)=>a+d.l,0),dOT=days.reduce((a,d)=>a+d.dOT,0),reg=labor-dOT,wOT=Math.max(0,reg-Number(st.weeklyOT??40));
+    const dOT=otDaily()?Math.max(0,l-Number(st.otAfter??8)):0;return {dt,l,n,dOT,help}});
+  const labor=days.reduce((a,d)=>a+d.l,0),dOT=days.reduce((a,d)=>a+d.dOT,0),reg=labor-dOT,wOT=otWeekly()?Math.max(0,reg-Number(st.weeklyOT??40)):0;
   const night=days.reduce((a,d)=>a+d.n,0),ot=dOT+wOT,wage=Number(e.wage)||0;
   const otPay=Math.round(wage*Number(st.otRate??1.25)*ot),nightPay=Math.round(wage*Number(st.nightRate??0.25)*night);
   return {days,labor,dOT,wOT,ot,night,otPay,nightPay,wage};
@@ -3167,7 +3174,7 @@ function empOT(){
     <div class="scroll"><table class="t"><thead><tr><th>社員</th><th class="r">労働h</th><th class="r">1日8h超</th><th class="r">週40h超</th><th class="r">残業 計</th><th class="r">深夜h</th><th class="r">残業代</th><th class="r">深夜手当</th><th class="r">合計</th></tr></thead><tbody>${rows}</tbody></table></div>
     <details><summary style="cursor:pointer;font-weight:700;font-size:13px">日別の内訳</summary><div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>社員</th>${weekDates(W).map(dt=>`<th class="r">${md(dt)}（${WD[wd(dt)]}）</th>`).join('')}</tr></thead><tbody>${detail}</tbody></table></div></details>
     ${S.otCopy?`<textarea readonly rows="${emps.length+1}" style="width:100%" id="otBox">${esc(S.otText)}</textarea>`:''}
-    <p class="hint">残業＝1日${set().otAfter??8}時間を超えた分＋週${set().weeklyOT??40}時間を超えた分（1日で数えた分は除く）。残業代＝時給×${set().otRate}×残業時間、深夜手当＝時給×${set().nightRate??0.25}×深夜（${tLabel(set().nightFrom)}〜${tLabel(set().nightTo)}）の時間。残業と深夜が重なる時間は両方つきます。ヘルプ（他店）の時間も本人の勤務として含めます。法定休日の割増は含みません。時給・割増率は名簿と設定の値です。</p></section>`;
+    <p class="hint">残業＝${otRuleText()}（「マスタ → 設定」で変えられます）。残業代＝時給×${set().otRate}×残業時間、深夜手当＝時給×${set().nightRate??0.25}×深夜（${tLabel(set().nightFrom)}〜${tLabel(set().nightTo)}）の時間。残業と深夜が重なる時間は両方つきます。ヘルプ（他店）の時間も本人の勤務として含めます。法定休日の割増は含みません。時給・割増率は名簿と設定の値です。</p></section>`;
 }
 
 /* --- 28h --- */
@@ -3263,10 +3270,11 @@ function vSettings(){
     <label class="field"><span>立ち上げの時刻（空欄＝その日一番早い出勤）</span><input type="number" step="0.5" min="0" max="31" id="s_openAt" data-ocset="openAt" value="${st.openAt??''}" placeholder="例 11"></label>
     <label class="field"><span>締めの時刻（空欄＝その日一番遅い退勤）</span><input type="number" step="0.5" min="0" max="31" id="s_closeAt" data-ocset="closeAt" value="${st.closeAt??''}" placeholder="例 23.5"></label>
     ${num('brk1At','休憩1：勤務がこの時間以上',0.5)}${num('brk1','→ 休憩（h）',0.25)}${num('brk2Over','休憩2：勤務がこの時間超',0.5)}${num('brk2','→ 休憩（h）',0.25)}
-    ${num('otAfter','残業：労働がこの時間超',0.5)}${num('otRate','残業の割増率',0.05)}${num('weeklyOT','週の残業：この時間超',0.5)}${num('nightRate','深夜の割増率',0.05)}
+    <label class="field"><span>残業の数え方</span><select id="s_otMode" data-otmode="1">${Object.entries(OT_MODES).map(([k,v])=>`<option value="${k}"${otMode()===k?' selected':''}>${v}</option>`).join('')}</select></label>
+    ${num('otAfter','残業：1日の基準（この時間を超えた分）',0.5)}${num('otRate','残業の割増率',0.05)}${num('weeklyOT','残業：週の基準（この時間を超えた分）',0.5)}${num('nightRate','深夜の割増率',0.05)}
     ${num('nightFrom','深夜の開始（時）',0.5)}${num('nightTo','深夜の終了（24+時）',0.5)}
     ${num('peakFrom','ピーク帯表示 開始',1)}${num('peakTo','ピーク帯表示 終了',1)}</div>
-    <p class="hint">人件費 ＝ 時給 ×（労働時間のうち${st.otAfter}hまで）＋ 時給 × ${st.otRate} ×（${st.otAfter}hを超えた分）。労働 ＝ 勤務 − 休憩。シートの計算と同じです。</p></section></div>`;
+    <p class="hint">残業の数え方：${otRuleText()}。${otDaily()?`日々の人件費 ＝ 時給 ×（労働時間のうち${st.otAfter}hまで）＋ 時給 × ${st.otRate} ×（${st.otAfter}hを超えた分）。`:'日々の人件費 ＝ 時給 × 労働時間（1日ごとの割増はつけません）。'}労働 ＝ 勤務 − 休憩。社員の残業・残業代は「集計 → 社員勤務時間」で、この数え方で計算します。</p></section></div>`;
 }
 
 /* ---------- 入力イベント ---------- */
@@ -3275,6 +3283,7 @@ function curDate(){return weekDates(S.week)[S.dayIdx]}
 app.addEventListener('change',e=>{
   const el=e.target, f=el.dataset.f;
   if(el.dataset.dmemo){const [dt,i]=el.dataset.dmemo.split('|'),d=ensureDay(dt);if(d.shifts[+i]){d.shifts[+i].memo=el.value;saveDay(dt)}return render()}
+  if(el.dataset.otmode){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.otMode=el.value;saveSettings();toast('残業の数え方を「'+OT_MODES[el.value]+'」にしました');return render()}
   if(el.dataset.ocset){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings[el.dataset.ocset]=el.value===''?null:Number(el.value);saveSettings();return render()}
   if(el.dataset.popt){S.printOpt={...(S.printOpt||{week:true,days:true,recruit:true}),[el.dataset.popt]:el.checked};return render()}
   if(el.dataset.tpl){const [w,i]=el.dataset.tpl.split('|').map(Number),t=tplGet(w);t.ideal[i]=Math.max(0,Number(el.value)||0);tplPut(w,t);return render()}
