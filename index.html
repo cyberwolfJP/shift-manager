@@ -432,7 +432,7 @@ body.out .brand{visibility:hidden}
     <button data-tab="paid" data-in="stats">有給</button>
     <button data-tab="fare" data-in="stats">交通費</button>
     <button data-tab="emp" data-in="stats">社員勤務時間</button>
-    <button data-tab="budget" data-in="master">月間予算</button>
+    <button data-tab="budget" data-in="master">売上予算</button>
     <button data-tab="ideal" data-in="master">理想人数</button>
     <button data-tab="roster" data-in="master">名簿</button>
     <button data-tab="skill" data-in="master">スキル</button>
@@ -2657,7 +2657,7 @@ function vHelp(){
     <ol style="display:grid;gap:10px;margin:0;padding-left:1.4em">
       ${step(1,'名簿','スタッフ・時給・交通費を登録。留学生には「留学生」にチェック。一番下の「社員の勤務ルール」で週の出勤日数・基本の時間を決めます。')}
       ${step(2,'スキル','ポジションごとのレベル（0できない〜3リーダー）。自動配置に使います。')}
-      ${step(3,'設定','月間の目標人件費率・理想人件費、ポジション、休憩や残業のルール。月の初めに「マスタ → 月間予算」で1か月分の売上予算を入れておくと、週ごとの目標人件費率が正しく出ます。')}
+      ${step(3,'設定','月間の目標人件費率・理想人件費、ポジション、休憩や残業のルール。月の初めに「マスタ → 売上予算」で1か月分の売上予算を入れておくと、週ごとの目標人件費率が正しく出ます。')}
     </ol>
     <h3>毎週の流れ</h3>
     <ol style="display:grid;gap:10px;margin:0;padding-left:1.4em">
@@ -2681,7 +2681,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.62'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.63'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2903,7 +2903,7 @@ function weightsFromPast(){const sum=Array(7).fill(0),cnt=Array(7).fill(0),from=
   const W={};for(let i=0;i<7;i++)W[i]=avg[i]?Math.round(avg[i]/base*100)/100:1;return W}
 function vBudget(){const st=set(),ym=S.bym||ymOf(S.week),ds=monthDays(ym),y=+ym.slice(0,4),m=+ym.slice(5,7),MR=Number(st.monthRate??24);S.bym=ym;
   const nav=`<div class="weeknav"><button class="btn sm" data-act="bym" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${y}年${m}月</span><button class="btn sm" data-act="bym" data-n="1" aria-label="次の月">›</button><button class="btn sm ghost" data-act="bymNow">今月</button></div>`;
-  if(moneyLocked())return `<section class="panel"><div class="bar"><h2>月間予算</h2>${nav}</div><div class="empty">売上予算は隠れています。上の「閲覧用パスワードで表示」で解除すると入力できます。</div></section>`;
+  if(moneyLocked())return `<section class="panel"><div class="bar"><h2>売上予算（日ごと）</h2>${nav}</div><div class="empty">売上予算は隠れています。上の「閲覧用パスワードで表示」で解除すると入力できます。</div></section>`;
   const tot=ds.reduce((a,d)=>a+budOf(d),0),filled=ds.filter(d=>budOf(d)>0).length;
   let cost=0,costDays=0;for(const d of ds){const C=calcDay(d);if(C.cost>0){cost+=C.cost;costDays++}}
   const W=st.budgetWeights||DEFAULT_SETTINGS.budgetWeights,order=[1,2,3,4,5,6,0];
@@ -2914,22 +2914,25 @@ function vBudget(){const st=set(),ym=S.bym||ymOf(S.week),ds=monthDays(ym),y=+ym.
       <input type="text" id="bn_${d}" data-bnote="${d}" value="${esc(note)}" placeholder="メモ" maxlength="30" aria-label="${md(d)}のメモ"></div>`}
   const wdAvg=order.map(w=>{const v=ds.filter(d=>wd(d)===w&&budOf(d)>0);return v.length?v.reduce((a,d)=>a+budOf(d),0)/v.length:0});
   const G=goalOf(ym),gd=tot-G;
-  return `<section class="panel"><div class="bar"><h2>月間予算</h2>${nav}</div>
-    <div class="autobar" style="flex-wrap:wrap;align-items:flex-end"><label class="field" style="margin:0"><span><b>月間の売上目標（円）</b></span><input type="number" step="10000" min="0" id="mGoal" data-mgoal="${ym}" value="${G||''}" placeholder="例 12000000" style="width:170px"></label>
-      ${G?`<span>日別予算の合計との差 <b class="${gd<0?'cell-bad':'cell-good'}" style="padding:2px 6px;border-radius:4px">${gd<0?'−':'+'}${yen(Math.abs(gd))}</b>${gd<0?'（日別の予算が目標に届いていません）':''}</span><button class="btn sm pri" data-act="goalSpread">目標を曜日の比率で日別に振り分ける</button>`:'<span class="hint">目標を入れると、日別の予算の合計と比べたり、日別に振り分けたりできます</span>'}</div>
+  return `<section class="panel"><div class="bar"><h2>売上予算（日ごと）</h2>${nav}</div>
+    <p class="hint" style="margin:0">カレンダーの各日に、その日の売上予算を入れてください（シフト作成の「売上予算」と同じ値です）。</p>
     <div class="kpis"><div class="kpi"><span class="k">月間の売上目標</span><span class="v">${G?yen(G):'—'}</span></div><div class="kpi"><span class="k">日別予算の合計</span><span class="v">${yen(tot)}</span>${G?`<span class="muted" style="font-size:11px">目標の${Math.round(tot/G*100)}%</span>`:''}</div>
       <div class="kpi"><span class="k">入力済み</span><span class="v">${filled}／${ds.length}日</span></div>
       <div class="kpi"><span class="k">人件費の枠（×${MR}%）</span><span class="v">${yen(tot*MR/100)}</span></div>
       <div class="kpi"><span class="k">シフト済みの人件費</span><span class="v">${yen(cost)}</span><span class="muted" style="font-size:11px">${costDays}日分${tot?`・枠の${Math.round(cost/(tot*MR/100)*100)}%`:''}</span></div></div>
+    <div class="bcal">${['月','火','水','木','金','土','日'].map(x=>`<div class="bdow">${x}</div>`).join('')}${cells}</div>
+    <details${S.budToolOpen?' open':''} id="budToolDet"><summary style="cursor:pointer;font-weight:700;font-size:14px">まとめて入れる（月間の売上目標から振り分け・前の月から・消す）</summary><div style="display:grid;gap:10px;margin-top:8px">
+    <div class="autobar" style="flex-wrap:wrap;align-items:flex-end"><label class="field" style="margin:0"><span><b>月間の売上目標（円）</b></span><input type="number" step="10000" min="0" id="mGoal" data-mgoal="${ym}" value="${G||''}" placeholder="例 12000000" style="width:170px"></label>
+      ${G?`<span>日別予算の合計との差 <b class="${gd<0?'cell-bad':'cell-good'}" style="padding:2px 6px;border-radius:4px">${gd<0?'−':'+'}${yen(Math.abs(gd))}</b>${gd<0?'（日別の予算が目標に届いていません）':''}</span><button class="btn sm pri" data-act="goalSpread">目標を曜日の比率で日別に振り分ける</button>`:'<span class="hint">目標を入れると、日別の予算の合計と比べたり、日別に振り分けたりできます</span>'}</div>
     <form id="spreadForm" class="autobar" style="flex-wrap:wrap;align-items:flex-end">
       <label class="field" style="margin:0"><span>月の合計を振り分ける（円）</span><input type="number" step="10000" min="0" id="bTotal" placeholder="例 12000000" style="width:150px"></label>
       ${order.map(w=>`<label class="field" style="margin:0"><span>${WD[w]}の比率</span><input type="number" step="0.01" min="0" id="bw${w}" data-bw="${w}" value="${W[w]??1}" style="width:68px"></label>`).join('')}
       <label style="font-size:13px"><input type="checkbox" id="bOver"> 入力済みの日も振り分け直す</label>
       <button class="btn pri" type="submit">曜日の比率で振り分ける</button><button class="btn sm ghost" type="button" data-act="bwPast">過去の予算から比率を出す</button></form>
     <p class="hint" style="margin:0">比率は「月曜を1」とした曜日ごとの重さです（金・土が1.27なら月曜の1.27倍）。入力済みの日は、チェックしない限りそのまま残し、残りの金額を空いている日に振り分けます。祝日やイベントの日は、振り分けたあとに下のカレンダーで直してください。</p>
-    <div class="bcal">${['月','火','水','木','金','土','日'].map(x=>`<div class="bdow">${x}</div>`).join('')}${cells}</div>
     <div class="bar" style="flex-wrap:wrap"><span class="hint">曜日ごとの平均：${order.map((w,i)=>`${WD[w]} ${wdAvg[i]?yen(wdAvg[i]):'—'}`).join('　')}</span>
       <button class="btn sm" data-act="bCopyPrev">前の月の曜日平均で空いている日を埋める</button><button class="btn sm ghost" data-act="bClear">この月の予算を消す</button></div>
+    </div></details>
     <p class="hint">ここで入れた金額は、シフト作成の各日の「売上予算」と同じものです。月間の目標人件費率（${MR}%）から週ごとの目標を決めるときに使うので、月の初めにまとめて入れておくと週の目標が正しく出ます。${S.crypt?'金額は暗号化して保存します。':''}</p></section>`}
 function vYear(){
   const st=set(),y=S.year||parse(S.week).getFullYear(),m=S.month||parse(S.week).getMonth()+1;S.year=y;S.month=m;
@@ -3715,7 +3718,7 @@ app.addEventListener('change',e=>{if(e.target.id!=='importFile')return;const f=e
     if(d.format!=='shift-app-backup')return toast('このアプリのバックアップファイルではありません');
     S.importInfo={data:d,msg:`「${d.store?.name||''}」のバックアップ（スタッフ${(d.staff||[]).length}人・${Object.keys(d.days||{}).length}日分）を、今の店舗「${S.stores[S.store]?.name||''}」に取り込みます。`};render()})});
 app.addEventListener('input',e=>{if(e.target.id!=='reportNote')return;S.reportNote=e.target.value;try{localStorage.setItem('shiftapp:report:'+S.store+':'+S.week,S.reportNote)}catch(_){}});
-app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='paidNoDet')S.paidNoOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
+app.addEventListener('toggle',e=>{if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='budToolDet')S.budToolOpen=e.target.open;if(e.target.id==='paidNoDet')S.paidNoOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
 document.getElementById('who').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
   if(b.dataset.act==='logout')logout();
   if(b.dataset.act==='changeMe'){S.me='';try{localStorage.removeItem('shiftapp:me:'+S.store)}catch(_){};S.draft=null;render()}});
@@ -3745,7 +3748,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v74';
+  const APP_SW='v75';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
