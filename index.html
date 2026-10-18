@@ -1989,7 +1989,7 @@ function reportFindings(week){
     out.push(['留学生28時間',over.length?`超過：${over.join('、')}。修正が必要です。`:`全員${lim}時間以内${near.length?`（上限まで2時間未満：${near.length}人）`:''}。`])}
   // 社員
   const emps=staffList(true).filter(x=>isEmp(x)&&x.active!==false);
-  if(emps.length){const R=emps.map(e=>({e,r:otWeek(e,week)})),ot=R.reduce((a,x)=>a+x.r.ot,0),ng=R.reduce((a,x)=>a+x.r.night,0),pay=R.reduce((a,x)=>a+x.r.otPay+x.r.nightPay,0);
+  if(emps.length){const R=emps.map(e=>({e,r:otWeek(e,week)})),ot=R.reduce((a,x)=>a+x.r.ot,0),ng=R.reduce((a,x)=>a+x.r.night,0),pay=R.reduce((a,x)=>a+x.r.total,0);
     const {y,m}=monthOf(week),mm=emps.map(e=>({e,M:empMonth(e,y,m)})).filter(x=>x.M.shotei);
     const over=mm.filter(x=>x.M.left<-8).map(x=>x.e.name),under=mm.filter(x=>x.M.left>0&&!x.M.undecided).map(x=>x.e.name);
     out.push(['社員',`残業 ${n1(ot)}h・深夜 ${n1(ng)}h（手当の目安 ${yen(pay)}）。${m}月の所定労働時間：${over.length?`超過見込み ${over.join('、')}`:under.length?`不足見込み ${under.join('、')}`:'おおむね予定どおり'}。`])}
@@ -2617,7 +2617,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.57'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.58'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3079,22 +3079,27 @@ function idealPanel(date){
  予測（着地）＝実績＋予定＋有給＋まだ決まっていない日×（週の出勤日数÷7）×1日の平均労働時間 */
 function empMonthStat(e,y,m){const st=set(),pre=`${y}-${pad(m)}`,days=[];
   for(let d=`${pre}-01`;d.slice(0,7)===pre;d=addDays(d,1))days.push(d);
-  let act=0,actD=0,plan=0,planD=0,paid=0,paidD=0,off=0,und=0,night=0,dOT=0,lab=[];
+  let act=0,actD=0,plan=0,planD=0,paid=0,paidD=0,off=0,und=0,night=0,dOT=0,lab=[],allSegs=[],dNOT=0;
   for(const d of days){const mine=(dayDoc(d).shifts||[]).filter(x=>x.sid===e.id);
     if(!mine.length){if(d>=today)und++;continue}
-    let l=0,n=0,on=false,isOffDay=false,hasPaid=false,meet=false;
+    let l=0,n=0,on=false,isOffDay=false,hasPaid=false,meet=false,sg=[];
     for(const r of mine){if(r.pos===PAID){paid+=Math.max(0,Number(r.paidH)||0);paidD++;hasPaid=true;continue}if(isOff(r.pos)){isOffDay=true;continue}
-      const c=calcShift(r);if(c.on){l+=c.labor;n+=c.night;on=true}else if(isOther(r.pos))meet=true}
+      const c=calcShift(r);if(c.on){l+=c.labor;n+=c.night;on=true;sg.push(...workSegs(r))}else if(isOther(r.pos))meet=true}
+    sg.sort((a,b)=>a[0]-b[0]);allSegs.push(...sg);if(on&&otDaily())dNOT+=nightOf(tailSegs(sg,Math.max(0,l-Number(st.otAfter??8))));
     if(!on&&!isOffDay&&!hasPaid&&!meet&&d>=today)und++;
     if(on){if(d<today){act+=l;actD++}else{plan+=l;planD++}night+=n;if(otDaily())dOT+=Math.max(0,l-Number(st.otAfter??8));lab.push(l)}
     else if(isOffDay)off++}
   // 週40時間超（1日8時間超の分を除く）：月曜がこの月にある週で数える
-  let wOT=0;for(let w=monday(days[0]);w<=days[days.length-1];w=addDays(w,7)){if(w.slice(0,7)!==pre&&w<days[0])continue;const r=otWeek(e,w);wOT+=r.wOT}
+  let wOT=0,wNOT=0;for(let w=monday(days[0]);w<=days[days.length-1];w=addDays(w,7)){if(w.slice(0,7)!==pre&&w<days[0])continue;const r=otWeek(e,w);wOT+=r.wOT;wNOT+=r.wNOT}
   const avg=lab.length?lab.reduce((a,b)=>a+b,0)/lab.length:Math.max(0,Number(e.defEnd??23.5)-Number(e.defStart??12)-breakHours(Number(e.defEnd??23.5)-Number(e.defStart??12)));
   const rate=Math.min(1,Number(e.workDays??5)/7),fore=act+plan+paid+und*rate*avg,shotei=Number(e.shotei??173);
   // 月単位：所定を超えた労働時間（有給は含めない）。実績＋予定＋見込みで
-  const laborFore=act+plan+und*rate*avg,mOT=otMonthly()?Math.max(0,laborFore-shotei):0,ot=otMonthly()?mOT:dOT+wOT;
-  return {e,act,actD,plan,planD,paid,paidD,off,und,night,dOT,wOT,mOT,ot,avg,rate,fore,shotei,diff:fore-shotei,addDays:und*rate,total:days.length}}
+  const laborFore=act+plan+und*rate*avg,mOT=otMonthly()?Math.max(0,laborFore-shotei):0,ot=otMode()==='none'?0:otMonthly()?mOT:dOT+wOT;
+  // 深夜残業：月単位なら、月の最後の勤務の後ろの方から（見込みの分は深夜かどうか分からないので、シフトが入っている分だけ）
+  const nightOT=otMode()==='none'?0:otMonthly()?nightOf(tailSegs(allSegs,Math.min(mOT,segLen(allSegs)))):dNOT+wNOT;
+  const wage=Number(e.wage)||0,oR=Number(st.otRate??1.25),nR=Number(st.nightRate??0.25);
+  const otPay=wage*oR*Math.max(0,ot-nightOT),nightOTPay=wage*(oR+nR)*nightOT,nightPay=wage*nR*Math.max(0,night-nightOT);
+  return {nightOT,otPay,nightOTPay,nightPay,payTotal:otPay+nightOTPay+nightPay,e,act,actD,plan,planD,paid,paidD,off,und,night,dOT,wOT,mOT,ot,avg,rate,fore,shotei,diff:fore-shotei,addDays:und*rate,total:days.length}}
 function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false);if(!emps.length)return '';
   const ym=S.empYm||today.slice(0,7),y=+ym.slice(0,4),m=+ym.slice(5,7),past=ym<today.slice(0,7),fut=ym>today.slice(0,7);
   const R=emps.map(e=>({e,r:empMonthStat(e,y,m)}));
@@ -3129,7 +3134,7 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
   const body=days.map(d=>{const w=wd(d);return `<tr class="${d===today?'td':''} ${w===0?'sun':w===6?'sat':''}"><th class="num">${+d.slice(8)}<span>${WD[w]}</span></th>${emps.map(e=>cell(e,d)).join('')}</tr>`}).join('');
   const foot=[['所定労働時間',r=>`<b>${n1(r.shotei)}h</b>`],['実績（昨日まで）',r=>`${n1(r.act)}h`],['予定（シフト済み）＋有給',r=>`${n1(r.plan+r.paid)}h`],['未定の日の見込み',r=>r.und?`${n1(r.fore-r.act-r.plan-r.paid)}h<div class="muted" style="font-size:11px">${r.und}日中${n1(r.addDays)}日出勤</div>`:'—'],
     ['着地予測',r=>`<b style="font-size:16px">${n1(r.fore)}h</b>`],['所定との差',r=>{const d=r.diff;return `<b class="${d>8?'cell-bad':d<-8?'cell-warn':''}">${d>0?'+':''}${n1(d)}h</b><div style="font-size:11px">${d>8?'超える見込み':d<-8?'届かない見込み':'ほぼ所定どおり'}</div>`}],
-    [otMode()==='none'?'残業（計算しない）':otMonthly()?'残業（所定超・見込み）':'残業',r=>otMode()==='none'?'—':`${n1(r.ot)}h${otMode()==='dw'?`<div class="muted" style="font-size:11px">日${n1(r.dOT)}・週${n1(r.wOT)}</div>`:''}`],['深夜',r=>`${n1(r.night)}h`],['残業代・深夜手当の目安',r=>{const e=r.e,w=Number(e?.wage)||0;return w?yen(Math.round(w*Number(set().otRate??1.25)*r.ot+w*Number(set().nightRate??0.25)*r.night)):'—'}]];
+    [otMode()==='none'?'残業（計算しない）':otMonthly()?'残業（所定超・見込み）':'残業',r=>otMode()==='none'?'—':`${n1(r.ot)}h${otMode()==='dw'?`<div class="muted" style="font-size:11px">日${n1(r.dOT)}・週${n1(r.wOT)}</div>`:''}`],['深夜（うち深夜残業）',r=>`${n1(r.night)}h<div class="muted" style="font-size:11px">深夜残業${n1(r.nightOT)}h</div>`],['残業代・深夜残業代・深夜手当の目安',r=>Number(r.e?.wage)?`<b>${yen(Math.round(r.payTotal))}</b><div class="muted" style="font-size:11px">残業${yen(Math.round(r.otPay))}／深夜残業${yen(Math.round(r.nightOTPay))}／深夜${yen(Math.round(r.nightPay))}</div>`:'—']];
   return `<section class="panel"><div class="bar"><h2>社員の月間実績と着地予測</h2>
       <div class="weeknav"><button class="btn sm" data-act="empYm" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${y}年${m}月</span><button class="btn sm" data-act="empYm" data-n="1" aria-label="次の月">›</button><button class="btn sm ghost" data-act="empYmNow">今月</button></div>
       <span class="hint">${past?'終わった月：実績で確定しています':fut?'これからの月：シフトと見込みで予測しています':`${md(today)}時点`}</span></div>
@@ -3154,27 +3159,39 @@ function vEmp(){
   ${empOT()}`;
 }
 /* 社員の残業・深夜（週）：1日8時間超＋週40時間超（1日で数えた分を除く）。深夜は22時〜翌5時 */
+/* 深夜残業：残業になった時間のうち、深夜（22時〜翌5時）に入る時間。残業代は 時給×(残業の割増＋深夜の割増) で数える
+ 1日の残業＝その日の勤務の後ろの方（基準を超えたあと）、週・月の残業＝その期間の最後の勤務の後ろの方、として深夜にかかる時間を数える */
+function workSegs(sh){const c=calcShift(sh);if(!c.on)return [];const bs=breakStart(sh,c);
+  return bs!=null&&c.brk?[[sh.start,bs],[bs+c.brk,sh.end]].filter(x=>x[1]>x[0]):[[sh.start,sh.end]]}
+function tailSegs(segs,h){const out=[];for(let i=segs.length-1;i>=0&&h>1e-9;i--){const [a,b,k]=segs[i],t=Math.min(h,b-a);out.unshift([b-t,b,k]);h-=t}return out}
+function headSegs(segs,h){const out=[];for(const [a,b,k] of segs){if(h<=1e-9)break;const t=Math.min(h,b-a);out.push([a,a+t,k]);h-=t}return out}
+function nightOf(segs){const st=set(),nf=Number(st.nightFrom??22),nt=Number(st.nightTo??29);return segs.reduce((x,[a,b])=>x+Math.max(0,Math.min(b,nt)-Math.max(a,nf)),0)}
+const segLen=segs=>segs.reduce((x,[a,b])=>x+(b-a),0);
 function otWeek(e,week){
-  const st=set(),days=weekDates(week).map(dt=>{let l=0,n=0,w=0,help=[];for(const sh of dayDoc(dt).shifts||[]){if(sh.sid!==e.id)continue;const c=calcShift(sh);if(!c.on)continue;l+=c.labor;n+=c.night;w+=c.work;if(c.help)help.push(sh.helpTo||'他店')}
-    const dOT=otDaily()?Math.max(0,l-Number(st.otAfter??8)):0;return {dt,l,n,dOT,help}});
+  const st=set(),days=weekDates(week).map(dt=>{let l=0,n=0,w=0,help=[],segs=[];for(const sh of dayDoc(dt).shifts||[]){if(sh.sid!==e.id)continue;const c=calcShift(sh);if(!c.on)continue;l+=c.labor;n+=c.night;w+=c.work;segs.push(...workSegs(sh));if(c.help)help.push(sh.helpTo||'他店')}
+    segs.sort((a,b)=>a[0]-b[0]);const dOT=otDaily()?Math.max(0,l-Number(st.otAfter??8)):0,otSegs=tailSegs(segs,dOT);
+    return {dt,l,n,dOT,dNOT:nightOf(otSegs),help,reg:headSegs(segs,l-dOT)}});
   const labor=days.reduce((a,d)=>a+d.l,0),dOT=days.reduce((a,d)=>a+d.dOT,0),reg=labor-dOT,wOT=otWeekly()?Math.max(0,reg-Number(st.weeklyOT??40)):0;
-  const night=days.reduce((a,d)=>a+d.n,0),ot=dOT+wOT,wage=Number(e.wage)||0;
-  const otPay=Math.round(wage*Number(st.otRate??1.25)*ot),nightPay=Math.round(wage*Number(st.nightRate??0.25)*night);
-  return {days,labor,dOT,wOT,ot,night,otPay,nightPay,wage};
+  // 週の残業は、その週の最後の勤務の後ろから数える
+  const wSegs=tailSegs(days.flatMap(d=>d.reg),wOT),wNOT=nightOf(wSegs);
+  const nightOT=days.reduce((a,d)=>a+d.dNOT,0)+wNOT;
+  const night=days.reduce((a,d)=>a+d.n,0),ot=dOT+wOT,wage=Number(e.wage)||0,oR=Number(st.otRate??1.25),nR=Number(st.nightRate??0.25);
+  const otPay=Math.round(wage*oR*(ot-nightOT)),nightOTPay=Math.round(wage*(oR+nR)*nightOT),nightPay=Math.round(wage*nR*(night-nightOT));
+  return {days,labor,dOT,wOT,wNOT,ot,night,nightOT,otPay,nightOTPay,nightPay,total:otPay+nightOTPay+nightPay,wage};
 }
 function empOT(){
   const emps=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false);if(!emps.length)return '';
   const W=S.week,R=emps.map(e=>({e,r:otWeek(e,W)}));
-  const rows=R.map(({e,r})=>`<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td><td class="num">${n1(r.labor)}</td><td class="num">${n1(r.dOT)}</td><td class="num">${n1(r.wOT)}</td><td class="num"><b>${n1(r.ot)}</b></td><td class="num"><b>${n1(r.night)}</b></td><td class="num">${yen(r.otPay)}</td><td class="num">${yen(r.nightPay)}</td><td class="num"><b>${yen(r.otPay+r.nightPay)}</b></td></tr>`).join('');
+  const rows=R.map(({e,r})=>`<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td><td class="num">${n1(r.labor)}</td><td class="num">${n1(r.dOT)}</td><td class="num">${n1(r.wOT)}</td><td class="num"><b>${n1(r.ot)}</b></td><td class="num"><b>${n1(r.night)}</b></td><td class="num">${n1(r.nightOT)}</td><td class="num">${yen(r.otPay)}</td><td class="num">${yen(r.nightOTPay)}</td><td class="num">${yen(r.nightPay)}</td><td class="num"><b>${yen(r.total)}</b></td></tr>`).join('');
   const detail=R.map(({e,r})=>`<tr><td style="white-space:nowrap">${esc(e.name)}</td>${r.days.map(d=>`<td class="num" style="font-size:12px">${d.l?`${n1(d.l)}${d.dOT?`<div style="color:var(--bad)">残${n1(d.dOT)}</div>`:''}${d.n?`<div style="color:var(--ink)">深${n1(d.n)}</div>`:''}${d.help.length?`<div style="color:var(--muted)">→${esc(d.help.join(','))}</div>`:''}`:'<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('');
-  const tot=R.reduce((a,x)=>({ot:a.ot+x.r.ot,night:a.night+x.r.night,pay:a.pay+x.r.otPay+x.r.nightPay}),{ot:0,night:0,pay:0});
-  S.otText=`【${md(W)}〜${md(addDays(W,6))} 社員 残業・深夜】\n`+R.map(({e,r})=>`${e.name}：労働${n1(r.labor)}h／残業${n1(r.ot)}h（1日8h超${n1(r.dOT)}・週40h超${n1(r.wOT)}）／深夜${n1(r.night)}h／残業代${yen(r.otPay)}・深夜手当${yen(r.nightPay)}`).join('\n');
+  const tot=R.reduce((a,x)=>({ot:a.ot+x.r.ot,night:a.night+x.r.night,pay:a.pay+x.r.total}),{ot:0,night:0,pay:0});
+  S.otText=`【${md(W)}〜${md(addDays(W,6))} 社員 残業・深夜】\n`+R.map(({e,r})=>`${e.name}：労働${n1(r.labor)}h／残業${n1(r.ot)}h（1日8h超${n1(r.dOT)}・週40h超${n1(r.wOT)}）／深夜${n1(r.night)}h（うち深夜残業${n1(r.nightOT)}h）／残業代${yen(r.otPay)}・深夜残業代${yen(r.nightOTPay)}・深夜手当${yen(r.nightPay)}`).join('\n');
   return `<section class="panel"><div class="bar"><h2>社員の残業・深夜（週）</h2>${weekNav()}<span style="margin-left:auto"><button class="btn sm" data-act="copyOT">入力用にコピー</button></span></div>
     <div class="kpis"><div class="kpi"><span class="k">残業 合計</span><span class="v">${n1(tot.ot)}h</span></div><div class="kpi"><span class="k">深夜 合計</span><span class="v">${n1(tot.night)}h</span></div><div class="kpi hi"><span class="k">残業代＋深夜手当</span><span class="v">${yen(tot.pay)}</span></div></div>
-    <div class="scroll"><table class="t"><thead><tr><th>社員</th><th class="r">労働h</th><th class="r">1日8h超</th><th class="r">週40h超</th><th class="r">残業 計</th><th class="r">深夜h</th><th class="r">残業代</th><th class="r">深夜手当</th><th class="r">合計</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="scroll"><table class="t"><thead><tr><th>社員</th><th class="r">労働h</th><th class="r">1日8h超</th><th class="r">週40h超</th><th class="r">残業 計</th><th class="r">深夜h</th><th class="r">うち深夜残業h</th><th class="r">残業代</th><th class="r">深夜残業代</th><th class="r">深夜手当</th><th class="r">合計</th></tr></thead><tbody>${rows}</tbody></table></div>
     <details><summary style="cursor:pointer;font-weight:700;font-size:13px">日別の内訳</summary><div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>社員</th>${weekDates(W).map(dt=>`<th class="r">${md(dt)}（${WD[wd(dt)]}）</th>`).join('')}</tr></thead><tbody>${detail}</tbody></table></div></details>
     ${S.otCopy?`<textarea readonly rows="${emps.length+1}" style="width:100%" id="otBox">${esc(S.otText)}</textarea>`:''}
-    <p class="hint">残業＝${otRuleText()}（「マスタ → 設定」で変えられます）。残業代＝時給×${set().otRate}×残業時間、深夜手当＝時給×${set().nightRate??0.25}×深夜（${tLabel(set().nightFrom)}〜${tLabel(set().nightTo)}）の時間。残業と深夜が重なる時間は両方つきます。ヘルプ（他店）の時間も本人の勤務として含めます。法定休日の割増は含みません。時給・割増率は名簿と設定の値です。</p></section>`;
+    <p class="hint">残業＝${otRuleText()}（「マスタ → 設定」で変えられます）。残業代＝時給×${set().otRate}×残業時間（深夜以外）、深夜残業代＝時給×（${set().otRate}＋${set().nightRate??0.25}）×残業のうち深夜（${tLabel(set().nightFrom)}〜${tLabel(set().nightTo)}）の時間、深夜手当＝時給×${set().nightRate??0.25}×残業でない深夜の時間。残業の時間は、1日の残業はその日の勤務の後ろの方、週の残業はその週の最後の勤務の後ろの方として深夜かどうかを数えます。ヘルプ（他店）の時間も本人の勤務として含めます。法定休日の割増は含みません。時給・割増率は名簿と設定の値です。</p></section>`;
 }
 
 /* --- 28h --- */
