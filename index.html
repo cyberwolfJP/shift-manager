@@ -236,6 +236,10 @@ table.wk tr.me td{background:var(--warn-bg)}
 .pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span.f{background:var(--p-violet);font-weight:700}
 .pedit{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:12px}.pedit label{display:grid;gap:2px}
 .ewk td.w28{background:var(--warn-bg)}
+.rcimgs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.rcimg{position:relative;width:84px;border:1px solid var(--line);border-radius:8px;padding:4px;background:var(--surface);display:grid;gap:3px}.rcimg img{width:100%;height:110px;object-fit:cover;object-position:top;border-radius:4px;background:#fff}
+.rcimg .n{position:absolute;left:6px;top:6px;background:var(--accent);color:#fff;border-radius:9px;font-size:11px;padding:0 6px;font-weight:700}.rcimg .st{font-size:11px;text-align:center;color:var(--muted)}.rcimg .st.bad{color:var(--bad)}.rcimg.error{border-color:var(--bad)}
+.rcimg .x{position:absolute;right:2px;top:2px;width:22px;height:22px;border-radius:11px;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:13px;line-height:22px;padding:0;cursor:pointer}
+.rcgrid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}.rcperson{display:grid;gap:8px;align-content:start;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface)}.rcperson.ok{border-color:var(--good);background:var(--good-bg)}
 .rcitem{display:grid;grid-template-columns:150px 1fr;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface)}.rcitem.ok{border-color:var(--good);background:var(--good-bg)}
 .rcitem img{width:150px;max-height:300px;object-fit:contain;object-position:top;border-radius:6px;border:1px solid var(--line);background:#fff}
 .rcbar{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden}.rcbar i{display:block;height:100%;background:var(--accent)}
@@ -2686,7 +2690,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.65'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.66'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2747,71 +2751,117 @@ function ocrPrep(file){return new Promise((ok,ng)=>{const img=new Image(),u=URL.
   let s=0;for(let i=0;i<p.length;i+=4)s+=.299*p[i]+.587*p[i+1]+.114*p[i+2];const inv=s/(p.length/4)<110;
   for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];if(inv)g=255-g;g=g>175?255:g<90?0:(g-90)*3;p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);ok(c)};img.onerror=ng;img.src=u})}
 const z2h=t=>String(t||'').replace(/[！-～]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[〜～~ー－―‐−]/g,'-').replace(/　/g,' ');
-const nameKey=t=>z2h(t).replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60)).replace(/[★☆●◎◇◆♪♡♥!?！？。、.,・\s"'「」『』()（）\[\]]/g,'').replace(/(さん|様|さま|ちゃん|くん|君)$/,'').toLowerCase();
-// 文字からスタッフを探す（名簿の名前と「LINE名」）
-function matchStaff(lines){const list=staffList();let best=null,bs=0,cand='';
-  const keys=list.map(s=>({s,ks:[s.name,...String(s.lineName||'').split(/[,、]/)].map(nameKey).filter(k=>k.length>=1)}));
-  lines.slice(0,12).forEach((ln,i)=>{const raw=ln.trim();if(!raw||/\d{1,2}\s*[:時\/-]/.test(z2h(raw)))return;const k=nameKey(raw);if(!k||k.length>20)return;if(!cand&&k.length>=2&&!/^(トーク|ノート|アルバム|既読|メッセージ)/.test(raw))cand=raw.replace(/\s+/g,' ').slice(0,20);
-    for(const {s,ks} of keys)for(const kk of ks){if(!kk)continue;const sc=k===kk?10:(kk.length>=2&&(k.includes(kk)||kk.includes(k)&&k.length>=2))?6:0;if(sc&&sc-i*0.1>bs){bs=sc-i*0.1;best=s}}});
-  // 本文の中にフルネームで出てくる場合
-  if(!best){const all=nameKey(lines.join(''));for(const {s,ks} of keys)for(const kk of ks)if(kk.length>=2&&all.includes(kk)){best=s;break}}
-  return {staff:best,cand}}
-// 文字からその週の希望を読み取る
-function parseWishes(text,week){const ds=weekDates(week),byMD={},byW={};ds.forEach(dt=>{byMD[`${+dt.slice(5,7)}/${+dt.slice(8)}`]=dt;byW[WD[wd(dt)]]=dt});
+const nameKey=t=>z2h(t).replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60)).replace(/[ァィゥェォッャュョヮヵヶ]/g,c=>({'ァ':'ア','ィ':'イ','ゥ':'ウ','ェ':'エ','ォ':'オ','ッ':'ツ','ャ':'ヤ','ュ':'ユ','ョ':'ヨ','ヮ':'ワ','ヵ':'カ','ヶ':'ケ'})[c]).replace(/[^\p{L}\p{N}]/gu,'').replace(/(サン|様|サマ|チヤン|クン|君)$/,'').toLowerCase();
+const cleanName=t=>z2h(t).replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim().slice(0,30);
+function lev(a,b){const m=a.length,n=b.length;if(!m||!n)return Math.max(m,n);let p=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
+// 名前の行から名簿のスタッフを探す（名簿の名前と「LINEの名前」。10=完全一致 7〜8=一部一致 5=よく似ている）
+function nameScore(raw){const k=nameKey(raw);let best=null,bs=0;if(!k||k.length>30)return {staff:null,score:0};
+  for(const s of staffList())for(const kk of [s.name,...String(s.lineName||'').split(/[,、]/)].map(nameKey)){if(!kk)continue;let sc=0;
+    if(k===kk)sc=10;else if(kk.length>=2&&k.includes(kk))sc=8;else if(k.length>=3&&kk.includes(k))sc=7;else if(Math.min(k.length,kk.length)>=3&&1-lev(k,kk)/Math.max(k.length,kk.length)>=.75)sc=5;
+    if(!sc)for(const t of z2h(raw).split(/\s+/).map(nameKey).filter(t=>t.length>=2)){if(t===kk){sc=8;break}if(Math.min(t.length,kk.length)>=3&&1-lev(t,kk)/Math.max(t.length,kk.length)>=.7)sc=5}
+    if(sc>bs){bs=sc;best=s}}
+  return {staff:best,score:bs}}
+// LINEの画面の決まった文字（見出し・ボタン・投稿時刻など）
+const RC_NOISE=/(銀だこ|アルバム|^ノート$|コメント|PayPay|いいね|返信|既読|メンバー|トーク|投稿|イベント|^[<＜]|^ノート\s)/;
+const RC_TS=/^(?:(?:\d+\s*(?:秒|分|時間|日|週間|か月|ヶ月|カ月)前|昨日|今日|\d{1,2}\s*[\/月]\s*\d{1,2}\s*日?(?:\([^)]*\))?|\d{4}\s*[\/.年]\s*\d{1,2}\s*[\/.月]\s*\d{1,2}\s*日?(?:\([^)]*\))?)\s*)?\d{1,2}:\d{2}$/;
+const RC_GREET=/(お疲れ|おつかれ|お疲|よろしく|宜しく|お願い|です|ます|希望|シフト|提出)/;
+const rcWishy=l=>{const z=z2h(l);return /\d{1,2}\s*[\/月]\s*\d{1,2}|\d{1,2}\s*日(?!\s*前)|(^|[\s(,・、/])[月火水木金土日](曜|$|[\s)0-9:,・、/\-]|から)|^[月火水木金土日]{2,7}|\d{1,2}\s*[:時.]\s*\d|\d\s*(から|-)/.test(z)};
+const rcNameish=l=>{const z=z2h(l).trim();if(/\d/.test(z)||RC_GREET.test(z)||RC_NOISE.test(z)||rcWishy(z)||/休|OK|ok|大丈夫|無理|以上|全部|毎日|いつでも|もっと見/.test(z))return false;const c=cleanName(z);return c.replace(/\s/g,'').length>=2};
+// 1枚のスクショの文字を「送った人ごと」に分ける（名前の行 → その下の本文。投稿時刻で区切り）
+function rcSegment(text){const L=String(text).split(/\r?\n/).map(s=>s.trim()).filter(Boolean),out=[];let cur=null,boundary=true;
+  for(let i=0;i<L.length;i++){let l=L[i];const z=z2h(l).replace(/\s+/g,' ').trim();
+    if(/もっと見|続きを読む/.test(l)){if(cur)cur.trunc=true;l=l.replace(/[.．・…]*\s*(もっと見る?|続きを読む)/g,'').trim();if(!l)continue}
+    else if(RC_TS.test(z)){boundary=true;if(cur&&cur.lines.length)cur=null;continue}
+    else if(RC_NOISE.test(l)&&!rcWishy(l)){boundary=true;continue}
+    if(rcNameish(l)){const M=nameScore(l),nx=L.slice(i+1,i+3).map(z2h),good=nx.some(x=>RC_GREET.test(x)||rcWishy(x));
+      if(M.score>=7||(good&&(boundary||RC_GREET.test(nx[0]||'')))){cur={name:cleanName(l),staff:M.score>=5?M.staff:null,score:M.score,lines:[],trunc:false};out.push(cur);boundary=false;continue}}
+    boundary=false;if(!cur){cur={name:'',staff:null,score:0,lines:[],trunc:false};out.push(cur)}
+    cur.lines.push(l)}
+  return out.map(b=>({...b,text:b.lines.join('\n')}))}
+// 文字からその週の希望を読み取る（10/20・20日・火曜日・火 ／ 17-23・17:30から23:30まで・17.5から・18時からL）
+function parseWishes(text,week){const ds=weekDates(week),byMD={},byW={},byD={};ds.forEach(dt=>{byMD[`${+dt.slice(5,7)}/${+dt.slice(8)}`]=dt;byW[WD[wd(dt)]]=dt;byD[+dt.slice(8)]=dt});
   const st=set(),Lend=st.closeAt!=null&&st.closeAt!==''?Number(st.closeAt):23.5;
   const hr=(h,m)=>{let v=Number(h)+(Number(m)||0)/60;if(v<8)v+=24;return Math.round(v*2)/2};
-  const days={},other=[];let found=0;
-  for(const raw of String(text).split(/\r?\n/)){const ln=z2h(raw).trim();if(!ln)continue;const targets=[];
-    for(const m of ln.matchAll(/(\d{1,2})\s*[\/月]\s*(\d{1,2})\s*日?/g)){const dt=byMD[`${+m[1]}/${+m[2]}`];if(dt)targets.push(dt);else if(+m[1]>=1&&+m[1]<=12)other.push(`${m[1]}/${m[2]}`)}
-    if(!targets.length)for(const m of ln.matchAll(/(^|[\s(,・、/])([月火水木金土日])(?=$|[\s)曜:,・、/\-0-9]|から)/g)){const dt=byW[m[2]];if(dt&&!targets.includes(dt))targets.push(dt)}
-    if(!targets.length)continue;
-    const body=ln.replace(/(\d{1,2})\s*[\/月]\s*(\d{1,2})\s*日?/g,' ').replace(/\([月火水木金土日]\)/g,' ');
+  const days={},other=[];let found=0,pend=[],pAge=0;
+  const MD=/(\d{1,2})\s*[\/月]\s*(\d{1,2})\s*日?/g,DD=/(^|[^\d\/:.])(\d{1,2})\s*日(?!\s*(?:前|間))/g;
+  for(const raw of String(text).split(/\r?\n/)){let ln=z2h(raw).trim();if(!ln)continue;const targets=[];
+    ln=ln.replace(/(\d{1,2})\s*時半/g,'$1:30').replace(/(\d{1,2})\s*[.]\s*(5|0)(?![\d\/])/g,(m,h,d)=>d==='5'?h+':30':h);
+    for(const m of ln.matchAll(MD)){const dt=byMD[`${+m[1]}/${+m[2]}`];if(dt)targets.push(dt);else if(+m[1]>=1&&+m[1]<=12)other.push(`${m[1]}/${m[2]}`)}
+    let body=ln.replace(MD,' ');
+    if(!targets.length)for(const m of body.matchAll(DD)){const dt=byD[+m[2]];if(dt){if(!targets.includes(dt))targets.push(dt)}else if(+m[2]>=1&&+m[2]<=31)other.push(`${m[2]}日`)}
+    body=body.replace(DD,'$1 ').replace(/\([月火水木金土日]\)/g,' ');
+    if(!targets.length){const sq=body.match(/^([月火水木金土日]{2,7})(?=$|[\s曜0-9:,・、/\-]|から)/);if(sq)for(const c of sq[1])if(byW[c]&&!targets.includes(byW[c]))targets.push(byW[c])}
+    if(!targets.length)for(const m of body.matchAll(/(^|[\s(,・、/と])([月火水木金土日])(?=$|[\s)曜:,・、/\-0-9と]|から)/g)){const dt=byW[m[2]];if(dt&&!targets.includes(dt))targets.push(dt)}
+    body=body.replace(/([月火水木金土日])曜日?/g,'$1 ');
     let v=null;const tm=body.match(/(\d{1,2})(?:\s*[:時]\s*(\d{2}))?\s*(?:時)?\s*(?:-|から)\s*(\d{1,2}(?:\s*[:時]\s*\d{2})?|L|LAST|ラスト|ラス|締め|〆|close|閉店|クローズ)/i);
     if(tm){const s0=hr(tm[1],tm[2]);let e0;if(/^\d/.test(tm[3])){const mm=tm[3].match(/(\d{1,2})(?:\s*[:時]\s*(\d{2}))?/);e0=hr(mm[1],mm[2])}else e0=Lend;if(e0>s0)v={st:'on',start:s0,end:e0}}
     if(!v){const t2=body.match(/(\d{1,2})(?:\s*[:時]\s*(\d{2}))?\s*時?\s*(?:から|-).{0,3}?(L|LAST|ラスト|ラス|締め|〆|最後|閉店|クローズ)/i);if(t2){const s0=hr(t2[1],t2[2]);if(Lend>s0)v={st:'on',start:s0,end:Lend}}}
-    if(!v){const fr=body.match(/(\d{1,2})(?:\s*[:時]\s*(\d{2}))?\s*時?\s*(?:から|-|〜)?\s*(?:L|ラスト|ラス|締め|〆|まで)?\s*$/);
+    if(!v){const fr=body.match(/(\d{1,2})(?:\s*[:時]\s*(\d{2}))?\s*時?\s*(?:から|-)?\s*(?:L|ラスト|ラス|締め|〆|まで)?\s*(?:で?(?:お願いします|お願い致します|希望です|です|大丈夫です))?\s*$/);
       if(/休|×|✕|✖|❌|NG|無理|不可|ダメ|だめ|出れません|入れません|でれません|難しい|(^|\s)[xX](\s|$)/.test(body))v={st:'off'};
-      else if(fr&&/から|-|L|ラスト|ラス/i.test(body)){const s0=hr(fr[1],fr[2]);v={st:'on',start:s0,end:Lend}}
+      else if(fr&&/から|-|L|ラスト|ラス/i.test(body)){const s0=hr(fr[1],fr[2]);if(Lend>s0)v={st:'on',start:s0,end:Lend}}
       else if(/OK|ok|○|◯|〇|可能|いつでも|終日|フル|入れます|大丈夫/.test(body))v={st:'on',start:null,end:null,any:true}}
-    if(!v)continue;for(const dt of targets){days[dt]={...v};found++}}
-  return {days,found,other:[...new Set(other)]}}
-// 読み取りの順番待ち（何枚でも）
-S.rc=S.rc||[];
+    // 「火曜日」の次の行に時間が書いてある形にも対応
+    if(targets.length&&!v){pend=targets;pAge=0;continue}
+    if(!targets.length&&v&&pend.length){targets.push(...pend)}
+    if(!targets.length||!v){if(pend.length&&++pAge>1)pend=[];continue}
+    pend=[];for(const dt of targets){days[dt]={...v};found++}}
+  return {days,found:Object.keys(days).length,other:[...new Set(other)]}}
+// スクショの順番待ち（何枚でも）→ 読み取ったら人ごとの下書きにまとめる
+S.rc=S.rc||[];S.rcP=S.rcP||[];S.rcN=S.rcN||0;
 async function rcRun(){if(S.rcBusy)return;S.rcBusy=true;
   try{while(true){const q=S.rc.find(x=>x.status==='wait');if(!q)break;q.status='ocr';q.prog=0;q.msg='読み取りエンジンを準備中…（初回は少し時間がかかります）';render();
       try{const w=await ocrGetWorker();q.msg='文字を読み取り中…';render();window._rcProg=p=>{q.prog=p;const el=document.getElementById('rcp'+q.id);if(el)el.style.width=p+'%'};
-        const c=await ocrPrep(q.file),r=await w.recognize(c);window._rcProg=null;q.text=(r.data.text||'').replace(/[ \t]+\n/g,'\n').trim();rcAnalyze(q);q.status='done';q.msg=''}
-      catch(e){console.error(e);q.status='error';q.msg=e.message==='noengine'?'読み取りエンジンが見つかりません（ネットにつながった状態で一度開いてください）':'読み取りに失敗しました。写真を撮り直すか、文字を直接入れてください'}
+        const c=await ocrPrep(q.file),r=await w.recognize(c);window._rcProg=null;if(!S.rc.includes(q))continue;q.text=(r.data.text||'').replace(/[ \t]+\n/g,'\n').trim();rcAnalyze(q);q.status='done';q.msg=''}
+      catch(e){console.error(e);q.status='error';q.msg=e.message==='noengine'?'読み取りエンジンが見つかりません（ネットにつながった状態で一度開いてください）':'読み取りに失敗しました'}
       render()}}
   finally{S.rcBusy=false;if(ocrWorker){try{await ocrWorker.terminate()}catch(_){}ocrWorker=null}}}
-function rcAnalyze(q){const lines=q.text.split(/\r?\n/);const M=matchStaff(lines);q.cand=M.cand;if(!q.sidFixed)q.sid=M.staff?.id||'';q.matched=!!M.staff;
-  const P=parseWishes(q.text,S.week);q.days=P.days;q.found=P.found;q.other=P.other}
-function rcPanel(){const L=S.rc||[];const tOpt=(v,a,b)=>tOptions(v,a,b);
-  const item=q=>{const s=S.staff[q.sid],ds=weekDates(S.week);
-    if(q.status!=='done')return `<div class="rcitem"><img src="${q.url}" alt="スクショ"><div style="display:grid;gap:6px;align-content:start"><b>${q.status==='error'?'読み取りできませんでした':'読み取り中…'}</b><div class="rcbar"><i id="rcp${q.id}" style="width:${q.prog||0}%"></i></div><span class="hint">${esc(q.msg||'')}</span>${q.status==='error'?`<button class="btn sm" data-act="rcDel" data-q="${q.id}">消す</button>`:''}</div></div>`;
-    const days=ds.map(dt=>{const v=q.days[dt]||{st:''},w=wd(dt);
+const rcId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function rcAnalyze(q){S.rcWeek=S.week;const blocks=rcSegment(q.text);q.blocks=blocks.length;
+  blocks.forEach((b,bi)=>{const P=parseWishes(b.text,S.week);
+    if(!b.name){// 名前のない本文：前のスクショからの続き → 前の画像の最後の人につなげる
+      if(!P.found)return;const all=S.rcP.flatMap(p=>p.texts);if(all.some(t=>t.includes(b.text)))return;
+      if(bi===0){const prev=S.rc.filter(x=>x.n<q.n&&x.status==='done').sort((a,c)=>c.n-a.n)[0];const pp=prev&&S.rcP.find(p=>p.id===prev.lastP);if(pp)return rcMerge(pp,b,P,q)}
+      return rcMerge(rcNewP('u:'+rcId(),b),b,P,q)}
+    const strong=b.staff&&b.score>=7,key=strong?'s:'+b.staff.id:'n:'+nameKey(b.name);
+    let p=S.rcP.find(x=>x.key===key||(strong&&x.sid===b.staff.id));if(!p)p=rcNewP(key,b);rcMerge(p,b,P,q)})}
+function rcNewP(key,b){const p={id:rcId(),key,sid:b.staff?.id||'',matched:!!(b.staff&&b.score>=7),near:!!(b.staff&&b.score<7),cand:b.name,days:{},edited:{},other:[],texts:[],imgs:[],trunc:undefined};S.rcP.push(p);return p}
+function rcMerge(p,b,P,q){if(b.text&&!p.texts.some(t=>t.includes(b.text))){p.texts=p.texts.filter(t=>!b.text.includes(t));p.texts.push(b.text)}
+  p.trunc=p.trunc===undefined?b.trunc:(p.trunc&&b.trunc);if(!p.imgs.includes(q.n))p.imgs.push(q.n);q.lastP=p.id;
+  for(const [dt,v] of Object.entries(P.days))if(!p.edited[dt])p.days[dt]=v;p.other=[...new Set([...p.other,...P.other])];p.found=Object.keys(p.days).length;p.text=p.texts.join('\n\n');p.applied=false}
+function rcReady(p){if(!p.sid)return '名前を選んでください';if(!p.found)return '希望が読み取れていません';for(const [dt,v] of Object.entries(p.days))if(v.st==='on'&&!(v.end>v.start))return `${md(dt)}の時間を選んでください`;return ''}
+function rcPanel(){if(S.rcWeek&&S.rcWeek!==S.week&&!S.rcBusy)rcRebuild();const I=S.rc||[],P=S.rcP||[],ds=weekDates(S.week);const busy=I.some(q=>q.status==='wait'||q.status==='ocr');
+  const imgs=I.length?`<div class="rcimgs">${I.map(q=>`<div class="rcimg ${q.status}"><img src="${q.url}" alt="スクショ${q.n}"><span class="n">${q.n}</span>
+      ${q.status==='done'?`<span class="st">${q.blocks||0}件</span>`:q.status==='error'?`<span class="st bad">失敗</span>`:`<div class="rcbar"><i id="rcp${q.id}" style="width:${q.prog||0}%"></i></div>`}
+      <button class="x" data-act="ocrDelImg" data-q="${q.id}" title="このスクショを外す">×</button></div>`).join('')}</div>
+    ${I.filter(q=>q.msg).map(q=>`<div class="hint">${q.n}枚目：${esc(q.msg)}</div>`).slice(0,1).join('')}`:'';
+  const card=p=>{const s=S.staff[p.sid],err=rcReady(p);
+    const days=ds.map(dt=>{const v=p.days[dt]||{st:''},w=wd(dt);
       return `<div class="rcday"><span class="w ${w===6?'w-sat':w===0?'w-sun':''}">${WD[w]} ${md(dt)}</span>
-        <select data-rcst="${q.id}|${dt}"><option value=""${v.st===''?' selected':''}>（なし）</option><option value="on"${v.st==='on'?' selected':''}>出勤</option><option value="off"${v.st==='off'?' selected':''}>休み</option></select>
-        ${v.st==='on'?`<select data-rct="${q.id}|${dt}|start">${tOpt(v.start,8,31.5)}</select>〜<select data-rct="${q.id}|${dt}|end">${tOpt(v.end,8.5,32)}</select>${v.any&&v.start==null?'<span class="pill warn" style="font-size:11px">時間を選んでください</span>':''}`:''}</div>`}).join('');
-    return `<div class="rcitem${q.applied?' ok':''}"><img src="${q.url}" alt="スクショ">
-      <div style="display:grid;gap:8px;min-width:0">
-        <div class="bar" style="gap:6px;flex-wrap:wrap"><b>スタッフ</b><select data-rcsid="${q.id}"><option value="">（選んでください）</option>${staffList().map(x=>`<option value="${x.id}"${x.id===q.sid?' selected':''}>${esc(x.name)}</option>`).join('')}</select>
-          ${q.cand?`<span class="muted" style="font-size:12px">LINEの名前：${esc(q.cand)}</span>`:''}
-          ${!q.matched?`<span class="pill bad">名簿の名前と一致しません</span>`:'<span class="pill good">名前が一致</span>'}</div>
-        ${!q.matched&&q.sid&&q.cand?`<label style="font-size:13px"><input type="checkbox" data-rclearn="${q.id}" checked> 「${esc(q.cand)}」を ${esc(s?.name||'')} さんのLINE名として覚える（次から自動で一致）</label>`:''}
-        <div class="rcdays">${days}</div>
-        <details data-rcdet="${q.id}"${q.open?' open':''}><summary style="cursor:pointer;font-size:12px;color:var(--muted)">読み取った文字を見る・直す（${q.found}件の希望を見つけました${q.other?.length?`／この週以外の日付：${esc(q.other.join('・'))}`:''}）</summary>
-          <textarea data-rctext="${q.id}" rows="8" style="width:100%;font-size:13px">${esc(q.text)}</textarea><button class="btn sm" data-act="rcReparse" data-q="${q.id}">この文字で読み直す</button></details>
-        <div class="bar" style="gap:6px">${q.applied?'<span class="pill good">登録しました</span>':''}<button class="btn pri" data-act="rcApply" data-q="${q.id}"${q.sid?'':' disabled'}>${q.applied?'もう一度登録':'この内容で登録'}</button><button class="btn sm ghost" data-act="rcDel" data-q="${q.id}">消す</button></div>
-      </div></div>`};
-  return `<section class="panel"><div class="bar"><h2 style="font-size:17px">LINEのスクショから読み取る</h2><label class="btn pri" style="display:inline-flex;align-items:center">スクショを選ぶ<input type="file" id="rcFile" accept="image/*" multiple hidden></label>
-      ${L.some(q=>q.applied)?'<button class="btn sm ghost" data-act="rcClear">登録済みを片付ける</button>':''}<span class="hint">${md(S.week)}〜${md(addDays(S.week,6))}の週として読み取ります。画像と文字はこのiPadの中だけで読み取り、外には送りません</span></div>
-    ${L.length?`<div style="display:grid;gap:10px">${L.map(item).join('')}</div>`:'<p class="hint" style="margin:0">LINEで届いた希望のスクリーンショットを選ぶと、名前と日付・時間を読み取って下書きを作ります。内容を確かめて「この内容で登録」を押してください（例：「10/20 17-23」「火 休み」「水 18時からL」など）。</p>'}</section>`}
-function rcApply(q){if(!q.sid)return toast('スタッフを選んでください');const s=S.staff[q.sid];
-  for(const [dt,v] of Object.entries(q.days))if(v.st==='on'&&!(v.end>v.start))return toast(`${md(dt)}の時間を選んでください`);
-  if(!q.matched&&q.cand&&q.learn!==false){const cur=String(s.lineName||'').split(/[,、]/).map(x=>x.trim()).filter(Boolean);if(!cur.includes(q.cand)){s.lineName=[...cur,q.cand].join(',');saveStaff(s.id)}q.matched=true}
-  S.bulk=bulkInit(q.sid);for(const [dt,v] of Object.entries(q.days)){if(!S.bulk.days[dt]||!v.st)continue;S.bulk.days[dt]=v.st==='on'?{st:'on',start:v.start,end:v.end,pin:!!S.bulk.days[dt].pin}:{st:v.st}}
-  if(bulkSave()!==false)q.applied=true;render()}
+        <select data-rcst="${p.id}|${dt}"><option value=""${v.st===''?' selected':''}>（なし）</option><option value="on"${v.st==='on'?' selected':''}>出勤</option><option value="off"${v.st==='off'?' selected':''}>休み</option></select>
+        ${v.st==='on'?`<select data-rct="${p.id}|${dt}|start">${tOptions(v.start,8,31.5)}</select>〜<select data-rct="${p.id}|${dt}|end">${tOptions(v.end,8.5,32)}</select>${v.start==null||v.end==null?'<span class="pill warn" style="font-size:11px">時間を選んでください</span>':''}`:''}</div>`}).join('');
+    return `<div class="rcperson${p.applied?' ok':''}">
+      <div class="bar" style="gap:6px;flex-wrap:wrap"><select data-rcsid="${p.id}" style="font-weight:700"><option value="">（スタッフを選ぶ）</option>${staffList().map(x=>`<option value="${x.id}"${x.id===p.sid?' selected':''}>${esc(x.name)}</option>`).join('')}</select>
+        <span class="muted" style="font-size:12px">LINEの名前：${p.cand?esc(p.cand):'（読み取れず）'}・スクショ${p.imgs.join('・')}</span>
+        ${p.matched?'<span class="pill good">名前が一致</span>':p.near&&p.sid?'<span class="pill warn">似た名前で選びました</span>':'<span class="pill bad">名簿の名前と一致しません</span>'}
+        ${p.applied?'<span class="pill good">登録済み</span>':''}</div>
+      ${!p.matched&&p.sid&&p.cand?`<label style="font-size:13px"><input type="checkbox" data-rclearn="${p.id}"${p.learn!==false?' checked':''}> 「${esc(p.cand)}」を ${esc(s?.name||'')} さんのLINEの名前として覚える（次から自動で一致）</label>`:''}
+      ${p.trunc?`<div class="pill warn" style="white-space:normal">途中で切れています（…もっと見る）。LINEでコメントを開いて、全文が写ったスクショも追加してください</div>`:''}
+      <div class="rcdays">${days}</div>
+      <details data-rcdet="${p.id}"${p.open?' open':''}><summary style="cursor:pointer;font-size:12px;color:var(--muted)">読み取った文字を見る・直す（${p.found}日分${p.other?.length?`／この週以外：${esc(p.other.join('・'))}`:''}）</summary>
+        <textarea data-rctext="${p.id}" rows="6" style="width:100%;font-size:13px">${esc(p.text||'')}</textarea><button class="btn sm" data-act="ocrReparse" data-q="${p.id}">この文字で読み直す</button></details>
+      <div class="bar" style="gap:6px"><button class="btn pri sm" data-act="ocrApply" data-q="${p.id}"${err?' disabled':''}>${p.applied?'もう一度登録':'この人を登録'}</button><button class="btn sm ghost" data-act="ocrDel" data-q="${p.id}">消す</button>${err?`<span class="hint">${esc(err)}</span>`:''}</div></div>`};
+  const ready=P.filter(p=>!p.applied&&!rcReady(p)).length,bad=P.filter(p=>!p.applied&&!p.matched).length;
+  return `<section class="panel"><div class="bar" style="flex-wrap:wrap"><h2 style="font-size:17px">LINEのスクショから読み取る</h2><label class="btn pri" style="display:inline-flex;align-items:center">スクショを選ぶ（何枚でも）<input type="file" id="rcFile" accept="image/*" multiple hidden></label>
+      ${I.length?'<button class="btn sm ghost" data-act="ocrReset">全部やめる</button>':''}<span class="hint">${md(S.week)}〜${md(addDays(S.week,6))}の週として読み取ります。画像と文字はこのiPadの中だけで読み取り、外には送りません</span></div>
+    ${imgs}
+    ${P.length?`<div class="bar" style="gap:8px;flex-wrap:wrap;margin:8px 0"><b>${P.length}人分</b>${bad?`<span class="pill bad">名前の確認が必要 ${bad}人</span>`:''}${busy?'<span class="hint">まだ読み取り中のスクショがあります</span>':''}
+        <button class="btn pri" data-act="ocrApplyAll"${ready?'':' disabled'}>確認できた${ready}人をまとめて登録</button>${P.some(p=>p.applied)?'<button class="btn sm ghost" data-act="ocrClear">登録済みを片付ける</button>':''}</div>
+      <div class="rcgrid">${P.map(card).join('')}</div>`:I.length?'':'<p class="hint" style="margin:0">グループLINEのノートのコメント画面を、5枚くらいまとめて選んでください。コメントごとに名前と日付・時間を読み取り、人ごとにまとめて下書きを作ります（例：「火曜日17:30から23:30まで」「月曜日17.5から」「26日16:00から23:30まで」「水 休み」）。内容を確かめて登録してください。</p>'}</section>`}
+function rcApply(p,quiet){const err=rcReady(p);if(err){if(!quiet)toast(err);return false}const s=S.staff[p.sid];
+  if(!p.matched&&p.cand&&p.learn!==false){const cur=String(s.lineName||'').split(/[,、]/).map(x=>x.trim()).filter(Boolean);if(!cur.includes(p.cand)){s.lineName=[...cur,p.cand].join(',');saveStaff(s.id)}p.matched=true}
+  S.bulk=bulkInit(p.sid);for(const [dt,v] of Object.entries(p.days)){if(!S.bulk.days[dt]||!v.st)continue;S.bulk.days[dt]=v.st==='on'?{st:'on',start:v.start,end:v.end,pin:!!S.bulk.days[dt].pin}:{st:v.st}}
+  const ok=bulkSave()!==false;if(ok)p.applied=true;return ok}
+function rcRebuild(){S.rcP=[];S.rcWeek=S.week;S.rc.filter(q=>q.status==='done').sort((a,b)=>a.n-b.n).forEach(rcAnalyze)}
 function vReq(){
   const list=staffList();
   if(!list.length)return `<section class="panel"><h2>希望入力</h2><div class="empty">まずスタッフを登録してください。<br><button class="btn pri" data-act="go" data-t="roster" style="margin-top:10px">名簿を開く</button></div></section>`;
@@ -3563,10 +3613,13 @@ app.addEventListener('click',e=>{
   if(a==='rcDel'){const dt=curDate(),d=newDay(dt);d.recruit=(d.recruit||[]).filter((_,i)=>i!==+b.dataset.i);saveDay(dt);return render()}
   if(a==='empYm'){const [Y,M]=(S.empYm||today.slice(0,7)).split('-').map(Number),d=new Date(Y,M-1+ +b.dataset.n,1);S.empYm=d.getFullYear()+'-'+pad(d.getMonth()+1);return render()}
   if(a==='empYmNow'){S.empYm=null;return render()}
-  if(a==='rcDel'){const x=S.rc.find(y=>y.id===b.dataset.q);if(x){try{URL.revokeObjectURL(x.url)}catch(_){}S.rc=S.rc.filter(y=>y!==x)}return render()}
-  if(a==='rcClear'){S.rc=S.rc.filter(y=>{if(y.applied){try{URL.revokeObjectURL(y.url)}catch(_){}}return !y.applied});return render()}
-  if(a==='rcReparse'){const x=S.rc.find(y=>y.id===b.dataset.q);if(x){const ta=document.querySelector(`[data-rctext="${x.id}"]`);if(ta)x.text=ta.value;rcAnalyze(x);toast(`${x.found}件の希望を読み取りました`)}return render()}
-  if(a==='rcApply'){const x=S.rc.find(y=>y.id===b.dataset.q);if(x)rcApply(x);return}
+  if(a==='ocrDelImg'){const x=S.rc.find(y=>y.id===b.dataset.q);if(x){try{URL.revokeObjectURL(x.url)}catch(_){}S.rc=S.rc.filter(y=>y!==x);if(!S.rc.length){S.rcP=[];S.rcN=0}else rcRebuild()}return render()}
+  if(a==='ocrReset'){if(!confirm('読み込んだスクショと下書きを全部消しますか？（登録済みのシフト希望はそのままです）'))return;S.rc.forEach(y=>{try{URL.revokeObjectURL(y.url)}catch(_){}});S.rc=[];S.rcP=[];S.rcN=0;return render()}
+  if(a==='ocrDel'){S.rcP=S.rcP.filter(y=>y.id!==b.dataset.q);return render()}
+  if(a==='ocrClear'){S.rcP=S.rcP.filter(y=>!y.applied);return render()}
+  if(a==='ocrReparse'){const x=S.rcP.find(y=>y.id===b.dataset.q);if(x){const ta=document.querySelector(`[data-rctext="${x.id}"]`);if(ta)x.text=ta.value;x.texts=[x.text];const P=parseWishes(x.text,S.week);x.days=P.days;x.edited={};x.found=P.found;x.other=P.other;x.applied=false;toast(`${x.found}日分の希望を読み取りました`)}return render()}
+  if(a==='ocrApply'){const x=S.rcP.find(y=>y.id===b.dataset.q);if(x)rcApply(x);return render()}
+  if(a==='ocrApplyAll'){let n=0;const names=[];for(const p of S.rcP){if(p.applied||rcReady(p))continue;if(rcApply(p,true)){n++;names.push(S.staff[p.sid]?.name)}}toast(n?`${n}人分を登録しました（${names.join('・')}）`:'登録できる人がいません');return render()}
   if(a==='lockDay'){const dt=curDate(),d=ensureDay(dt);d.locked=!d.locked;saveDay(dt);toast(d.locked?`${md(dt)}を確定しました（まとめて実行・自動の調整・手での編集で変わりません）`:`${md(dt)}の確定を解除しました`);return render()}
   if(a==='pickStore'){const x=S.loginChoices[+b.dataset.i],pw=S.pendingPw;S.loginChoices=null;S.pendingPw=null;S.loginBusy=true;render();
     AU().signInWithEmailAndPassword(acctEmail(x.store,x.role),pw).then(()=>{S.loginBusy=false;savePw(x.store,x.role,pw)},()=>{S.loginBusy=false;S.loginErr='ログインできませんでした。もう一度入れてください';render()});return}
@@ -3805,11 +3858,11 @@ app.addEventListener('submit',e=>{
         [['Name',name],['Id',sid],['M',m],['S',st]].forEach(([k,val])=>{const el=document.getElementById(px+k);if(el)el.value=val})});}
 });
 app.addEventListener('change',e=>{const el=e.target;
-  if(el.id==='rcFile'){for(const f of el.files||[]){S.rc.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),file:f,url:URL.createObjectURL(f),status:'wait',days:{},text:''})}el.value='';render();rcRun();return}
-  const q=id=>S.rc.find(x=>x.id===id);
-  if(el.dataset.rcsid){const x=q(el.dataset.rcsid);if(x){x.sid=el.value;x.sidFixed=true;x.matched=!!(x.sid&&(()=>{const s=S.staff[x.sid];return [s.name,...String(s.lineName||'').split(/[,、]/)].map(nameKey).some(k=>k&&nameKey(x.cand||'')===k)})());}return render()}
-  if(el.dataset.rcst){const [id,dt]=el.dataset.rcst.split('|'),x=q(id);if(x){const v=x.days[dt]||{};x.days[dt]=el.value==='on'?{st:'on',start:v.start??(S.bulkT?.[0]??17),end:v.end??(S.bulkT?.[1]??23.5)}:{st:el.value}}return render()}
-  if(el.dataset.rct){const [id,dt,k]=el.dataset.rct.split('|'),x=q(id);if(x&&x.days[dt]){x.days[dt][k]=el.value===''?null:Number(el.value);delete x.days[dt].any}return render()}
+  if(el.id==='rcFile'){for(const f of el.files||[]){S.rc.push({id:rcId(),n:++S.rcN,file:f,url:URL.createObjectURL(f),status:'wait',text:''})}el.value='';render();rcRun();return}
+  const q=id=>S.rcP.find(x=>x.id===id);
+  if(el.dataset.rcsid){const x=q(el.dataset.rcsid);if(x){x.sid=el.value;x.near=false;x.applied=false;x.matched=!!(x.sid&&(()=>{const s=S.staff[x.sid];return [s.name,...String(s.lineName||'').split(/[,、]/)].map(nameKey).some(k=>k&&nameKey(x.cand||'')===k)})());}return render()}
+  if(el.dataset.rcst){const [id,dt]=el.dataset.rcst.split('|'),x=q(id);if(x){const v=x.days[dt]||{};x.days[dt]=el.value==='on'?{st:'on',start:v.start??(S.bulkT?.[0]??17),end:v.end??(S.bulkT?.[1]??23.5)}:{st:el.value};x.edited[dt]=true;x.found=Object.values(x.days).filter(d=>d.st).length;x.applied=false}return render()}
+  if(el.dataset.rct){const [id,dt,k]=el.dataset.rct.split('|'),x=q(id);if(x&&x.days[dt]){x.days[dt][k]=el.value===''?null:Number(el.value);delete x.days[dt].any;x.edited[dt]=true;x.applied=false}return render()}
   if(el.dataset.rclearn){const x=q(el.dataset.rclearn);if(x)x.learn=el.checked;return}
   if(el.dataset.rctext){const x=q(el.dataset.rctext);if(x)x.text=el.value;return}
 });
@@ -3819,7 +3872,7 @@ app.addEventListener('change',e=>{if(e.target.id!=='importFile')return;const f=e
     if(d.format!=='shift-app-backup')return toast('このアプリのバックアップファイルではありません');
     S.importInfo={data:d,msg:`「${d.store?.name||''}」のバックアップ（スタッフ${(d.staff||[]).length}人・${Object.keys(d.days||{}).length}日分）を、今の店舗「${S.stores[S.store]?.name||''}」に取り込みます。`};render()})});
 app.addEventListener('input',e=>{if(e.target.id!=='reportNote')return;S.reportNote=e.target.value;try{localStorage.setItem('shiftapp:report:'+S.store+':'+S.week,S.reportNote)}catch(_){}});
-app.addEventListener('toggle',e=>{if(e.target.dataset&&e.target.dataset.rcdet){const x=(S.rc||[]).find(y=>y.id===e.target.dataset.rcdet);if(x)x.open=e.target.open}if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='budToolDet')S.budToolOpen=e.target.open;if(e.target.id==='paidNoDet')S.paidNoOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
+app.addEventListener('toggle',e=>{if(e.target.dataset&&e.target.dataset.rcdet){const x=(S.rcP||[]).find(y=>y.id===e.target.dataset.rcdet);if(x)x.open=e.target.open}if(e.target.id==='fairDet')S.fairOpen=e.target.open;if(e.target.id==='recDet')S.recOpen=e.target.open;if(e.target.id==='h28Det')S.h28Open=e.target.open;if(e.target.id==='budToolDet')S.budToolOpen=e.target.open;if(e.target.id==='paidNoDet')S.paidNoOpen=e.target.open;if(e.target.id==='sidDet')S.sidOpen=e.target.open;if(e.target.id==='subDet')S.subOpen=e.target.open;if(e.target.id==='createDet')S.createOpen=e.target.open;if(e.target.id==='reqDet')S.reqOpen=e.target.open;if(e.target.id==='bulkDet')S.bulkOpen=e.target.open;if(e.target.id==='shortDet')S.shortOpen=e.target.open;if(e.target.id==='idealDet')S.idealOpen=e.target.open;if(e.target.id==='shortListDet')S.shortListOpen=e.target.open},true);
 document.getElementById('who').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
   if(b.dataset.act==='logout')logout();
   if(b.dataset.act==='changeMe'){S.me='';try{localStorage.removeItem('shiftapp:me:'+S.store)}catch(_){};S.draft=null;render()}});
@@ -3849,7 +3902,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v77';
+  const APP_SW='v78';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
