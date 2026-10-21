@@ -1,6 +1,6 @@
 // シフトマネージャーをネットなしでも開けるようにするためのファイル。
 // アプリを更新したら VERSION の数字を1つ上げてください。
-const VERSION = 'v76';
+const VERSION = 'v77';
 const CACHE = 'shift-app-' + VERSION;
 const APP = ['./', './index.html', './local-db.js', './firebase-config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
@@ -18,6 +18,11 @@ self.addEventListener('fetch', e => {
   // このフォルダ直下のファイルだけを扱う（yosoku/ など別のアプリのフォルダには手を出さない）
   const mine = url.origin === location.origin && url.pathname.startsWith(base) && !url.pathname.slice(base.length).includes('/');
   const font = url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com');
+  // 読み取りエンジン（yosoku/ocr）：一度読み込んだらこの端末に保存して、ネットなしでも使えるように
+  if (url.origin === location.origin && url.pathname.startsWith(base + 'yosoku/ocr/')) {
+    e.respondWith(caches.open('shift-ocr-v1').then(c => c.match(req).then(hit => hit || fetch(req).then(res => { if (res.ok) c.put(req, res.clone()); return res; }))));
+    return;
+  }
   if (!mine && !font) return;
   // アプリのファイル：つながっていれば最新、つながらなければ保存済み
   if (mine) {
