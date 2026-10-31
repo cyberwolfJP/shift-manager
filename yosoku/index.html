@@ -232,7 +232,7 @@ const TABS=[['dash','ダッシュボード'],['up','写真アップロード'],[
 const COLS=[{k:'sales',n:'売上'},{k:'guests',n:'客数'},{k:'pa',n:'PA人件費'},{k:'labor',n:'人件費合計'},{k:'r1',n:'仕入れ1'},{k:'r2',n:'仕入れ2'},{k:'r3',n:'仕入れ3'}];
 const KINDS={sales:{n:'売上・客数',cols:['sales','guests']},labor:{n:'人件費',cols:['pa','labor']},pur:{n:'仕入れ',cols:['r1','r2','r3']},att:{n:'勤怠実績',cols:['work','night']}};
 const KW={
-  sales:{inc:/売上|売り上げ|純売|総売/,exc:/前年|昨年|年売|年度|予算|目標|比|累計|率|単価/},
+  sales:{inc:/売上|売り上げ|純売|総売|[発亮克][上土]/,exc:/前年|昨年|年売|年度|予算|目標|比|累計|率|単価/},
   guests:{inc:/客数|来客|人数|来店/,exc:/前年|昨年|年客|予算|比|単価|累計|目標/},
   pa:{inc:/PA|ＰＡ|パート|アルバイト|ﾊﾟｰﾄ/i,exc:/率|予算|時間/},
   labor:{inc:/人件費/,exc:/率|PA|ＰＡ|パート|アルバイト|予算|比|目標/},
@@ -565,11 +565,18 @@ function rUp(){
   let h=`<div class="card"><h2>${ymLabel(state.settings.target)}の予測に必要な写真<span class="r sub">準備 ${ck.done}/${ck.total}</span></h2>
    <div class="pbar"><i style="width:${ck.total?ck.done/ck.total*100:0}%"></i></div>
    <label class="drop" id="drop" style="margin-top:14px" onclick="pickFiles(null);return false"><b>写真をまとめて選ぶ</b>種類と月は自動で見分けて反映します。何枚でも一度に選べます。</label>
+   <details id="ltDet" style="margin-top:10px"${state.ui.ltOpen?' open':''} ontoggle="state.ui.ltOpen=this.open"><summary>うまく読めないときは：iPadの文字認識を貼り付ける（いちばん正確）</summary>
+    <ol class="sub" style="margin:6px 0 8px;padding-left:20px"><li>「写真」アプリで実績の写真やスクショを開く</li><li>表の文字を長押し（または右下の文字認識ボタン）→「すべてを選択」→「コピー」</li><li>下の欄を長押しして「ペースト」→「読み取る」</li></ol>
+    <div class="sub" style="margin-bottom:6px">iPadの文字認識もこの端末の中だけで動くので、内容は外に出ません。</div>
+    <textarea id="ltText" placeholder="ここに貼り付け"></textarea>
+    <div class="row" style="margin-top:8px"><select id="ltKind"><option value="">種類を自動で判断</option>${['sales','labor','pur'].map(k=>`<option value="${k}">${KINDS[k].n}</option>`).join('')}</select><label class="sub">月 <input type="month" id="ltYm" title="空欄なら自動で判断"></label><button class="btn p" onclick="pasteLT()">読み取る</button></div></details>
    ${queueHtml()}
    <div style="margin-top:6px">${ck.items.map(ckRow).join('')}</div></div>`;
   h+=`<div class="card"><h2>きれいに読み取るための撮り方</h2><ul class="pts sub">
-   <li>列の見出し（日付・売上・客数・人件費 など）が必ず写るように撮る。見出しで列を見分けます。</li>
-   <li>画面に対して真上・まっすぐ。斜めや影、画面の反射を避ける。スクリーンショットが一番確実です。</li>
+   <li>パソコンやタブレットの画面なら、写真ではなくスクリーンショットが一番確実です。</li>
+   <li>写真で撮るときは、画面の正面から・表がなるべく大きく写るように（余白を減らす）。ピントが合っているか確かめてから撮る。</li>
+   <li>画面の反射や天井の照明が映り込まない角度で。少しの傾きは自動でまっすぐにします。</li>
+   <li>列の見出し（日付・売上・客数・人件費 など）が写るように撮る。見出しが読めないときは、数字の関係（売上÷客数＝客単価、仕入れの合計など）から列を判断します。</li>
    <li>1ヶ月が1画面に収まらないときは、上半分・下半分の2枚に分けてOK（見出しは両方に入れる）。</li>
    <li>年月（例：2025年11月）が画面に写っていると、どの月のデータかを自動で判断できます。写っていなければ、上の一覧の月ボタンから撮ってください。</li></ul></div>`;
   h+=`<div class="card"><h2>情報の取り扱い</h2><div class="sub">写真の文字読み取りはこの端末の中だけで行い、写真もデータも外部には送りません。読み取った数値はパスワードで暗号化してこの端末に保存します。写真そのものは保存しません。</div></div>`;
@@ -613,47 +620,112 @@ async function getWorker(onProg){
   if(!window.Tesseract){try{await loadScript('./ocr/tesseract.min.js')}catch(e){throw new Error('noengine')}}
   if(!worker){const abs=p=>new URL(p,location.href).href;
     worker=await Tesseract.createWorker('jpn+eng',1,{workerPath:abs('./ocr/worker.min.js'),corePath:abs('./ocr/core'),langPath:abs('./ocr/lang'),workerBlobURL:false,logger:m=>{if(m.status==='recognizing text'&&window._ocrProg)window._ocrProg(Math.round(m.progress*100))}});
-    await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'11'})}
+    await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'})}
   return worker;
 }
-function prep(file){return new Promise((ok,ng)=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(u);let w=img.naturalWidth,h=img.naturalHeight;const target=Math.min(2600,Math.max(1800,w));const sc=target/w;w=Math.round(w*sc);h=Math.round(h*sc);
-  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,w,h);const d=x.getImageData(0,0,w,h),p=d.data;
-  let s=0;for(let i=0;i<p.length;i+=4)s+=.299*p[i]+.587*p[i+1]+.114*p[i+2];const mean=s/(p.length/4);const inv=mean<110;
-  for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];if(inv)g=255-g;g=g>170?255:g<85?0:(g-85)*3;p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);ok(c)};img.onerror=ng;img.src=u})}
+// 読みやすくする：大きさをそろえる → 周りより暗い所だけを文字として白黒に（反射・明るさのムラ・画面のしま模様に強い） → 傾きをまっすぐに
+function loadImg(file){return new Promise((ok,ng)=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(u);ok(img)};img.onerror=e=>{URL.revokeObjectURL(u);ng(e)};img.src=u})}
+function binarize(g,w,h,k){const W1=w+1,I=new Float64Array(W1*(h+1));for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=g[y*w+x];I[(y+1)*W1+x+1]=I[y*W1+x+1]+row}}
+  const r=Math.max(10,Math.floor(Math.max(w,h)/60)),out=new Uint8ClampedArray(w*h);
+  for(let y=0;y<h;y++){const y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);for(let x=0;x<w;x++){const x0=Math.max(0,x-r),x1=Math.min(w,x+r+1);
+    const m=(I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0])/((y1-y0)*(x1-x0)),v=g[y*w+x];out[y*w+x]=(v<m*k&&m-v>12)?0:255}}return out}
+function sharpen(g,w,h,r,a){const W1=w+1,I=new Float64Array(W1*(h+1));for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=g[y*w+x];I[(y+1)*W1+x+1]=I[y*W1+x+1]+row}}const o=new Float32Array(w*h);for(let y=0;y<h;y++){const y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);for(let x=0;x<w;x++){const x0=Math.max(0,x-r),x1=Math.min(w,x+r+1);const m=(I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0])/((y1-y0)*(x1-x0));o[y*w+x]=Math.min(255,Math.max(0,g[y*w+x]+a*(g[y*w+x]-m)))}}return o}
+function flatten(g,w,h){const W1=w+1,I=new Float64Array(W1*(h+1));for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=g[y*w+x];I[(y+1)*W1+x+1]=I[y*W1+x+1]+row}}
+  const r=Math.max(12,Math.floor(Math.max(w,h)/40)),out=new Uint8ClampedArray(w*h),K=2.4;
+  for(let y=0;y<h;y++){const y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);for(let x=0;x<w;x++){const x0=Math.max(0,x-r),x1=Math.min(w,x+r+1);
+    const m=(I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0])/((y1-y0)*(x1-x0))+1,v=g[y*w+x]/m;out[y*w+x]=255-Math.min(255,Math.max(0,(1-v)*255*K))}}return out}
+function skewAngle(b,w,h){const f=Math.max(1,Math.round(w/900)),pts=[];for(let y=0;y<h;y+=f)for(let x=0;x<w;x+=f)if(!b[y*w+x])pts.push(x/f,y/f);
+  if(pts.length<200)return 0;const H=Math.ceil(h/f)+2;let best=0,bs=-1;
+  const score=a=>{const t=Math.tan(a*Math.PI/180),cnt=new Float64Array(H*2+200);for(let i=0;i<pts.length;i+=2){const yy=Math.round(pts[i+1]-pts[i]*t)+H;if(yy>=0&&yy<cnt.length)cnt[yy]++}let s=0;for(let i=1;i<cnt.length;i++){const d=cnt[i]-cnt[i-1];s+=d*d}return s};
+  for(let a=-8;a<=8.001;a+=0.5){const s=score(a);if(s>bs){bs=s;best=a}}
+  for(let a=best-0.5;a<=best+0.5;a+=0.1){const s=score(a);if(s>bs){bs=s;best=a}}return best}
+async function prep(file){const img=await loadImg(file);let w=img.naturalWidth,h=img.naturalHeight;
+  const sc=Math.min(3,Math.max(.5,2400/Math.max(w,h*0.75)));w=Math.round(w*sc);h=Math.round(h*sc);
+  const c=document.createElement('canvas');c.width=w;c.height=h;let x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,w,h);
+  let d=x.getImageData(0,0,w,h),p=d.data,n=w*h,g=new Float32Array(n),s=0;for(let i=0,j=0;j<n;i+=4,j++){const v=.299*p[i]+.587*p[i+1]+.114*p[i+2];g[j]=v;s+=v}
+  if(s/n<110)for(let j=0;j<n;j++)g[j]=255-g[j];
+  let b=binarize(g,w,h,.86);const ang=skewAngle(b,w,h);
+  if(Math.abs(ang)>=0.15){const c2=document.createElement('canvas');c2.width=w;c2.height=h;const x2=c2.getContext('2d',{willReadFrequently:true});x2.fillStyle='#fff';x2.fillRect(0,0,w,h);
+    const gi=x.createImageData(w,h);for(let j=0,k=0;j<n;j++,k+=4){gi.data[k]=gi.data[k+1]=gi.data[k+2]=g[j];gi.data[k+3]=255}x.putImageData(gi,0,0);
+    x2.translate(w/2,h/2);x2.rotate(-ang*Math.PI/180);x2.translate(-w/2,-h/2);x2.drawImage(c,0,0);
+    d=x2.getImageData(0,0,w,h);p=d.data;for(let i=0,j=0;j<n;i+=4,j++)g[j]=p[i];b=binarize(g,w,h,.86);x=x2;
+    const sp=prep._sharp||[3,2];const ob=flatten(sp[1]?sharpen(g,w,h,sp[0],sp[1]):g,w,h);const o=x.createImageData(w,h);for(let j=0,k=0;j<n;j++,k+=4){o.data[k]=o.data[k+1]=o.data[k+2]=ob[j];o.data[k+3]=255}x.setTransform(1,0,0,1,0,0);x.putImageData(o,0,0);c2._ang=ang;return c2}
+  const sp=prep._sharp||[3,2];const ob=flatten(sp[1]?sharpen(g,w,h,sp[0],sp[1]):g,w,h);const o=x.createImageData(w,h);for(let j=0,k=0;j<n;j++,k+=4){o.data[k]=o.data[k+1]=o.data[k+2]=ob[j];o.data[k+3]=255}x.putImageData(o,0,0);c._ang=0;return c}
+async function ocrPass(w,c,psm){await w.setParameters({tessedit_pageseg_mode:String(psm)});const r=await w.recognize(c,{},{blocks:true,text:true});
+  const words=[];for(const b of r.data.blocks||[])for(const p of b.paragraphs||[])for(const l of p.lines||[])for(const wd of l.words||[])if(wd.text.trim())words.push({t:wd.text.trim(),x0:wd.bbox.x0,x1:wd.bbox.x1,y0:wd.bbox.y0,y1:wd.bbox.y1});
+  return words.length?wordsToLines(words):textToLines(r.data.text||'')}
+function lineScore(lines){let n=0;for(const l of lines){const f=findDay(l),nums=numsOf(l,f?f.ex:new Set()).filter(x=>Math.abs(x.v)>=100);if(nums.length>=2)n+=f?2:1}return n}
+// 1回目：表向けの読み方。行がうまく拾えなければ、別の読み方でもう一度読んで良い方を使う
 async function ocrImage(file,onProg,onMsg){
   onMsg('読み取りエンジンを準備中…（初回は少し時間がかかります）');const w=await getWorker();
-  onMsg('文字を読み取り中…');window._ocrProg=onProg;const c=await prep(file);
-  const r=await w.recognize(c,{},{blocks:true,text:true});window._ocrProg=null;
-  const words=[];for(const b of r.data.blocks||[])for(const p of b.paragraphs||[])for(const l of p.lines||[])for(const wd of l.words||[])if(wd.text.trim())words.push({t:wd.text.trim(),x0:wd.bbox.x0,x1:wd.bbox.x1,y0:wd.bbox.y0,y1:wd.bbox.y1});
-  return words.length?wordsToLines(words):textToLines(r.data.text||'');
-}
+  onMsg('文字を読み取り中…');window._ocrProg=onProg;prep._sharp=[3,2];const c=await prep(file);
+  let best=await ocrPass(w,c,6),bs=lineScore(best);
+  if(bs<30){onMsg('別の読み方でもう一度読んでいます…');onProg(0);
+    for(const [psm,sh] of [[11,null],[6,[0,0]]]){let cc=c;if(sh){prep._sharp=sh;cc=await prep(file)}const L=await ocrPass(w,cc,psm);const sc=lineScore(L);if(sc>bs){best=L;bs=sc}if(bs>=40)break}}
+  window._ocrProg=null;prep._sharp=[3,2];return best}
 function wordsToLines(words){
   const hs=words.map(w=>w.y1-w.y0).sort((a,b)=>a-b);const mh=hs[Math.floor(hs.length/2)]||20;
   const ws=words.map(w=>({...w,yc:(w.y0+w.y1)/2,x:(w.x0+w.x1)/2})).sort((a,b)=>a.yc-b.yc);
   const lines=[];for(const w of ws){const L=lines[lines.length-1];if(L&&Math.abs(w.yc-L.yc)<mh*.55){L.words.push(w);L.yc=(L.yc*(L.words.length-1)+w.yc)/L.words.length}else lines.push({yc:w.yc,words:[w]})}
-  lines.forEach(l=>l.words.sort((a,b)=>a.x0-b.x0));return lines.map(l=>({words:l.words.map(w=>({t:w.t,x:w.x,x0:w.x0,x1:w.x1}))}));
+  lines.forEach(l=>l.words.sort((a,b)=>a.x0-b.x0));return lines.map(l=>({yc:l.yc,h:mh,words:l.words.map(w=>({t:w.t,x:w.x,x0:w.x0,x1:w.x1}))}));
 }
-function textToLines(text){return text.split(/\r?\n/).map(l=>{const tab=l.includes('\t');const cells=tab?l.split('\t'):l.trim().split(/\s{1,}/);return{cells:true,words:cells.map((t,i)=>({t:t.trim(),x:i,x0:i-.4,x1:i+.4})).filter(w=>w.t!=='')}}).filter(l=>l.words.length)}
+// 貼り付けた文字を表にする。行ごとの並び（1(土) 312,000 …）でも、列ごとの並び（日付が縦に続いた後に売上が縦に続く）でも読む
+function colLines(text){const L=String(text).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(L.length<10)return null;
+  const cls=t=>{const z=fixNumTok(normW(t)).replace(/\s/g,'');if(/^(\d{1,2}\/)?\d{1,2}日?\(?[月火水木金土日祝]\)?$/.test(z)||/^\d{1,2}\/\d{1,2}$/.test(z))return'day';if(/^-?\d[\d,]*(\.\d+)?%?$/.test(z))return'num';return'text'};
+  const runs=[];let cur=null,label='';
+  for(const t of L){const c=cls(t);if(c==='text'){if(cur){runs.push(cur);cur=null}label=t;continue}
+    if(cur&&cur.c===c)cur.v.push(t);else{if(cur)runs.push(cur);cur={c,v:[t],label}}label=''}
+  if(cur)runs.push(cur);const R=runs.filter(r=>r.v.length>=5);if(R.length<2)return null;
+  const cnt={};R.forEach(r=>{cnt[r.v.length]=(cnt[r.v.length]||0)+1});const dr=R.find(r=>r.c==='day');const n=dr?dr.v.length:+Object.entries(cnt).sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];
+  const cols=[];R.forEach(r=>{if(r.v.length===n)cols.push(r);else if(r.v.length%n===0)for(let i=0;i<r.v.length;i+=n)cols.push({c:r.c,v:r.v.slice(i,i+n),label:i?'':r.label});else if(Math.abs(r.v.length-n)<=2)cols.push({c:r.c,v:r.v.slice(0,n),label:r.label})});
+  if(cols.length<2)return null;cols.sort((a,b)=>(a.c==='day'?0:1)-(b.c==='day'?0:1));
+  const X=k=>k*200+100,out=[{yc:40,h:20,words:cols.map((c,k)=>c.label?{t:c.label,x:X(k),x0:X(k)-60,x1:X(k)+60}:null).filter(Boolean)}];
+  for(let i=0;i<n;i++)out.push({yc:100+i*40,h:20,words:cols.map((c,k)=>({t:c.v[i],x:X(k),x0:X(k)-60,x1:X(k)+60}))});
+  return out.filter(l=>l.words.length)}
+function pasteLines(text,preset){const a=textToLines(text),b=colLines(text);if(!b)return a;
+  const ra=analyze(a,preset),rb=analyze(b,preset);return rb.rows.length>ra.rows.length?b:a}
+const LT_ICON="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="#e6f4f2"/><text x="32" y="42" font-size="26" text-anchor="middle" fill="#0f766e">文</text></svg>');
+function pasteLT(){const t=$('ltText').value;if(!t.trim()){toast('文字を貼り付けてください');return}const kind=$('ltKind').value||null,ym=$('ltYm').value||null;
+  const preset=kind||ym?{kind,ym}:null;const q={id:qid++,file:null,url:LT_ICON,status:'wait',preset,msg:''};q.lines=pasteLines(t,preset);analyzeAndApply(q);queue.push(q);
+  $('ltText').value='';save();render();toast(q.status==='done'?'読み取って反映しました。内容を確認してください':'読み取りました。確認が必要です')}
+function textToLines(text){return text.split(/\r?\n/).map(l=>{const tab=l.includes('\t');const cells=tab?l.split('\t'):l.trim().split(/\s{1,}/);return{cells:true,h:20,words:cells.map((t,i)=>({t:t.trim(),x:i*200+100,x0:i*200+40,x1:i*200+160})).filter(w=>w.t!=='')}}).filter(l=>l.words.length).map((l,i)=>({...l,yc:i*40}))}
 
 /* ---------- 解析 ---------- */
 const normW=s=>z2h(s).replace(/[，、]/g,',').replace(/[．]/g,'.').replace(/[／]/g,'/').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/[：]/g,':').replace(/[¥￥]/g,'');
 function lineText(l){let t='',off=[];l.words.forEach(w=>{const s=t.length;t+=(t?' ':'')+normW(w.t);off.push([t.length-normW(w.t).length,t.length])});return{t,off}}
 function findDay(l){const{t,off}=lineText(l);
   let m=t.match(/(?<![\d,.])(?:(20\d{2})\s*[\/\-年.]\s*)?(\d{1,2})\s*[\/月]\s*(\d{1,2})(?!\d)\s*日?/),day=null,span=null,ym=null;
-  if(m&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31){day=+m[3];span=[m.index,m.index+m[0].length];if(m[1])ym=m[1]+'-'+pad(+m[2])}
+  let mo=null;if(m&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31){day=+m[3];mo=+m[2];span=[m.index,m.index+m[0].length];if(m[1])ym=m[1]+'-'+pad(+m[2])}
   else{m=t.match(/^[^\d]{0,3}?(\d{1,2})(?=\s*日|\s*\(|\s*[月火水木金土日祝](?![\d,])|\s|$)/);if(m&&+m[1]>=1&&+m[1]<=31&&!/[,.]/.test(t.slice(m.index+m[0].length,m.index+m[0].length+1))){day=+m[1];span=[m.index,m.index+m[0].length]}}
   if(day==null)return null;const ex=new Set();off.forEach(([a,b],i)=>{if(a<span[1]&&b>span[0])ex.add(i)});
-  l.words.forEach((w,i)=>{if(/^[\(]?[月火水木金土日祝][\)]?$/.test(normW(w.t)))ex.add(i)});return{day,ex,ym}}
+  l.words.forEach((w,i)=>{if(/^[\(]?[月火水木金土日祝][\)]?$/.test(normW(w.t)))ex.add(i)});return{day,ex,ym,mo}}
+// 数字の読み間違いを直す（O→0、l→1 など。数字が多い語だけ）
+function fixNumTok(t){let s=t.replace(/^[\(\[\{|:;'"`]+|[\)\]\}|:;'"`]+$/g,'');const dig=(s.match(/\d/g)||[]).length;if(!dig)return s;
+  const lettery=(s.match(/[A-Za-z]/g)||[]).length;if(lettery>dig)return s;
+  return s.replace(/[OoDQ〇]/g,'0').replace(/[lI|!iJ]/g,'1').replace(/[Ss]/g,'5').replace(/[B]/g,'8').replace(/[Zz]/g,'2').replace(/[g]/g,'9').replace(/[‚，、]/g,',').replace(/(\d)[\.](\d{3})(?!\d)/g,'$1,$2')}
 function numsOf(l,ex){
-  const out=[];const ws=l.words.map((w,i)=>({...w,n:normW(w.t),i})).filter(w=>!ex.has(w.i));
+  const out=[],H=l.h||20;const ws=l.words.map((w,i)=>({...w,n:fixNumTok(normW(w.t)),i})).filter(w=>!ex.has(w.i));
   for(let i=0;i<ws.length;i++){let w=ws[i];
-    while(i+1<ws.length&&(/,$/.test(w.n)&&/^\d{3}/.test(ws[i+1].n)||/^\d{1,3}$/.test(w.n)&&/^,\d{3}/.test(ws[i+1].n))){const nx=ws[++i];w={...w,n:w.n+nx.n,x:(w.x0+nx.x1)/2,x1:nx.x1}}
+    while(i+1<ws.length){const nx=ws[i+1],gap=nx.x0-w.x1;
+      const a=/,$/.test(w.n)&&/^\d{3}/.test(nx.n),b=/^-?\d{1,3}(,\d{3})*$/.test(w.n)&&/^,\d{3}/.test(nx.n),c=/^-?\d{1,3}(,\d{3})*$/.test(w.n)&&/^\d{3}(?:,\d{3})*(?![\d.%])/.test(nx.n)&&gap<H*.75;
+      if(!(a||b||c))break;i++;w={...w,n:w.n+(c?',':'')+nx.n,x:(w.x0+nx.x1)/2,x1:nx.x1}}
     let s=w.n.replace(/円|人|名|件/g,'');if(/%/.test(s))continue;
     if(/^-?\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
-    if(!/^-?\d[\d,]*(\.\d+)?$/.test(s))continue;const v=parseFloat(s.replace(/,/g,''));if(isFinite(v))out.push({v,x:w.x,raw:w.n})}
+    if(!/^-?\d[\d,]*(\.\d+)?$/.test(s))continue;if(/,\d{1,2}(,|$)|,\d{4}/.test(s))s=s.replace(/,/g,'');const v=parseFloat(s.replace(/,/g,''));if(isFinite(v))out.push({v,x:w.x,x0:w.x0,x1:w.x1,raw:w.n})}
   return out}
-function detectMonth(lines){const cnt={};for(const l of lines){const t=lineText(l).t;for(const m of t.matchAll(/(20\d{2})\s*[年\/\-.]\s*(\d{1,2})(?!\d)/g)){const mo=+m[2];if(mo>=1&&mo<=12){const k=m[1]+'-'+pad(mo);cnt[k]=(cnt[k]||0)+1}}}
+function detectMonth(lines){const cnt={},add=(y,mo,wt)=>{if(mo>=1&&mo<=12&&y>=2020&&y<=2099){const k=y+'-'+pad(mo);cnt[k]=(cnt[k]||0)+wt}};
+  for(const l of lines){const t=lineText(l).t.replace(/\s+/g,'');
+    for(const m of t.matchAll(/(20\d{2})[年\/\-.](\d{1,2})(?!\d)/g))add(+m[1],+m[2],2);
+    for(const m of t.matchAll(/(?<!\d)(\d{2,3})年(\d{1,2})(?!\d)/g))add(2000+(+m[1].slice(-2)),+m[2],1)}
   const e=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);return e.length?e[0][0]:null}
+// 曜日の文字から何年何月かを割り出す（年月が読めなかったとき）
+function inferMonthByWeekday(pairs,res){const ok=pairs.filter(p=>p.w!=null);if(ok.length<3)return null;const base=state.settings.target,sc=[];
+  for(let k=0;k<=36;k++){const ym=ymAdd(base,-k);let g=0,b=0;for(const p of ok){if(p.d>dim(ym)){b+=2;continue}if(wdOf(ym,p.d)===p.w)g++;else b++}sc.push({ym,s:g-2*b,g})}
+  sc.sort((a,b)=>b.s-a.s);const best=sc[0];if(!(best.g>=3&&best.s>=Math.max(3,ok.length*.25)))return null;
+  let T=sc.filter(x=>x.s>=best.s-1).map(x=>x.ym);const ds=pairs.map(p=>p.d),mx=Math.max(...ds);
+  if(mx===31)T=T.filter(ym=>dim(ym)===31);else if(ds.length>=27&&mx>=28&&T.some(ym=>dim(ym)===mx))T=T.filter(ym=>dim(ym)===mx);
+  if(T.length>1){const need=new Set(checklist().items.flatMap(i=>i.months.filter(m=>!m.ok).map(m=>m.ym)));const N=T.filter(ym=>need.has(ym));if(N.length===1)T=N}
+  if(T.length===1)return T[0];if(res&&T.length>1)res.warn.push(`年月が読めませんでした。曜日の並びから ${T.slice(0,3).map(ymLabel).join('・')} のどれかです。確認画面で月を選んでください`);return null}
 function detectKind(lines){const t=lines.map(l=>lineText(l).t).join('\n');let best=null,bs=0;for(const k in KIND_SCORE){const s=(t.match(KIND_SCORE[k])||[]).length;if(s>bs){bs=s;best=k}}return best}
 function cellText(l,ws,a,b){const W=l.words,ch=Math.max(4,...W.slice(a,b+1).map(w=>(w.x1-w.x0)/Math.max(1,ws[W.indexOf(w)].length)));let L=a,R=b;while(L>0&&b-L<6&&W[L].x0-W[L-1].x1<ch*1.5)L--;while(R<W.length-1&&R-a<6&&W[R+1].x0-W[R].x1<ch*1.5)R++;return ws.slice(L,R+1).join('')}
 function findHeaders(lines,cols){
@@ -668,24 +740,85 @@ function assignByHeader(nums,H){
   const out={},used=new Set();
   const pairs=[];cols.forEach(c=>nums.forEach((n,i)=>pairs.push({c,i,d:Math.abs(n.x-H[c])})));pairs.sort((a,b)=>a.d-b.d);
   for(const p of pairs){if(out[p.c]!=null||used.has(p.i)||p.d>tol)continue;out[p.c]=nums[p.i].v;used.add(p.i)}return out}
+function median(a){const b=a.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y);return b.length?b[Math.floor(b.length/2)]:null}
+// 表の読み取り：数字を列ごとに並べ、見出し → 数字の関係（売上÷客数＝客単価、仕入れの合計など） → 覚えた並び の順で列を決める
 function analyze(lines,preset){
   const res={rows:[],warn:[],headers:{},ym:null,kind:null,mode:''};
-  const dm=detectMonth(lines);
-  res.kind=preset?.kind||detectKind(lines);
-  if(!res.kind){res.warn.push('写真の種類（売上・人件費・仕入れ・勤怠）を見分けられませんでした');return res}
-  if(res.kind==='att')return res;
-  const cols=KINDS[res.kind].cols;
-  const H=findHeaders(lines.filter(l=>!findDay(l)),cols);res.headers=H;
-  const learned=state.learn[res.kind];
-  const dayYm={};
-  for(const l of lines){const f=findDay(l);if(!f)continue;const nums=numsOf(l,f.ex);if(!nums.length)continue;if(f.ym)dayYm[f.ym]=(dayYm[f.ym]||0)+1;
-    let vals;if(Object.keys(H).length>=Math.min(2,cols.length)){vals=assignByHeader(nums,H);res.mode='header'}
-    else{const map=learned||Object.fromEntries(cols.map((c,i)=>[c,i+1]));vals={};for(const c of cols){const k=map[c];if(k&&nums[k-1])vals[c]=nums[k-1].v}res.mode=learned?'learned':'order'}
-    if(res.rows.find(r=>r.day===f.day))continue;res.rows.push({day:f.day,vals,nums:nums.map(n=>n.v)})}
-  res.rows.sort((a,b)=>a.day-b.day);
-  const rowYm=Object.entries(dayYm).sort((a,b)=>b[1]-a[1])[0]?.[0];
-  res.ym=preset?.ym||rowYm||dm||null;
-  if(preset?.months&&!preset.ym){const m=rowYm||dm;res.ym=m&&/^\d{4}-\d{2}$/.test(m)?m:null;if(!res.ym){const ck=checklist().items.find(i=>i.kind===preset.kind&&JSON.stringify(i.months.map(x=>x.ym))===JSON.stringify(preset.months));const miss=ck?.months.find(x=>!x.ok)||ck?.months[0];if(miss){res.ym=miss.ym;res.warn.push(`写真から年月が読めなかったため ${ymLabel(miss.ym)} として反映しました`)}}}
+  const dm=detectMonth(lines);let kind=preset?.kind||detectKind(lines);
+  if(kind==='att'){res.kind='att';return res}
+  const Hh=median(lines.map(l=>l.h))||20;
+  const D=[];lines.forEach((l,li)=>{const f=findDay(l);const nums=numsOf(l,f?f.ex:new Set());const big=nums.filter(n=>Math.abs(n.v)>=100||/,/.test(n.raw));if(big.length>=2||(f&&big.length>=1))D.push({l,li,f,nums,yc:l.yc??li*Hh})});
+  D.sort((a,b)=>a.yc-b.yc);
+  if(D.length<3){res.kind=kind;if(!kind)res.warn.push('写真の種類（売上・人件費・仕入れ・勤怠）を見分けられませんでした');return res}
+  // 列（右端の位置）でまとめる
+  const toks=[];D.forEach((r,ri)=>r.nums.forEach(n=>toks.push({ri,v:n.v,x:n.x,x1:n.x1??n.x})));toks.sort((a,b)=>a.x1-b.x1);
+  let cl=[];for(const t of toks){const c=cl[cl.length-1];if(c&&t.x1-c.m<=Hh*1.3){c.t.push(t);c.m=c.t.reduce((s,q)=>s+q.x1,0)/c.t.length}else cl.push({t:[t],m:t.x1})}
+  cl=cl.filter(c=>new Set(c.t.map(t=>t.ri)).size>=Math.max(2,D.length*.3));cl.forEach(c=>c.xm=c.t.reduce((s,q)=>s+q.x,0)/c.t.length);cl.sort((a,b)=>a.xm-b.xm);
+  const M=D.map(()=>cl.map(()=>null));cl.forEach((c,k)=>{const best={};c.t.forEach(t=>{if(best[t.ri]==null||Math.abs(t.x1-c.m)<Math.abs(best[t.ri].x1-c.m))best[t.ri]=t});for(const ri in best)M[ri][k]=best[ri].v});
+  const col=k=>M.map(r=>r[k]);
+  // 日付の列（いちばん左で1〜31が増えていく列）
+  let dayK=-1;for(let k=0;k<Math.min(2,cl.length);k++){const v=col(k).filter(x=>x!=null);if(v.length>=D.length*.5&&v.every(x=>Number.isInteger(x)&&x>=1&&x<=31)){let inc=0;for(let i=1;i<v.length;i++)if(v[i]>v[i-1])inc++;if(inc>=(v.length-1)*.7){dayK=k;break}}}
+  const valK=cl.map((_,k)=>k).filter(k=>k!==dayK);
+  const map={};let how=new Set();
+  const tryKinds=kind?[kind]:['sales','pur','labor'];
+  const rowsBoth=(a,b)=>M.filter(r=>r[a]!=null&&r[b]!=null);
+  // 見出しから
+  const Hd=findHeaders(lines.filter((l,li)=>!D.some(r=>r.li===li)),[...new Set(tryKinds.flatMap(k=>KINDS[k].cols))]);res.headers=Hd;
+  const xs=valK.map(k=>cl[k].xm),sp=median(xs.slice(1).map((x,i)=>x-xs[i]))||Hh*6;
+  const hp=[];for(const c in Hd)for(const k of valK)hp.push({c,k,d:Math.min(Math.abs(cl[k].xm-Hd[c]),Math.abs(cl[k].m-Hd[c]))});hp.sort((a,b)=>a.d-b.d);
+  const usedK=new Set();for(const p of hp){if(map[p.c]!=null||usedK.has(p.k)||p.d>Math.max(sp*.6,Hh*2.5))continue;map[p.c]=p.k;usedK.add(p.k);how.add('header')}
+  // 数字の関係から
+  const free=()=>valK.filter(k=>!Object.values(map).includes(k));
+  function salesRel(){if(map.sales!=null&&map.guests!=null)return 9;let best=null;
+    for(const i of map.sales!=null?[map.sales]:free())for(const j of map.guests!=null?[map.guests]:free()){if(i===j)continue;const B=rowsBoth(i,j);if(B.length<D.length*.5)continue;
+      const good=B.filter(r=>r[j]>0&&r[i]/r[j]>=600&&r[i]/r[j]<=20000&&Number.isInteger(r[j])).length/B.length;if(good<.8)continue;
+      let bonus=0;for(const k of valK){if(k===i||k===j)continue;const C=B.filter(r=>r[k]!=null);if(C.length<B.length*.5)continue;const m=C.filter(r=>Math.abs(r[k]-r[i]/r[j])<=Math.max(2,r[i]/r[j]*.02)).length/C.length;if(m>=.6){bonus=1;break}}
+      const sc=good+bonus*2-(i>j?.05:0)-valK.indexOf(i)*.001;if(!best||sc>best.sc)best={i,j,sc,bonus}}
+    if(best){map.sales=best.i;map.guests=best.j;how.add('rel');return best.bonus?2:1}return 0}
+  function purRel(){const R=['r1','r2','r3'];if(R.every(c=>map[c]!=null))return 9;const F=valK;let best=null;
+    for(const t of F)for(let a=0;a<F.length;a++)for(let b=a+1;b<F.length;b++)for(let c=b+1;c<=F.length;c++){const ks=[F[a],F[b],c<F.length?F[c]:null].filter(x=>x!=null);if(ks.includes(t))continue;
+      const B=M.filter(r=>r[t]!=null&&ks.filter(k=>r[k]!=null).length>=2);if(B.length<D.length*.5)continue;
+      const g=B.filter(r=>Math.abs(ks.reduce((s,k)=>s+(r[k]||0),0)-r[t])<=Math.max(2,r[t]*.005)).length/B.length;if(g>=.7&&(!best||g+ks.length*.01>best.g))best={t,ks,g:g+ks.length*.01}}
+    if(!best)return 0;const left=best.ks.filter(k=>!Object.values(map).includes(k)),need=R.filter(c=>map[c]==null);
+    const hist=purModel(null).ratio;need.sort((a,b)=>hist[b]-hist[a]);left.sort((a,b)=>median(col(b))-median(col(a)));
+    need.forEach((c,i)=>{if(left[i]!=null){map[c]=left[i];how.add('rel')}});if(need.length>1)res.warn.push('仕入れ先の見出しが読めなかった列は、これまでの金額の割合から割り当てました。確認してください');return 2}
+  function laborRel(){if(map.pa!=null&&map.labor!=null)return 9;let best=null;
+    for(const i of map.pa!=null?[map.pa]:free())for(const j of map.labor!=null?[map.labor]:free()){if(i===j)continue;const B=rowsBoth(i,j);if(B.length<D.length*.5)continue;const g=B.filter(r=>r[j]>0&&r[i]/r[j]>=.3&&r[i]/r[j]<=.98).length/B.length;if(g>=.85&&(!best||g>best.g))best={i,j,g}}
+    if(best){map.pa=best.i;map.labor=best.j;how.add('rel');return 1}return 0}
+  if(!kind){const s1=salesRel();if(s1===2||s1===9&&map.sales!=null)kind='sales';else{for(const c in map)if(!KINDS.sales.cols.includes(c))delete map[c];
+      const keep={...map};if(s1===1){/* 弱い一致は保留 */}const p=purRel();if(p){kind='pur'}else if(s1){kind='sales';Object.assign(map,keep)}}}
+  else if(kind==='sales')salesRel();else if(kind==='pur')purRel();else if(kind==='labor')laborRel();
+  res.kind=kind;if(!kind){res.warn.push('写真の種類（売上・人件費・仕入れ）を見分けられませんでした');return res}
+  const cols=KINDS[kind].cols;for(const c in map)if(!cols.includes(c))delete map[c];
+  // 覚えた並び・並び順
+  if(cols.some(c=>map[c]==null)){const L=state.learn[kind];if(L){cols.forEach(c=>{if(map[c]==null&&L[c]&&valK[L[c]-1]!=null&&!Object.values(map).includes(valK[L[c]-1])){map[c]=valK[L[c]-1];how.add('learned')}})}
+    if(!Object.keys(map).length){cols.forEach((c,i)=>{if(valK[i]!=null)map[c]=valK[i]});how.add('order')}}
+  res.mode=how.has('order')?'order':how.has('learned')?'learned':how.has('rel')?'rel':'header';
+  // 日付：日付の列 → 文字 → 並び順から補う
+  const days=D.map((r,ri)=>dayK>=0&&M[ri][dayK]!=null?M[ri][dayK]:r.f?r.f.day:null);
+  const off={};days.forEach((d,i)=>{if(d!=null){const o=d-i;off[o]=(off[o]||0)+1}});const ob=Object.entries(off).sort((a,b)=>b[1]-a[1])[0];const known=days.filter(d=>d!=null).length;
+  let filled=0;if(ob&&ob[1]>=Math.max(3,known*.4)){const o=+ob[0];days.forEach((d,i)=>{const e=i+o;if(e<1||e>31)return;if(d==null||(d!==e&&!days.slice(Math.max(0,i-1),i+2).some((x,q)=>x===e)&&ob[1]>=known*.7)){if(d!==e){days[i]=e;filled++}}})}
+  if(filled)res.warn.push(`日付が読めなかった${filled}行は、行の並び順から日付を補いました`);
+  // 年月
+  const wk={'日':0,'月':1,'火':2,'水':3,'木':4,'金':5,'土':6};const pairs=D.map((r,i)=>{const t=lineText(r.l).t.slice(0,14).replace(/\s/g,'');const m=t.match(/\(?([月火水木金土日])\)?/);return{d:days[i],w:m?wk[m[1]]:null}}).filter(p=>p.d!=null);
+  const dayYm={};D.forEach(r=>{if(r.f?.ym)dayYm[r.f.ym]=(dayYm[r.f.ym]||0)+1});const rowYm=Object.entries(dayYm).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  let dmx=dm;{const mv={};D.forEach(r=>{if(r.f?.mo)mv[r.f.mo]=(mv[r.f.mo]||0)+1});const top=Object.entries(mv).sort((a,b)=>b[1]-a[1])[0];
+    if(top&&top[1]>=5&&top[1]>=D.length*.4&&!rowYm&&!preset?.ym){const mo=+top[0];
+      if(dm&&+dm.slice(5)!==mo){const fixd=dm.slice(0,4)+'-'+pad(mo);res.warn.push(`見出しの年月（${ymLabel(dm)}）と日付の月（${mo}月）が合わないため、${ymLabel(fixd)} にしました。確認してください`);dmx=fixd}
+      else if(!dm){const c=[];for(let k=0;k<=36;k++){const ym=ymAdd(state.settings.target,-k);if(+ym.slice(5)===mo)c.push(ym)}const ok=pairs.filter(p=>p.w!=null);const fit=ym=>ok.filter(p=>p.d<=dim(ym)&&wdOf(ym,p.d)===p.w).length;c.sort((a,b)=>fit(b)-fit(a));
+        if(c.length&&(ok.length>=3?fit(c[0])>=ok.length*.6&&(!c[1]||fit(c[0])>fit(c[1])):c.length===1))dmx=c[0]}}}
+  if(dmx===dm&&dm&&!rowYm&&!preset?.ym){const ok=pairs.filter(p=>p.w!=null);if(ok.length>=8){const fit=ym=>ok.filter(p=>p.d<=dim(ym)&&wdOf(ym,p.d)===p.w).length;
+    if(fit(dm)<ok.length*.5){const alt=[];for(let k=0;k<=36;k++){const ym=ymAdd(state.settings.target,-k);if(fit(ym)>=ok.length*.75)alt.push(ym)}
+      const[dy,dmo]=dm.split('-');const pick=alt.find(ym=>ym.startsWith(dy)&&String(+ym.slice(5)).includes(String(+dmo)))||(alt.length===1?alt[0]:null);
+      if(pick){res.warn.push(`見出しの年月（${ymLabel(dm)}）と曜日が合わないため、曜日に合う ${ymLabel(pick)} にしました。確認してください`);dmx=pick}else{dmx=null;res.warn.push(`見出しの年月（${ymLabel(dm)}）と曜日が合いません。確認画面で月を選んでください`)}}}}
+  const wym=(preset?.ym||rowYm||dmx)?null:inferMonthByWeekday(pairs,res);
+  res.ym=preset?.ym||rowYm||dmx||wym||null;
+  if(!preset?.ym&&!rowYm&&!dmx&&wym)res.warn.push(`年月は曜日の並びから ${ymLabel(wym)} と判断しました`);
+  if(preset?.months&&!preset.ym&&!res.ym){const ck=checklist().items.find(i=>i.kind===preset.kind&&JSON.stringify(i.months.map(x=>x.ym))===JSON.stringify(preset.months));const miss=ck?.months.find(x=>!x.ok)||ck?.months[0];if(miss){res.ym=miss.ym;res.warn.push(`写真から年月が読めなかったため ${ymLabel(miss.ym)} として反映しました`)}}
+  // 行を作る（nums は列の順。確認画面で「◯番目」がどの行でも同じ列になる）
+  const seen=new Set();D.forEach((r,ri)=>{const d=days[ri];if(d==null||d<1||d>31||seen.has(d))return;const vals={};cols.forEach(c=>{if(map[c]!=null&&M[ri][map[c]]!=null)vals[c]=M[ri][map[c]]});
+    if(!Object.keys(vals).length)return;seen.add(d);res.rows.push({day:d,vals,nums:valK.map(k=>M[ri][k])})});
+  res.rows.sort((a,b)=>a.day-b.day);res.colMap=Object.fromEntries(cols.map(c=>[c,map[c]!=null?valK.indexOf(map[c])+1:0]));
   postCheck(res);return res}
 function postCheck(res){
   if(res.kind==='sales'){let sw=0;res.rows.forEach(r=>{const s=r.vals.sales,g=r.vals.guests;if(s!=null&&g!=null&&g>s){r.vals.sales=g;r.vals.guests=s;sw++}});
@@ -694,7 +827,7 @@ function postCheck(res){
     const bad=res.rows.filter(r=>r.vals.sales&&r.vals.guests&&(r.vals.sales/r.vals.guests<800||r.vals.sales/r.vals.guests>12000)).length;if(bad)res.warn.push(`客単価が不自然な日が${bad}日あります（確認してください）`)}
   if(res.kind==='labor'){res.rows.forEach(r=>{const a=r.vals.pa,b=r.vals.labor;if(a!=null&&b!=null&&a>b){r.vals.pa=b;r.vals.labor=a}})}
   const miss=KINDS[res.kind].cols.filter(c=>!res.rows.some(r=>r.vals[c]!=null));if(miss.length&&res.rows.length)res.warn.push(`${miss.map(c=>COLS.find(x=>x.k===c).n).join('・')}の列が見つかりませんでした`);
-  if(res.mode==='order'&&res.rows.length)res.warn.push('列の見出しが読めなかったため、並び順で割り当てました。内容を確認してください');
+  if(res.mode==='order'&&res.rows.length)res.warn.push('列の見出しが読めなかったため、並び順で割り当てました。内容を確認してください');if(res.mode==='rel'&&res.rows.length)res.warn.push('見出しが一部読めなかったため、数字の関係（売上÷客数＝客単価 など）から列を判断しました');
 }
 function analyzeAndApply(q){
   const r=analyze(q.lines,q.preset);q.kind=r.kind;q.ym=r.ym;q.res=r;q.warn=r.warn;
@@ -1054,7 +1187,7 @@ function rData(){
    <div class="row" style="margin-top:8px"><select id="pastek"><option value="">種類を自動判別</option>${['sales','labor','pur'].map(k=>`<option value="${k}">${KINDS[k].n}</option>`).join('')}</select><button class="btn p" onclick="pasteImport('${ym}')">取り込む</button></div></div>`;
   h+=dataTable(ym);return h;
 }
-function pasteImport(ym){const txt=$('pastet').value;if(!txt.trim())return;const kind=$('pastek').value||null;const lines=textToLines(txt);
+function pasteImport(ym){const txt=$('pastet').value;if(!txt.trim())return;const kind=$('pastek').value||null;const lines=pasteLines(txt,{kind,ym});
   const r=analyze(lines,{kind,ym});if(!r.kind){alert('種類を選んでください');return}if(!r.rows.length){alert('日付のある行が見つかりませんでした');return}
   const undo=applyRows(ym,r.rows,KINDS[r.kind].cols);window._lastPaste=undo;render();toast(`${KINDS[r.kind].n} ${r.rows.length}日分を反映しました`+(r.warn.length?'（'+r.warn[0]+'）':''))}
 function dataTable(ym){
