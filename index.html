@@ -490,7 +490,7 @@ const DEFAULT_SETTINGS = {
   nightFrom: 22, nightTo: 29,
   peakFrom: 16, peakTo: 23,
   targetRate: {1:22,2:22,3:22,4:22,5:22,6:22,0:22}, rateMode: 'month', monthRate: 24, budgetWeights: {1:1,2:1,3:1,4:1,5:1.27,6:1.27,0:1.18},
-  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: false, brk28: true, warn28: 2, alert28: 1, minEmp: 2,
+  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: false, brk28: false, warn28: 2, alert28: 1, minEmp: 2,
   dailyOT: 8, weeklyOT: 40, nightRate: 0.25, otMode: 'dw'
 };
 const COLORS = ['yellow','blue','green','teal','pink','red','violet','gray','orange'];
@@ -1311,15 +1311,15 @@ function lineText(){
 
 /* 28時間管理：どの連続7日間でも労働時間が上限を超えないか */
 // 28時間：日付は月をまたいでも連続で数える。ov は入力途中の値（日付→時間）で上書きするとき
-// 28時間の数え方：休憩込み（設定で休憩を除くこともできる）。調整でカットした日はカット後の時間で数える
-const brk28=()=>set().brk28!==false;
+// 28時間の数え方：休憩を引いた労働時間（設定で休憩込みにもできる）。調整でカットした日はカット後の時間で数える
+const brk28=()=>set().brk28===true;
 function h28Span(st0,en){if(!(en>st0))return 0;const w=en-st0;return brk28()?w:w-breakHours(w)}
 function h28Of(sh){const c=calcShift(sh);return c.on?(brk28()?c.work:c.labor):0}
 function h28Day(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid)h+=h28Of(sh);return h}
 function cut28(date,sid){let c=0;for(const sh of dayDoc(date).shifts||[]){if(sh.sid!==sid||!sh.req||sh.req.off||sh.req.paid||sh.req.start==null||sh.req.end==null)continue;const r=h28Span(sh.req.start,sh.req.end),n=h28Of(sh);if(r>n+1e-9)c+=r-n}return c}
 // 残りの色：黄＝残りが warn28 時間を切った、赤＝alert28 時間を切った／超えた
 const lv28=left=>{const st=set(),a=Number(st.alert28??1),w=Number(st.warn28??2);return left<0||left<a?'bad':left<w?'warn':'good'};
-const how28=()=>`${brk28()?'休憩込み（出勤〜退勤の時間）':'労働時間（休憩を除く）'}${set().paid28?'・有給も含めて':''}で数えています。調整でカットした日はカット後の時間です`;
+const how28=()=>`${brk28()?'休憩込み（出勤〜退勤の時間）':'休憩を引いた労働時間'}${set().paid28?'・有給も含めて':''}で数えています。調整でカットした日はカット後の時間です`;
 function hoursFn(sid,ov){const p=set().paid28;return dt=>ov&&Object.prototype.hasOwnProperty.call(ov,dt)?ov[dt]:h28Day(dt,sid)+(p?paidOf(dt,sid):0)}
 function roll7(sid,end,ov){const f=hoursFn(sid,ov);let h=0;for(let k=0;k<7;k++)h+=f(addDays(end,-k));return h}
 function rollMax(sid,from,to,ov){let m=0,at=null;for(let e=from;e<=to;e=addDays(e,1)){const h=roll7(sid,e,ov);if(h>m){m=h;at=e}}return {m,at}}
@@ -2701,7 +2701,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.68'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.69'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3542,7 +3542,7 @@ function vSettings(){
     <p class="hint">「シフト作成」の「目標に合わせる」は、売上予算×目標人件費率を上限に、時間帯ごとの理想人数を下回らない範囲でだけ勤務を短くします。</p></section>
   <section class="panel"><h2>計算ルール</h2>
     <div class="kpis">${num('border','社員ボーダー（週h）',0.5)}${num('limit28','28h管理の上限（h）',0.5)}${num('warn28','28h：黄色にする残り（h未満）',0.5)}${num('alert28','28h：警告にする残り（h未満）',0.5)}
-    <label style="font-size:13px;align-self:end"><input type="checkbox" id="brk28"${st.brk28!==false?' checked':''}> 28時間は休憩込みで数える</label>
+    <label style="font-size:13px;align-self:end"><input type="checkbox" id="brk28"${st.brk28===true?' checked':''}> 28時間を休憩込みで数える（ふつうは外したまま＝休憩を引いて数える）</label>
     <label class="field"><span>立ち上げの時刻（空欄＝その日一番早い出勤）</span><input type="number" step="0.5" min="0" max="31" id="s_openAt" data-ocset="openAt" value="${st.openAt??''}" placeholder="例 11"></label>
     <label class="field"><span>締めの時刻（空欄＝その日一番遅い退勤）</span><input type="number" step="0.5" min="0" max="31" id="s_closeAt" data-ocset="closeAt" value="${st.closeAt??''}" placeholder="例 23.5"></label>
     ${num('brk1At','休憩1：勤務がこの時間以上',0.5)}${num('brk1','→ 休憩（h）',0.25)}${num('brk2Over','休憩2：勤務がこの時間超',0.5)}${num('brk2','→ 休憩（h）',0.25)}
@@ -3930,7 +3930,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v80';
+  const APP_SW='v81';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
