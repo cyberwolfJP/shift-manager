@@ -232,7 +232,8 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
-.h28days span.on{color:var(--fg)}.paid28{display:block;font-style:normal;font-size:9px;font-weight:700;color:#7a4fb5;line-height:1.1}td .paid28{margin:1px 0 0}
+.h28days span.on{color:var(--fg)}.paidtag{font-size:12px;font-weight:700;color:#7a4fb5;background:var(--p-violet);border-radius:4px;padding:1px 6px}
+.paid28{display:block;font-style:normal;font-size:9px;font-weight:700;color:#7a4fb5;line-height:1.1}td .paid28{margin:1px 0 0}
 .cut28{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--warn);line-height:1.1}td .cut28{display:block;margin:1px 0 0}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
 .pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span small{margin-left:3px;font-size:10px;color:#7a4fb5;font-weight:700}
 .pdays span.f{background:var(--p-violet);font-weight:700}
@@ -825,11 +826,12 @@ function paidEst(sid,date){for(const span of [28,56]){let tot=0,n=0;for(let k=1;
   const s=S.staff[sid];if(s&&Number(s.paidDayH))return {h:Number(s.paidDayH),n:0,span:0};
   if(s&&s.defStart!=null&&s.defEnd!=null&&s.defEnd>s.defStart){const w=s.defEnd-s.defStart;return {h:w-breakHours(w),n:0,span:0}}
   return {h:0,n:0,span:0}}
+const bPaidH=(dt,v)=>Number(v.h)>0?Number(v.h):paidEst(S.bulk?.sid,dt).h;
 function setPaidAuto(sh,date){sh.paidAuto=true;sh.paidH=paidEst(sh.sid,date).h}
 // 時間が入っていない有給・暫定の有給は、直近の勤務から時間を入れ直す（過ぎた日は1度決まったらそのまま）
 function healPaid(){try{if(S.role!=='manager')return;if(S.settings&&!S.settings.paid28v){S.settings.paid28v=1;S.settings.paid28=true;saveSettings()}
   for(const [dt,d] of Object.entries(S.days||{})){let ch=false;for(const sh of d.shifts||[]){if(sh.pos!==PAID||!sh.sid)continue;
-      if(sh.paidH==null||sh.paidH===''||(sh.paidAuto&&dt>=today)){const old=sh.paidH,oa=sh.paidAuto;setPaidAuto(sh,dt);if(old!==sh.paidH||oa!==true)ch=true}}
+      if(!(Number(sh.paidH)>0)||(sh.paidAuto&&dt>=today)){const old=sh.paidH,oa=sh.paidAuto;setPaidAuto(sh,dt);if(old!==sh.paidH||oa!==true)ch=true}}
     if(ch)saveDay(dt)}}catch(e){console.error(e)}}
 const paidAutoOn=(date,sid)=>(dayDoc(date).shifts||[]).some(x=>x.sid===sid&&x.pos===PAID&&x.paidAuto);
 function paidOf(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid&&sh.pos===PAID)h+=Math.max(0,Number(sh.paidH)||0);return h}
@@ -2717,7 +2719,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.71'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.72'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2747,7 +2749,7 @@ function bulkInit(sid){
   const days={};
   for(const dt of weekDates(S.week)){const row=(dayDoc(dt).shifts||[]).find(x=>x.sid===sid);
     if(!row||row.gen)days[dt]={st:''};
-    else if(row.pos===PAID)days[dt]={st:'paid',h:row.paidAuto?null:(row.paidH??null)};
+    else if(row.pos===PAID)days[dt]={st:'paid',h:row.paidAuto||!(Number(row.paidH)>0)?null:Number(row.paidH)};
     else if(isOff(row.pos))days[dt]={st:'off'};
     else if(row.start!=null&&row.end!=null){const r=row.req&&row.req.start!=null?row.req:row;days[dt]={st:'on',start:r.start,end:r.end,pin:!!row.pin}}
     else days[dt]={st:''}}
@@ -2920,20 +2922,20 @@ function vBulk(page){
   if(!S.bulk||S.bulk.week!==S.week||!S.staff[S.bulk.sid])S.bulk=bulkInit(S.bulk&&S.staff[S.bulk.sid]?S.bulk.sid:list.find(s=>s.kind!=='社員')?.id||list[0].id);
   const B=S.bulk,s=S.staff[B.sid],dates=weekDates(S.week),open=S.bulkOpen!=null?S.bulkOpen:true;
   const has=sid=>dates.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===sid&&!x.gen));
-  const ov28=()=>{const o={};for(const [d0,v0] of Object.entries(B.days))o[d0]=v0.st==='on'&&v0.end>v0.start?h28Span(v0.start,v0.end):v0.st==='paid'&&set().paid28?Number(v0.h)||0:0;return o};
+  const ov28=()=>{const o={};for(const [d0,v0] of Object.entries(B.days))o[d0]=v0.st==='on'&&v0.end>v0.start?h28Span(v0.start,v0.end):v0.st==='paid'&&set().paid28?bPaidH(d0,v0):0;return o};
   const rows=dates.map(dt=>{const v=B.days[dt]||{st:''},w=wd(dt);
     const emp=s.kind==='社員';
     const seg=[['on',emp?'出勤（固定）':'出勤'],['off',emp?'公休希望':'休み'],['paid','有給']].map(([k,l])=>`<button class="${k==='on'?'on':k==='off'?'off':''}" data-act="bday" data-d="${dt}" data-v="${k}" aria-pressed="${v.st===k}"${k==='paid'&&v.st==='paid'?' style="background:var(--ink);color:var(--surface)"':''}>${l}</button>`).join('');
     const tm=v.st==='on'?`<select data-bf="start" data-d="${dt}" aria-label="${md(dt)}の開始">${tOptions(v.start,8,31.5)}</select><span>〜</span><select data-bf="end" data-d="${dt}" aria-label="${md(dt)}の終了">${tOptions(v.end,8.5,32)}</select>`
       +((dayDoc(dt).shifts||[]).find(x=>x.sid===B.sid)?.req?.any?'<span class="pill" style="font-size:11px">本人：時間おまかせ</span>':'')
       +(emp?'':`<button class="pin${v.pin?' on':''}" data-act="bpin" data-d="${dt}" style="font-size:11px;padding:2px 8px" title="この日は必ず入れる（自動調整で動かさない）">固定</button>`)
-      :v.st==='paid'?`<input type="number" step="0.5" min="0" max="12" data-bf="h" data-d="${dt}" value="${v.h??''}" style="width:70px" aria-label="${md(dt)}の有給時間"> 時間`:v.st===''?`<span class="muted" style="font-size:12px">${(()=>{const g=(dayDoc(dt).shifts||[]).find(x=>x.sid===B.sid&&x.gen);return g?(isOff(g.pos)?'自動作成：休み':`自動作成：${tLabel(g.start)}–${tLabel(g.end)}`):emp?'おまかせ（自動作成で決めます）':'未入力'})()}</span>`:'';
+      :v.st==='paid'?`<input type="number" step="0.5" min="0" max="12" data-bf="h" data-d="${dt}" value="${Number(v.h)>0?v.h:''}" placeholder="${n1(paidEst(B.sid,dt).h)}" style="width:70px" aria-label="${md(dt)}の有給時間"> 時間${Number(v.h)>0?'':` <span class="paidtag">暫定 ${n1(paidEst(B.sid,dt).h)}h（直近4週間の平均）</span>`}`:v.st===''?`<span class="muted" style="font-size:12px">${(()=>{const g=(dayDoc(dt).shifts||[]).find(x=>x.sid===B.sid&&x.gen);return g?(isOff(g.pos)?'自動作成：休み':`自動作成：${tLabel(g.start)}–${tLabel(g.end)}`):emp?'おまかせ（自動作成で決めます）':'未入力'})()}</span>`:'';
     const cap=s.limit28?capOn(B.sid,dt,ov28()):null;
     const capTx=cap==null?'':`<span style="font-size:11px;font-weight:700;color:var(--${cap<0?'bad':cap<3?'warn':'muted'})">${cap<0?`28h超過 ${n1(-cap)}h`:`あと${n1(cap)}h`}</span>`;
     return `<div class="sub-day"><div class="dl"><span class="w ${w===6?'w-sat':w===0?'w-sun':w===5?'w-fri':''}" style="display:inline-block;min-width:1.6em;text-align:center;border-radius:3px">${WD[w]}</span> ${md(dt)}</div><div class="seg" role="group" aria-label="${md(dt)}">${seg}</div><div class="tm">${tm}${capTx}</div></div>`}).join('');
   const lab=Object.values(B.days).reduce((a,v)=>a+(v.st==='on'&&v.end>v.start?(v.end-v.start)-breakHours(v.end-v.start):0),0);
-  const ph=Object.values(B.days).reduce((a,v)=>a+(v.st==='paid'?Number(v.h)||0:0),0),lim=Number(set().limit28);
-  const ov={};for(const [dt,v] of Object.entries(B.days))ov[dt]=v.st==='on'&&v.end>v.start?h28Span(v.start,v.end):v.st==='paid'&&set().paid28?Number(v.h)||0:0;
+  const ph=Object.entries(B.days).reduce((a,[d0,v])=>a+(v.st==='paid'?bPaidH(d0,v):0),0),lim=Number(set().limit28);
+  const ov={};for(const [dt,v] of Object.entries(B.days))ov[dt]=v.st==='on'&&v.end>v.start?h28Span(v.start,v.end):v.st==='paid'&&set().paid28?bPaidH(dt,v):0;
   const rm=s.limit28?rollMax(B.sid,dates[0],addDays(dates[6],6),ov):{m:0,at:null};
   const dirty=JSON.stringify(B.days)!==B.orig;
   return `<section class="panel" id="bulkForm"><div style="display:grid;gap:10px">
@@ -3692,7 +3694,7 @@ app.addEventListener('click',e=>{
   if(a==='bpick'||a==='bjump'){if(S.bulk&&JSON.stringify(S.bulk.days)!==S.bulk.orig)bulkSave();S.bulk=bulkInit(b.dataset.id);return render()}
   if(a==='bday'){const v=S.bulk.days[b.dataset.d],k=b.dataset.v;
     if(v.st===k)S.bulk.days[b.dataset.d]={st:''};
-    else S.bulk.days[b.dataset.d]=k==='on'?{st:'on',start:v.start??(S.staff[S.bulk.sid]?.kind==='社員'?Number(S.staff[S.bulk.sid].defStart??12):S.bulkT?.[0]??17),end:v.end??(S.staff[S.bulk.sid]?.kind==='社員'?Number(S.staff[S.bulk.sid].defEnd??23.5):S.bulkT?.[1]??23.5)}:k==='paid'?{st:'paid',h:Number(S.staff[S.bulk.sid]?.paidDayH)||null}:{st:'off'};return render()}
+    else S.bulk.days[b.dataset.d]=k==='on'?{st:'on',start:v.start??(S.staff[S.bulk.sid]?.kind==='社員'?Number(S.staff[S.bulk.sid].defStart??12):S.bulkT?.[0]??17),end:v.end??(S.staff[S.bulk.sid]?.kind==='社員'?Number(S.staff[S.bulk.sid].defEnd??23.5):S.bulkT?.[1]??23.5)}:k==='paid'?{st:'paid',h:null}:{st:'off'};return render()}
   if(a==='bAll'){for(const dt of Object.keys(S.bulk.days)){const v=S.bulk.days[dt];S.bulk.days[dt]=b.dataset.v==='on'?{st:'on',start:v.start??S.bulkT?.[0]??17,end:v.end??S.bulkT?.[1]??23.5}:b.dataset.v===''?{st:''}:{st:'off'}}return render()}
   if(a==='bTime'){const s0=Number(document.getElementById('bS').value),e0=Number(document.getElementById('bE').value);if(!(e0>s0))return toast('終了は開始より後にしてください');
     S.bulkT=[s0,e0];let n=0;for(const v of Object.values(S.bulk.days))if(v.st==='on'){v.start=s0;v.end=e0;n++}if(!n)toast('先に「出勤」の日を選んでください');return render()}
@@ -3938,7 +3940,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v83';
+  const APP_SW='v84';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
