@@ -232,7 +232,7 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
-.h28days span.on{color:var(--fg)}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
+.h28days span.on{color:var(--fg)}.cut28{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--warn);line-height:1.1}td .cut28{display:inline;margin-left:3px}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
 .pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span.f{background:var(--p-violet);font-weight:700}
 .pedit{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:12px}.pedit label{display:grid;gap:2px}
 .ewk td.w28{background:var(--warn-bg)}
@@ -490,7 +490,7 @@ const DEFAULT_SETTINGS = {
   nightFrom: 22, nightTo: 29,
   peakFrom: 16, peakTo: 23,
   targetRate: {1:22,2:22,3:22,4:22,5:22,6:22,0:22}, rateMode: 'month', monthRate: 24, budgetWeights: {1:1,2:1,3:1,4:1,5:1.27,6:1.27,0:1.18},
-  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: false, minEmp: 2,
+  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: false, brk28: true, warn28: 2, alert28: 1, minEmp: 2,
   dailyOT: 8, weeklyOT: 40, nightRate: 0.25, otMode: 'dw'
 };
 const COLORS = ['yellow','blue','green','teal','pink','red','violet','gray','orange'];
@@ -1245,7 +1245,7 @@ function adjust28(week){
     for(let g=0;g<7;g++){
       const winStart=addDays(r.at,-6),mins=Number(st.minShift||4);let trim=0;const cand=[];
       for(const dt of dates){if(dt<winStart||dt>r.at)continue;const d=ensureDay(dt),sh=d.shifts.find(x=>x.sid===s0.id);if(!sh||fixedRow(sh)||dayLocked(dt))continue;
-        const c=calcShift(sh);if(!c.on)continue;trim+=Math.max(0,c.labor-(mins-breakHours(mins)));
+        const c=calcShift(sh);if(!c.on)continue;trim+=Math.max(0,h28Of(sh)-h28Span(0,mins));
         const B=hourCover(d),ideal=(d.ideal||[]).map(Number);let sur=0;for(let h=Math.floor(sh.start-8);h<Math.ceil(sh.end-8);h++)sur+=(B.H[h]||0)-(ideal[h]||0);
         if(ocUsed()){const R0=ocState(dt,d.shifts),R1=ocState(dt,d.shifts.filter(x=>x!==sh));if(!ocKeeps(R0,R1))sur-=1e5}cand.push({dt,sh,sur})}
       if(r.m-lim<=trim||!cand.length)break;
@@ -1311,7 +1311,16 @@ function lineText(){
 
 /* 28時間管理：どの連続7日間でも労働時間が上限を超えないか */
 // 28時間：日付は月をまたいでも連続で数える。ov は入力途中の値（日付→時間）で上書きするとき
-function hoursFn(sid,ov){const p=set().paid28;return dt=>ov&&Object.prototype.hasOwnProperty.call(ov,dt)?ov[dt]:laborOf(dt,sid)+(p?paidOf(dt,sid):0)}
+// 28時間の数え方：休憩込み（設定で休憩を除くこともできる）。調整でカットした日はカット後の時間で数える
+const brk28=()=>set().brk28!==false;
+function h28Span(st0,en){if(!(en>st0))return 0;const w=en-st0;return brk28()?w:w-breakHours(w)}
+function h28Of(sh){const c=calcShift(sh);return c.on?(brk28()?c.work:c.labor):0}
+function h28Day(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid)h+=h28Of(sh);return h}
+function cut28(date,sid){let c=0;for(const sh of dayDoc(date).shifts||[]){if(sh.sid!==sid||!sh.req||sh.req.off||sh.req.paid||sh.req.start==null||sh.req.end==null)continue;const r=h28Span(sh.req.start,sh.req.end),n=h28Of(sh);if(r>n+1e-9)c+=r-n}return c}
+// 残りの色：黄＝残りが warn28 時間を切った、赤＝alert28 時間を切った／超えた
+const lv28=left=>{const st=set(),a=Number(st.alert28??1),w=Number(st.warn28??2);return left<0||left<a?'bad':left<w?'warn':'good'};
+const how28=()=>`${brk28()?'休憩込み（出勤〜退勤の時間）':'労働時間（休憩を除く）'}${set().paid28?'・有給も含めて':''}で数えています。調整でカットした日はカット後の時間です`;
+function hoursFn(sid,ov){const p=set().paid28;return dt=>ov&&Object.prototype.hasOwnProperty.call(ov,dt)?ov[dt]:h28Day(dt,sid)+(p?paidOf(dt,sid):0)}
 function roll7(sid,end,ov){const f=hoursFn(sid,ov);let h=0;for(let k=0;k<7;k++)h+=f(addDays(end,-k));return h}
 function rollMax(sid,from,to,ov){let m=0,at=null;for(let e=from;e<=to;e=addDays(e,1)){const h=roll7(sid,e,ov);if(h>m){m=h;at=e}}return {m,at}}
 // その日を含むどの7日間も上限を超えないために、その日にあと何時間足せるか
@@ -1321,7 +1330,7 @@ function check28(dates){
   for(const s of staffList(true).filter(x=>x.limit28)){
     let max=0,at=null;
     for(let dt=dates[0];dt<=addDays(dates[dates.length-1],6);dt=addDays(dt,1)){const h=roll7(s.id,dt);if(h>max){max=h;at=dt}}
-    if(max>lim)out.push({s,max,at,level:'over'});else if(max>lim-3&&max>0)out.push({s,max,at,level:'near'});
+    const L=lv28(lim-max);if(max>lim)out.push({s,max,at,level:'over'});else if(L!=='good'&&max>0)out.push({s,max,at,level:L==='bad'?'alert':'near'});
   }
   return out.sort((a,b)=>b.max-a.max);
 }
@@ -1329,8 +1338,8 @@ function check28(dates){
 function intlWeekPanel(date,compact){const list=staffList().filter(s=>s.limit28);if(!list.length)return '';
   const st=set(),lim=Number(st.limit28),ds=weekDates(monday(date)),f=sid=>hoursFn(sid);
   const rows=list.map(s=>{const h=ds.map(dt=>f(s.id)(dt)),tot=h.reduce((a,b)=>a+b,0),R=rollMax(s.id,ds[0],addDays(ds[6],6)),left=lim-R.m;return {s,h,tot,R,left}}).sort((a,b)=>a.left-b.left);
-  const col=x=>x.left<0?'var(--bad)':x.left<=3?'var(--warn)':'var(--good)';
-  return `<section class="panel" style="padding:10px 14px"${compact?'':''}><div class="bar"><h2 style="font-size:16px">留学生の労働時間（週${lim}時間まで）</h2><span class="hint">${st.paid28?'有給も含めて':'労働時間（休憩を除く）で'}数えています。「連続7日の最大」は前後の週もまたいだ一番多い7日間です</span></div>
+  const col=x=>`var(--${lv28(x.left)})`;
+  return `<section class="panel" style="padding:10px 14px"${compact?'':''}><div class="bar"><h2 style="font-size:16px">留学生の労働時間（週${lim}時間まで）</h2><span class="hint">${how28()}。「連続7日の最大」は前後の週もまたいだ一番多い7日間です</span></div>
     <div class="scroll"><table class="t ewk"><thead><tr><th>名前</th>${ds.map(dt=>`<th class="${dt===date?'cur':''}">${WD[wd(dt)]} ${md(dt)}</th>`).join('')}<th class="r">この週</th><th style="min-width:120px"></th><th class="r">連続7日の最大</th><th class="r">残り</th></tr></thead><tbody>
     ${rows.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${ds[i]===date?' cur':''}${v?'':' muted'}">${v?n1(v):'—'}</td>`).join('')}
       <td class="num"><b>${n1(x.tot)}h</b></td><td><div class="meter"><i style="width:${Math.min(100,x.tot/lim*100)}%;background:${col(x)}"></i></div></td>
@@ -1338,9 +1347,10 @@ function intlWeekPanel(date,compact){const list=staffList().filter(s=>s.limit28)
     </tbody></table></div></section>`}
 function alert28Html(dates){
   const a=check28(dates),lim=set().limit28;if(!a.length)return '';
-  const over=a.filter(x=>x.level==='over'),near=a.filter(x=>x.level==='near');
+  const over=a.filter(x=>x.level==='over'),alrt=a.filter(x=>x.level==='alert'),near=a.filter(x=>x.level==='near');
   const line=x=>`${esc(x.s.name)} <b class="num">${n1(x.max)}h</b>（${md(addDays(x.at,-6))}〜${md(x.at)}）`;
   return (over.length?`<div class="alert28" role="alert"><b>留学生の${lim}時間超過：${over.length}人</b><span>${over.map(line).join('　')}</span><span style="font-size:12px">連続7日間の労働時間が${lim}時間を超えています。シフトを減らしてください。</span></div>`:'')+
+    (alrt.length?`<div class="alert28" role="alert"><b>残り${n1(Number(set().alert28??1))}時間を切っています：${alrt.length}人</b><span>${alrt.map(x=>`${line(x)} 残り${n1(lim-x.max)}h`).join('　')}</span></div>`:'')+
     (near.length?`<div class="alert28 near"><b>残りわずか：${near.length}人</b><span>${near.map(x=>`${line(x)} 残り${n1(lim-x.max)}h`).join('　')}</span></div>`:'');
 }
 // 休憩：理想人数に対して人が一番余っている時間帯に入れる。同じポジションの休憩はなるべく重ねない。
@@ -1573,8 +1583,8 @@ function vSubmit(){
         :v.st==='paid'?'<span style="font-size:12px">有給を使いたい日です（店長が確認します）</span>'
         :v.st===''?'<span class="muted" style="font-size:12px">未選択（提出しても変わりません）</span>':''}${fixed}</div></div>`}).join('');
   const nOn=Object.values(D.days).filter(v=>v.st==='on'||v.st==='any').length,nAny=Object.values(D.days).filter(v=>v.st==='any').length,nPaid=Object.values(D.days).filter(v=>v.st==='paid').length, hrs=Object.values(D.days).reduce((a,v)=>a+(v.st==='on'&&v.end>v.start?v.end-v.start:0),0);
-  const lab=Object.values(D.days).reduce((a,v)=>a+(v.st==='on'&&v.end>v.start?(v.end-v.start)-breakHours(v.end-v.start):0),0),lim=set().limit28;
-  const warn=s?.limit28?(lab>lim?`<div class="alert28" role="alert"><b>週${lim}時間を超えています</b><span>この週の労働時間（休憩を除く）が ${n1(lab)}時間 です。留学生の方は${lim}時間以内になるよう、日数か時間を減らしてください。</span></div>`:
+  const lab=Object.values(D.days).reduce((a,v)=>a+(v.st==='on'&&v.end>v.start?h28Span(v.start,v.end):0),0),lim=set().limit28;
+  const warn=s?.limit28?(lab>lim?`<div class="alert28" role="alert"><b>週${lim}時間を超えています</b><span>この週の時間（${brk28()?'休憩込み':'休憩を除く'}）が ${n1(lab)}時間 です。留学生の方は${lim}時間以内になるよう、日数か時間を減らしてください。</span></div>`:
     `<div class="alert28 near" style="background:var(--sunk);color:var(--fg)"><span>留学生の方は週${lim}時間まで：この週は 労働 <b class="num">${n1(lab)}h</b>（あと ${n1(lim-lab)}h）</span></div>`):'';
   return `<section class="panel" style="max-width:760px;margin:0 auto;width:100%">
     <div class="bar"><h2>シフト提出</h2><div class="weeknav"><button class="btn sm" data-act="swk" data-n="-7" aria-label="前の週">‹</button><span class="lbl">${md(wk)}–${md(addDays(wk,6))}</span><button class="btn sm" data-act="swk" data-n="7" aria-label="次の週">›</button></div>
@@ -2691,7 +2701,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.67'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.68'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2902,7 +2912,7 @@ function vBulk(page){
   if(!S.bulk||S.bulk.week!==S.week||!S.staff[S.bulk.sid])S.bulk=bulkInit(S.bulk&&S.staff[S.bulk.sid]?S.bulk.sid:list.find(s=>s.kind!=='社員')?.id||list[0].id);
   const B=S.bulk,s=S.staff[B.sid],dates=weekDates(S.week),open=S.bulkOpen!=null?S.bulkOpen:true;
   const has=sid=>dates.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===sid&&!x.gen));
-  const ov28=()=>{const o={};for(const [d0,v0] of Object.entries(B.days))o[d0]=v0.st==='on'&&v0.end>v0.start?(v0.end-v0.start)-breakHours(v0.end-v0.start):v0.st==='paid'&&set().paid28?Number(v0.h)||0:0;return o};
+  const ov28=()=>{const o={};for(const [d0,v0] of Object.entries(B.days))o[d0]=v0.st==='on'&&v0.end>v0.start?h28Span(v0.start,v0.end):v0.st==='paid'&&set().paid28?Number(v0.h)||0:0;return o};
   const rows=dates.map(dt=>{const v=B.days[dt]||{st:''},w=wd(dt);
     const emp=s.kind==='社員';
     const seg=[['on',emp?'出勤（固定）':'出勤'],['off',emp?'公休希望':'休み'],['paid','有給']].map(([k,l])=>`<button class="${k==='on'?'on':k==='off'?'off':''}" data-act="bday" data-d="${dt}" data-v="${k}" aria-pressed="${v.st===k}"${k==='paid'&&v.st==='paid'?' style="background:var(--ink);color:var(--surface)"':''}>${l}</button>`).join('');
@@ -2915,7 +2925,7 @@ function vBulk(page){
     return `<div class="sub-day"><div class="dl"><span class="w ${w===6?'w-sat':w===0?'w-sun':w===5?'w-fri':''}" style="display:inline-block;min-width:1.6em;text-align:center;border-radius:3px">${WD[w]}</span> ${md(dt)}</div><div class="seg" role="group" aria-label="${md(dt)}">${seg}</div><div class="tm">${tm}${capTx}</div></div>`}).join('');
   const lab=Object.values(B.days).reduce((a,v)=>a+(v.st==='on'&&v.end>v.start?(v.end-v.start)-breakHours(v.end-v.start):0),0);
   const ph=Object.values(B.days).reduce((a,v)=>a+(v.st==='paid'?Number(v.h)||0:0),0),lim=Number(set().limit28);
-  const ov={};for(const [dt,v] of Object.entries(B.days))ov[dt]=v.st==='on'&&v.end>v.start?(v.end-v.start)-breakHours(v.end-v.start):v.st==='paid'&&set().paid28?Number(v.h)||0:0;
+  const ov={};for(const [dt,v] of Object.entries(B.days))ov[dt]=v.st==='on'&&v.end>v.start?h28Span(v.start,v.end):v.st==='paid'&&set().paid28?Number(v.h)||0:0;
   const rm=s.limit28?rollMax(B.sid,dates[0],addDays(dates[6],6),ov):{m:0,at:null};
   const dirty=JSON.stringify(B.days)!==B.orig;
   return `<section class="panel" id="bulkForm"><div style="display:grid;gap:10px">
@@ -2924,7 +2934,7 @@ function vBulk(page){
       <select id="bS" aria-label="まとめて入れる開始">${tOptions(S.bulkT?.[0]??17,8,31.5)}</select>〜<select id="bE" aria-label="まとめて入れる終了">${tOptions(S.bulkT?.[1]??23.5,8.5,32)}</select><button class="btn sm" data-act="bTime">出勤日にこの時間</button></span></div>
     <div>${rows}</div>
     <div class="bar"><span class="muted">労働 ${n1(lab)}h${ph?`・有給 ${n1(ph)}h`:''}</span>
-      ${s.limit28?`<span class="pill ${rm.m>lim?'bad':rm.m>lim-3?'warn':'good'}" title="前後の週も含めて、どの連続7日間で見ても${lim}時間以内かを見ています">${rm.m>lim?`7日間で${n1(rm.m)}h（${md(addDays(rm.at,-6))}〜${md(rm.at)}）${n1(rm.m-lim)}h超過`:`どの7日間でも最大${n1(rm.m)}h・あと${n1(lim-rm.m)}h入れられます`}</span>`:''}
+      ${s.limit28?`<span class="pill ${lv28(lim-rm.m)}" title="前後の週も含めて、どの連続7日間で見ても${lim}時間以内かを見ています">${rm.m>lim?`7日間で${n1(rm.m)}h（${md(addDays(rm.at,-6))}〜${md(rm.at)}）${n1(rm.m-lim)}h超過`:`どの7日間でも最大${n1(rm.m)}h・あと${n1(lim-rm.m)}h入れられます`}</span>`:''}
       <span style="margin-left:auto" class="bar"><button class="btn" data-act="bSave"${dirty?'':' disabled'}>登録</button><button class="btn pri" data-act="bSaveNext">登録して次の人へ</button></span></div>
     <p class="hint" style="margin:0">${s.kind==='社員'?'毎週、届いた公休希望の日に「公休希望」を押して登録してください。「出勤（固定）」＝決め打ち、「公休希望」＝第2優先。何も押していない日は、週の出勤日数に合わせて自動で決まります。すでに社員シフトを自動作成した週は、登録すると希望に合わせて組み直します。':'出勤の時間は「希望」としても記録されます。「固定」を押した日は、28時間や人件費の自動調整でも動かしません。'}</p>
     </div></section>`;
@@ -3437,29 +3447,29 @@ function empOT(){
 /* --- 28h --- */
 function v28(){
   const st=set(),lim=Number(st.limit28),list=staffList().filter(s=>s.limit28),wk=S.week,ds=weekDates(wk),nx=weekDates(addDays(wk,7)),all=[...ds,...nx];
-  const head=`<div class="bar"><h2>28時間管理</h2>${weekNav()}<span class="hint">留学生は、どの連続7日間でも${lim}時間まで（月や週をまたいでも）。${st.paid28?'有給も含めて':'労働時間（休憩を除く）で'}数えています</span></div>`;
+  const head=`<div class="bar"><h2>28時間管理</h2>${weekNav()}<span class="hint">留学生は、どの連続7日間でも${lim}時間まで（月や週をまたいでも）。${how28()}</span></div>`;
   if(!list.length)return `<section class="panel">${head}<div class="empty">28時間管理の対象者がいません。「マスタ → 名簿」で「留学生」にチェックを入れてください。</div></section>`;
   const f=sid=>hoursFn(sid);
-  const D=list.map(s=>{const h=all.map(dt=>f(s.id)(dt)),R=rollMax(s.id,ds[0],addDays(ds[6],6)),left=lim-R.m,wkH=h.slice(0,7).reduce((a,b)=>a+b,0),nxH=h.slice(7).reduce((a,b)=>a+b,0);
-    const win=R.at?new Set(Array.from({length:7},(_,k)=>addDays(R.at,-k))):new Set();return {s,h,R,left,wkH,nxH,win}}).sort((a,b)=>a.left-b.left);
-  const lvl=x=>x.left<0?'bad':x.left<=3?'warn':'good',word=x=>x.left<0?`${n1(-x.left)}時間オーバー`:x.left<=3?'あとわずか':'余裕あり';
-  const nOver=D.filter(x=>x.left<0).length,nNear=D.filter(x=>x.left>=0&&x.left<=3).length;
+  const D=list.map(s=>{const h=all.map(dt=>f(s.id)(dt)),cut=all.map(dt=>cut28(dt,s.id)),R=rollMax(s.id,ds[0],addDays(ds[6],6)),left=lim-R.m,wkH=h.slice(0,7).reduce((a,b)=>a+b,0),nxH=h.slice(7).reduce((a,b)=>a+b,0);
+    const win=R.at?new Set(Array.from({length:7},(_,k)=>addDays(R.at,-k))):new Set();return {s,h,cut,R,left,wkH,nxH,win}}).sort((a,b)=>a.left-b.left);
+  const A28=Number(st.alert28??1),W28=Number(st.warn28??2),lvl=x=>lv28(x.left),word=x=>x.left<0?`${n1(-x.left)}時間オーバー`:lvl(x)==='bad'?`残り${n1(A28)}時間を切りました`:lvl(x)==='warn'?'あとわずか':'余裕あり';
+  const nOver=D.filter(x=>lvl(x)==='bad').length,nNear=D.filter(x=>lvl(x)==='warn').length;
   const sum=`<div class="kpis"><div class="kpi"><span class="k">対象の留学生</span><span class="v">${D.length}人</span></div>
-    <div class="kpi ${nOver?'bad':''}"><span class="k">28時間を超えている</span><span class="v" style="color:${nOver?'var(--bad)':'inherit'}">${nOver}人</span></div>
-    <div class="kpi"><span class="k">残り3時間以下</span><span class="v" style="color:${nNear?'var(--warn)':'inherit'}">${nNear}人</span></div></div>`;
+    <div class="kpi ${nOver?'bad':''}"><span class="k">超過・残り${n1(A28)}時間未満</span><span class="v" style="color:${nOver?'var(--bad)':'inherit'}">${nOver}人</span></div>
+    <div class="kpi"><span class="k">残り${n1(W28)}時間未満</span><span class="v" style="color:${nNear?'var(--warn)':'inherit'}">${nNear}人</span></div></div>`;
   const card=x=>{const c=lvl(x),pct=Math.min(100,x.R.m/lim*100);
     return `<div class="h28c ${c}"><div class="h28top"><b>${esc(x.s.name)}</b><span class="pill ${c}">${word(x)}</span></div>
       <div class="h28big"><span class="k">残り</span><span class="v">${x.left<0?'−'+n1(-x.left):n1(x.left)}<small>時間</small></span></div>
       <div class="h28bar"><i style="width:${pct}%"></i><b style="left:100%"></b></div>
       <div class="muted" style="font-size:12px">一番多い7日間：<b style="color:var(--fg)">${n1(x.R.m)}h</b>${x.R.at?`（${md(addDays(x.R.at,-6))}〜${md(x.R.at)}）`:''}</div>
-      <div class="h28days">${ds.map((dt,i)=>`<span class="${x.h[i]?'on':''}${x.win.has(dt)?' w':''}" title="${md(dt)} ${n1(x.h[i])}h／この日にあと${n1(Math.max(0,capOn(x.s.id,dt)))}h入れられます"><i>${WD[wd(dt)]}</i>${x.h[i]?n1(x.h[i]):'—'}</span>`).join('')}</div>
-      <div class="muted" style="font-size:12px">この週 ${n1(x.wkH)}h ／ 次の週 ${n1(x.nxH)}h</div></div>`};
+      <div class="h28days">${ds.map((dt,i)=>`<span class="${x.h[i]?'on':''}${x.win.has(dt)?' w':''}" title="${md(dt)} ${n1(x.h[i])}h${x.cut[i]?`（調整で${n1(x.cut[i])}hカット済み）`:''}／この日にあと${n1(Math.max(0,capOn(x.s.id,dt)))}h入れられます"><i>${WD[wd(dt)]}</i>${x.h[i]?n1(x.h[i]):'—'}${x.cut[i]?'<em class="cut28">カット</em>':''}</span>`).join('')}</div>
+      <div class="muted" style="font-size:12px">この週 ${n1(x.wkH)}h ／ 次の週 ${n1(x.nxH)}h${x.cut.slice(0,7).some(Boolean)?`・カット ${n1(x.cut.slice(0,7).reduce((a,b)=>a+b,0))}h（反映済み）`:''}</div></div>`};
   const tbl=`<details${S.h28Open?' open':''} id="h28Det"><summary style="cursor:pointer;font-weight:700;font-size:13px">2週間の表で見る（${md(ds[0])}〜${md(nx[6])}）</summary>
     <div class="scroll" style="margin-top:6px"><table class="t ewk"><thead><tr><th>名前</th>${all.map((dt,i)=>`<th style="${i===7?'border-left:2px solid var(--muted)':''}">${WD[wd(dt)]}<br>${md(dt)}</th>`).join('')}<th class="r">この週</th><th class="r">次の週</th><th class="r">残り</th></tr></thead><tbody>
-    ${D.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${x.win.has(all[i])?' w28':''}" style="${i===7?'border-left:2px solid var(--muted)':''}">${v?n1(v):'<span class="muted">—</span>'}</td>`).join('')}<td class="num"><b>${n1(x.wkH)}</b></td><td class="num">${n1(x.nxH)}</td><td class="num" style="font-weight:700;color:var(--${lvl(x)})">${x.left<0?'−'+n1(-x.left):n1(x.left)}h</td></tr>`).join('')}</tbody></table></div>
+    ${D.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${x.win.has(all[i])?' w28':''}" style="${i===7?'border-left:2px solid var(--muted)':''}"${x.cut[i]?` title="調整で${n1(x.cut[i])}hカット済み"`:''}>${v?n1(v):'<span class="muted">—</span>'}${x.cut[i]?'<em class="cut28">カット</em>':''}</td>`).join('')}<td class="num"><b>${n1(x.wkH)}</b></td><td class="num">${n1(x.nxH)}</td><td class="num" style="font-weight:700;color:var(--${lvl(x)})">${x.left<0?'−'+n1(-x.left):n1(x.left)}h</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">色のついたマスは、その人の「一番多い7日間」です。マスに指を乗せると、その日にあと何時間入れられるかが出ます。</p></details>`;
   return `<section class="panel">${head}${sum}<div class="h28grid">${D.map(card).join('')}</div>${tbl}
-    <p class="hint">残り＝${lim}時間 −（この週を含む、一番多い連続7日間の合計）。緑＝余裕あり、黄＝残り3時間以下、赤＝超えています。超えている人は「シフト作成 → 3 28時間の修正」で自動で短くできます。</p></section>`;
+    <p class="hint">残り＝${lim}時間 −（この週を含む、一番多い連続7日間の合計）。緑＝余裕あり、黄＝残り${n1(W28)}時間未満、赤＝残り${n1(A28)}時間未満または超えています。「カット」は調整で短くした日で、カット後の時間で数えています。超えている人は「シフト作成 → 3 28時間の修正」で自動で短くできます。</p></section>`;
 }
 
 /* --- 交通費算出 --- */
@@ -3488,7 +3498,7 @@ function vSettings(){
     <td><div class="swatches">${COLORS.map(c=>`<button class="sw" style="--pc:var(--p-${c})" data-act="pcolor" data-i="${i}" data-c="${c}" aria-pressed="${p.color===c}" aria-label="${c}"></button>`).join('')}</div></td>
     <td><select data-pf="kind" data-i="${i}" aria-label="扱い"><option value="work"${p.kind==='work'?' selected':''}>人数集計に入れる</option><option value="free"${p.kind==='free'?' selected':''}>フリー（人数に入る・足りないポジションに回せる）</option><option value="help"${p.kind==='help'?' selected':''}>ヘルプ（他店へ・自店に含めない）</option><option value="other"${p.kind==='other'?' selected':''}>会議・その他（決め打ち・人数に数えない）</option><option value="off"${p.kind==='off'?' selected':''}>休み</option></select></td>
     <td><button class="del" data-act="delPos" data-i="${i}" aria-label="${esc(p.name)}を削除">×</button></td></tr>`).join('');
-  const num=(f,l,step=1)=>`<label class="field"><span>${l}</span><input type="number" step="${step}" id="s_${f}" data-sset="${f}" value="${st[f]}"></label>`;
+  const num=(f,l,step=1)=>`<label class="field"><span>${l}</span><input type="number" step="${step}" id="s_${f}" data-sset="${f}" value="${st[f]??DEFAULT_SETTINGS[f]??''}"></label>`;
   const cur=S.stores[S.store]||{};
   const storeSec=`<section class="panel"><h2>店舗とパスワード</h2>
     <div class="bar"><label class="field"><span>店舗名</span><span class="bar"><input type="text" id="stName" value="${esc(cur.name)}"><button class="btn sm" data-act="saveStoreName">保存</button></span></label>
@@ -3531,7 +3541,8 @@ function vSettings(){
     <div class="bar">${num('minShift','調整後も残す最短勤務（h）',0.5)}${num('fairMaxDay','公平：1日で削る上限（h）',0.5)}${num('fairMaxRatio','公平：週で削る上限（希望の%）',5)}<label style="font-size:13px"><input type="checkbox" id="adjEmp"${st.adjustEmployees?' checked':''}> 社員も調整の対象にする</label></div>
     <p class="hint">「シフト作成」の「目標に合わせる」は、売上予算×目標人件費率を上限に、時間帯ごとの理想人数を下回らない範囲でだけ勤務を短くします。</p></section>
   <section class="panel"><h2>計算ルール</h2>
-    <div class="kpis">${num('border','社員ボーダー（週h）',0.5)}${num('limit28','28h管理の上限（h）',0.5)}
+    <div class="kpis">${num('border','社員ボーダー（週h）',0.5)}${num('limit28','28h管理の上限（h）',0.5)}${num('warn28','28h：黄色にする残り（h未満）',0.5)}${num('alert28','28h：警告にする残り（h未満）',0.5)}
+    <label style="font-size:13px;align-self:end"><input type="checkbox" id="brk28"${st.brk28!==false?' checked':''}> 28時間は休憩込みで数える</label>
     <label class="field"><span>立ち上げの時刻（空欄＝その日一番早い出勤）</span><input type="number" step="0.5" min="0" max="31" id="s_openAt" data-ocset="openAt" value="${st.openAt??''}" placeholder="例 11"></label>
     <label class="field"><span>締めの時刻（空欄＝その日一番遅い退勤）</span><input type="number" step="0.5" min="0" max="31" id="s_closeAt" data-ocset="closeAt" value="${st.closeAt??''}" placeholder="例 23.5"></label>
     ${num('brk1At','休憩1：勤務がこの時間以上',0.5)}${num('brk1','→ 休憩（h）',0.25)}${num('brk2Over','休憩2：勤務がこの時間超',0.5)}${num('brk2','→ 休憩（h）',0.25)}
@@ -3568,6 +3579,7 @@ app.addEventListener('change',e=>{
   if(el.id==='reqPick'){if(S.bulk&&JSON.stringify(S.bulk.days)!==S.bulk.orig)bulkSave();S.bulk=bulkInit(el.value);return render()}
   if(el.id==='bS'||el.id==='bE'){S.bulkT=[Number(document.getElementById('bS').value),Number(document.getElementById('bE').value)];return}
   if(el.dataset.bf){const v=S.bulk.days[el.dataset.d];v[el.dataset.bf]=el.value===''?null:Number(el.value);return render()}
+  if(el.id==='brk28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.brk28=el.checked;saveSettings();return render()}
   if(el.id==='paid28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.paid28=el.checked;saveSettings();return render()}
   if(el.dataset.subf){const v=S.draft.days[el.dataset.d];v[el.dataset.subf]=el.value===''?null:Number(el.value);S.draft.dirty=true;return render()}
   if(f&&S.tab==='shift'&&!['monthStart','monthEnd','fareDate','h28Start','me','subNote','budget','note','memo','ideal','posIdeal'].includes(f)&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return render()}
@@ -3918,7 +3930,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v79';
+  const APP_SW='v80';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
