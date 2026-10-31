@@ -232,8 +232,10 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
-.h28days span.on{color:var(--fg)}.cut28{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--warn);line-height:1.1}td .cut28{display:block;margin:1px 0 0}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
-.pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span.f{background:var(--p-violet);font-weight:700}
+.h28days span.on{color:var(--fg)}.paid28{display:block;font-style:normal;font-size:9px;font-weight:700;color:#7a4fb5;line-height:1.1}td .paid28{margin:1px 0 0}
+.cut28{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--warn);line-height:1.1}td .cut28{display:block;margin:1px 0 0}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
+.pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span small{margin-left:3px;font-size:10px;color:#7a4fb5;font-weight:700}
+.pdays span.f{background:var(--p-violet);font-weight:700}
 .pedit{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:12px}.pedit label{display:grid;gap:2px}
 .ewk td.w28{background:var(--warn-bg)}
 .rcimgs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.rcimg{position:relative;width:84px;border:1px solid var(--line);border-radius:8px;padding:4px;background:var(--surface);display:grid;gap:3px}.rcimg img{width:100%;height:110px;object-fit:cover;object-position:top;border-radius:4px;background:#fff}
@@ -490,7 +492,7 @@ const DEFAULT_SETTINGS = {
   nightFrom: 22, nightTo: 29,
   peakFrom: 16, peakTo: 23,
   targetRate: {1:22,2:22,3:22,4:22,5:22,6:22,0:22}, rateMode: 'month', monthRate: 24, budgetWeights: {1:1,2:1,3:1,4:1,5:1.27,6:1.27,0:1.18},
-  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: false, brk28: false, warn28: 2, alert28: 1, minEmp: 2,
+  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: true, brk28: false, warn28: 2, alert28: 1, minEmp: 2,
   dailyOT: 8, weeklyOT: 40, nightRate: 0.25, otMode: 'dw'
 };
 const COLORS = ['yellow','blue','green','teal','pink','red','violet','gray','orange'];
@@ -817,6 +819,19 @@ function calcDay(date){
 }
 function laborOf(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid)h+=calcShift(sh).labor;return h}
 function costOf(date,sid){let c=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid)c+=calcShift(sh).cost;return c}
+// 有給の暫定時間：その日より前の直近4週間（なければ8週間）に出勤した日の平均（休憩を引いた時間）。シフト表で時間を入れたらその時間を使う
+function paidEst(sid,date){for(const span of [28,56]){let tot=0,n=0;for(let k=1;k<=span;k++){const d=addDays(date,-k);let l=0;for(const r of dayDoc(d).shifts||[])if(r.sid===sid){const c=calcShift(r);if(c.on)l+=c.labor}if(l>0){tot+=l;n++}}
+    if(n)return {h:Math.round(tot/n*4)/4,n,span}}
+  const s=S.staff[sid];if(s&&Number(s.paidDayH))return {h:Number(s.paidDayH),n:0,span:0};
+  if(s&&s.defStart!=null&&s.defEnd!=null&&s.defEnd>s.defStart){const w=s.defEnd-s.defStart;return {h:w-breakHours(w),n:0,span:0}}
+  return {h:0,n:0,span:0}}
+function setPaidAuto(sh,date){sh.paidAuto=true;sh.paidH=paidEst(sh.sid,date).h}
+// 時間が入っていない有給・暫定の有給は、直近の勤務から時間を入れ直す（過ぎた日は1度決まったらそのまま）
+function healPaid(){try{if(S.role!=='manager')return;if(S.settings&&!S.settings.paid28v){S.settings.paid28v=1;S.settings.paid28=true;saveSettings()}
+  for(const [dt,d] of Object.entries(S.days||{})){let ch=false;for(const sh of d.shifts||[]){if(sh.pos!==PAID||!sh.sid)continue;
+      if(sh.paidH==null||sh.paidH===''||(sh.paidAuto&&dt>=today)){const old=sh.paidH,oa=sh.paidAuto;setPaidAuto(sh,dt);if(old!==sh.paidH||oa!==true)ch=true}}
+    if(ch)saveDay(dt)}}catch(e){console.error(e)}}
+const paidAutoOn=(date,sid)=>(dayDoc(date).shifts||[]).some(x=>x.sid===sid&&x.pos===PAID&&x.paidAuto);
 function paidOf(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid&&sh.pos===PAID)h+=Math.max(0,Number(sh.paidH)||0);return h}
 function paidUsed(s,from,to){let h=0,days=[];for(const [dt,d] of Object.entries(S.days)){if((from&&dt<from)||(to&&dt>to))continue;for(const sh of d.shifts||[])if(sh.sid===s.id&&sh.pos===PAID){h+=Math.max(0,Number(sh.paidH)||0);days.push(dt)}}return {h,days:days.sort()}}
 function worked(date,sid){return (dayDoc(date).shifts||[]).some(sh=>sh.sid===sid&&calcShift(sh).on)}
@@ -1319,7 +1334,8 @@ function h28Day(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.
 function cut28(date,sid){let c=0;for(const sh of dayDoc(date).shifts||[]){if(sh.sid!==sid||!sh.req||sh.req.off||sh.req.paid||sh.req.start==null||sh.req.end==null)continue;const c0=calcShift(sh),r=sh.req.end-sh.req.start,n=c0.on?sh.end-sh.start:0;if(r>n+1e-9)c+=r-n}return c}
 // 残りの色：黄＝残りが warn28 時間を切った、赤＝alert28 時間を切った／超えた
 const lv28=left=>{const st=set(),a=Number(st.alert28??1),w=Number(st.warn28??2);return left<0||left<a?'bad':left<w?'warn':'good'};
-const how28=()=>`${brk28()?'休憩込み（出勤〜退勤の時間）':'休憩を引いた労働時間'}${set().paid28?'・有給も含めて':''}で数えています。調整でカットした日はカット後の時間です`;
+const pm28=(dt,sid)=>{const p=paidOf(dt,sid);return p?`<em class="paid28">有給${paidAutoOn(dt,sid)?'（暫定）':''}${set().paid28?'':'・数えない'}</em>`:''};
+const how28=()=>`${brk28()?'休憩込み（出勤〜退勤の時間）':'休憩を引いた労働時間'}${set().paid28?'。有給は「有給」と表示して時間に含めています（時間を入れていない有給は直近4週間の平均で暫定）':''}。調整でカットした日はカット後の時間です`;
 function hoursFn(sid,ov){const p=set().paid28;return dt=>ov&&Object.prototype.hasOwnProperty.call(ov,dt)?ov[dt]:h28Day(dt,sid)+(p?paidOf(dt,sid):0)}
 function roll7(sid,end,ov){const f=hoursFn(sid,ov);let h=0;for(let k=0;k<7;k++)h+=f(addDays(end,-k));return h}
 function rollMax(sid,from,to,ov){let m=0,at=null;for(let e=from;e<=to;e=addDays(e,1)){const h=roll7(sid,e,ov);if(h>m){m=h;at=e}}return {m,at}}
@@ -1341,7 +1357,7 @@ function intlWeekPanel(date,compact){const list=staffList().filter(s=>s.limit28)
   const col=x=>`var(--${lv28(x.left)})`;
   return `<section class="panel" style="padding:10px 14px"${compact?'':''}><div class="bar"><h2 style="font-size:16px">留学生の労働時間（週${lim}時間まで）</h2><span class="hint">${how28()}。「カット−」は調整で短くした時間（上の数字はカット後・休憩を引いた時間）。赤い枠の列は今開いている日です。「連続7日の最大」は前後の週もまたいだ一番多い7日間です</span></div>
     <div class="scroll"><table class="t ewk"><thead><tr><th>名前</th>${ds.map(dt=>`<th class="${dt===date?'cur':''}">${WD[wd(dt)]} ${md(dt)}</th>`).join('')}<th class="r">この週</th><th style="min-width:120px"></th><th class="r">連続7日の最大</th><th class="r">残り</th></tr></thead><tbody>
-    ${rows.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${ds[i]===date?' cur':''}${v?'':' muted'}"${x.cut[i]?` title="調整で${n1(x.cut[i])}hカット済み"`:''}>${v?n1(v):'—'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}</td>`).join('')}
+    ${rows.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${ds[i]===date?' cur':''}${v?'':' muted'}"${x.cut[i]?` title="調整で${n1(x.cut[i])}hカット済み"`:''}>${v?n1(v):'—'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}${pm28(ds[i],x.s.id)}</td>`).join('')}
       <td class="num"><b>${n1(x.tot)}h</b>${x.ct?`<em class="cut28">カット−${n1(x.ct)}h</em>`:''}</td><td><div class="meter"><i style="width:${Math.min(100,x.tot/lim*100)}%;background:${col(x)}"></i></div></td>
       <td class="num" title="${x.R.at?md(addDays(x.R.at,-6))+'〜'+md(x.R.at):''}">${n1(x.R.m)}h</td><td class="num" style="color:${col(x)};font-weight:700">${x.left<0?`${n1(-x.left)}h 超過`:`${n1(x.left)}h`}</td></tr>`).join('')}
     </tbody></table></div></section>`}
@@ -1441,7 +1457,7 @@ function healPositions(){try{
   miss.forEach((n,i)=>{st.positions.splice(Math.min(3+i,st.positions.length),0,{name:n,color:cols[i%cols.length],kind:'work'});st.summaryOrder.splice(i,0,n)});
   S.settings=st;saveSettings();
 }catch(_){}}
-function render(){healPositions();rateCache.clear();
+function render(){healPositions();healPaid();rateCache.clear();
   const a=document.activeElement;
   if(a&&app.contains(a)&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&!['checkbox','radio','file','button','date','time','month','week'].includes(a.type)))){S.deferRender=true;return}
   S.deferRender=false;
@@ -1616,7 +1632,7 @@ async function submitWeek(){
         if(isOff(row.pos))row.pos=emp?(me.defPos||''):'';
         const s0=emp?Number(me.defStart??12):Number(me.defStart??set().peakFrom??17),e0=emp?Number(me.defEnd??23.5):Number(me.defEnd??23.5);
         if(row.start==null||row.end==null){row.start=s0;row.end=e0}row.req={any:true};row.pin=false}
-      else if(v.st==='paid'){row.pos=PAID;row.start=null;row.end=null;row.paidH=Number(me.paidDayH)||null;row.req={paid:true};row.pin=false}
+      else if(v.st==='paid'){row.pos=PAID;row.start=null;row.end=null;row.paidH=null;row.req={paid:true};row.pin=false}
       else{row.pos=offPos();row.start=null;row.end=null;row.req={off:true};row.pin=false}
       await ref.set(doc);
     }
@@ -1669,7 +1685,7 @@ function vShift(){
     const nm=S.staff[sh.sid];
     return sepRow+`<tr style="${posStyle(sh.pos)}" class="${isEmp(nm)?'emp':''}">
       <td class="stk"><select class="nm" data-f="sid" data-i="${i}" aria-label="名前">${staffOpts(sh.sid)}</select>${newTag(S.staff[sh.sid])}${sh.sid&&c.on?`<button class="pin${sh.pin?' on':''}" data-act="pin" data-i="${i}" title="${sh.pin?'決め打ち中：自動作成・調整で動かしません（押すと解除）':'押すと決め打ち（自動作成・調整で動かさない）'}">${sh.pin?'固定':'固定する'}</button><button class="pin edu${sh.edu?' on':''}" data-act="edu" data-i="${i}" title="${sh.edu?'教育（研修）中：研修費として別に計上し、人件費・人数に含めません（押すと解除）':'押すと教育（研修）にする：研修費として別に計上'}">教育</button>`:''}${sh.gen&&!sh.pin?'<span class="subtag" style="background:var(--ink)" title="社員シフトの自動作成で入れた行">自動</span>':''}${sh.sub?'<span class="subtag" title="アルバイトさんが提出した希望">提出</span>':''}${(()=>{const s=S.staff[sh.sid];if(!s?.limit28||!c.on)return '';let mx=0;for(let k=0;k<7;k++)mx=Math.max(mx,roll7(s.id,addDays(date,k)));const lim=set().limit28;return mx>lim?`<span class="tag28" title="この日を含む7日間で${n1(mx)}時間">28h超</span>`:mx>lim-3?`<span class="tag28 near" title="この日を含む7日間で${n1(mx)}時間">残${n1(lim-mx)}h</span>`:''})()}</td>
-      ${sh.pos===PAID?`<td colspan="2" style="white-space:nowrap;padding:0 4px"><input type="number" step="0.5" min="0" max="12" data-f="paidH" data-i="${i}" value="${sh.paidH??''}" style="width:64px" aria-label="有給の時間"> h</td>`:
+      ${sh.pos===PAID?`<td colspan="2" style="white-space:nowrap;padding:0 4px"><input type="number" step="0.5" min="0" max="12" data-f="paidH" data-i="${i}" value="${sh.paidAuto?'':(sh.paidH??'')}" placeholder="${sh.paidAuto&&sh.paidH!=null?'暫定'+n1(sh.paidH):'自動'}" style="width:64px" aria-label="有給の時間"> h</td>`:
       `<td><select class="t" data-f="start" data-i="${i}" aria-label="開始">${tOptions(sh.start,8,31.5)}</select></td>
       <td><select class="t" data-f="end" data-i="${i}" aria-label="終了">${tOptions(sh.end,8.5,32)}</select></td>`}
       <td><select class="pos" data-f="pos" data-i="${i}" aria-label="ポジション">${posOpts(sh.pos)}</select></td>
@@ -2701,37 +2717,29 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.70'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.71'}</p></section>`;
 }
 
 /* --- 有給 --- */
 function vPaid(){
-  const st=set(),list=staffList(true).filter(s=>s.active!==false),ym=today.slice(0,7);
-  const info=s=>{const from=s.paidGrantDate||'',u=paidUsed(s,from||null,null),grant=Number(s.paidGrant)||0,dayH=Number(s.paidDayH)||8;
-    const past=u.days.filter(d=>d<today),fut=u.days.filter(d=>d>=today),hOf=ds=>ds.reduce((a,d)=>a+paidOf(d,s.id),0);
-    const usedH=hOf(past),planH=hOf(fut),left=grant-u.h,exp=from?addDays(from,730):'',mon=hOf(u.days.filter(d=>d.slice(0,7)===ym));
-    return {s,from,grant,dayH,past,fut,usedH,planH,left,exp,mon,total:u.h}};
-  const I=list.map(info),withG=I.slice().sort((a,b)=>(a.grant?a.left:1e9)-(b.grant?b.left:1e9)||staffRank(a.s)-staffRank(b.s)),noG=[];
-  const lvl=x=>!x.grant?'':x.left<0?'bad':x.left<=x.dayH?'warn':'good';
-  const sumMon=I.reduce((a,x)=>a+x.mon,0),sumPlan=I.reduce((a,x)=>a+x.planH,0),few=I.filter(x=>x.grant&&x.left<=x.dayH).length;
-  const edit=x=>`<div class="pedit"><label>付与日<input type="date" data-sf="paidGrantDate" data-id="${x.s.id}" value="${esc(x.from)}"></label><label>付与（時間）<input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${x.s.id}" value="${x.s.paidGrant??''}" style="width:80px"></label><label>1日あたり（時間）<input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${x.s.id}" value="${x.s.paidDayH??''}" style="width:70px"></label></div>`;
-  const card=x=>{const c=lvl(x),pct=x.grant?Math.min(100,x.total/x.grant*100):0,pu=x.grant?Math.min(100,x.usedH/x.grant*100):0;
-    return `<div class="h28c ${c}"><div class="h28top"><b>${esc(x.s.name)}</b><span class="pill ${c}">${!x.grant?'付与が未入力':x.left<0?'使いすぎ':x.left<=x.dayH?'残りわずか':'残りあり'}</span></div>
-      <div class="h28big"><span class="k">残り</span><span class="v">${x.grant?n1(x.left):'—'}<small>${x.grant?'時間':''}</small></span>${x.grant?`<span class="muted" style="font-size:13px">約${n1(x.left/x.dayH)}日分</span>`:''}</div>
-      ${x.grant?`<div class="h28bar"><i style="width:${pct}%;opacity:.45"></i><i style="width:${pu}%"></i></div>`:''}
-      <div style="font-size:13px">使った <b>${n1(x.usedH)}h</b>（${x.past.length}日）／ 予定 <b>${n1(x.planH)}h</b>（${x.fut.length}日）${x.grant?` ／ 付与 ${n1(x.grant)}h`:''}</div>
-      ${x.from?`<div class="muted" style="font-size:12px">付与日 ${x.from.replace(/-/g,'/')}　有効期限の目安 ${x.exp.replace(/-/g,'/')}</div>`:''}
-      ${x.past.length||x.fut.length?`<div class="pdays">${[...x.past.slice(-6).map(d=>`<span>${md(d)}</span>`),...x.fut.map(d=>`<span class="f">${md(d)}予定</span>`)].join('')}</div>`:''}
-      ${x.grant?`<details><summary style="cursor:pointer;font-size:12px;color:var(--muted)">付与を直す</summary>${edit(x)}</details>`:`<div class="hint" style="margin:0">付与日と時間を入れると、残りが出ます</div>${edit(x)}`}</div>`};
-  return `<section class="panel"><div class="bar"><h2>有給の管理</h2><span class="hint">時間で管理します。シフト表（またはカレンダー）でポジションを「有給」にすると、ここに数えられます</span></div>
-    <div class="kpis"><div class="kpi"><span class="k">今月使った・使う有給</span><span class="v">${n1(sumMon)}h</span></div><div class="kpi"><span class="k">これからの予定</span><span class="v">${n1(sumPlan)}h</span></div>
-      <div class="kpi"><span class="k">残りが1日分以下の人</span><span class="v" style="color:${few?'var(--warn)':'inherit'}">${few}人</span></div></div>
-    ${withG.length?`<div class="h28grid">${withG.map(card).join('')}</div>`:'<div class="empty">在籍しているスタッフがいません。</div>'}
-    ${noG.length?`<details${S.paidNoOpen||!withG.length?' open':''} id="paidNoDet"><summary style="cursor:pointer;font-weight:700;font-size:13px">付与がまだ入っていない人（${noG.length}人）</summary>
-      <div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>スタッフ</th><th>付与日</th><th class="r">付与（時間）</th><th class="r">1日あたり（時間）</th></tr></thead><tbody>
-      ${noG.map(x=>`<tr><td><b>${esc(x.s.name)}</b>${x.s.limit28?' <span class="tag28 near">留学生</span>':''}</td><td><input type="date" data-sf="paidGrantDate" data-id="${x.s.id}" value="${esc(x.from)}"></td><td class="r"><input type="number" step="0.5" min="0" data-sf="paidGrant" data-id="${x.s.id}" value="${x.s.paidGrant??''}" style="width:80px"></td><td class="r"><input type="number" step="0.5" min="0" data-sf="paidDayH" data-id="${x.s.id}" value="${x.s.paidDayH??''}" style="width:70px"></td></tr>`).join('')}</tbody></table></div></details>`:''}
-    <label style="font-size:13px;font-weight:700"><input type="checkbox" id="paid28"${st.paid28?' checked':''}> 留学生の28時間チェックに有給の時間も含める</label>
-    <p class="hint">残り＝付与 −（付与日以降に登録した有給。使った分＋予定）。黄は残りが1日分以下、赤は付与より多く登録しています。「1日あたり」を入れておくと、有給を選んだときにその時間が自動で入ります。有効期限の目安は付与日から2年です。有給の時間は人件費に含め、労働時間・人時生産性には含めません。</p></section>`;
+  const st=set(),list=staffList(true).filter(s=>s.active!==false),ym=today.slice(0,7),from=addDays(today,-90);
+  const I=list.map(s=>{const u=paidUsed(s,from,null),days=u.days.slice().sort(),past=days.filter(d=>d<today),fut=days.filter(d=>d>=today),hOf=ds=>ds.reduce((a,d)=>a+paidOf(d,s.id),0);
+    return {s,days,past,fut,pastH:hOf(past),futH:hOf(fut),mon:hOf(days.filter(d=>d.slice(0,7)===ym)),monD:days.filter(d=>d.slice(0,7)===ym).length,auto:days.filter(d=>paidAutoOn(d,s.id)).length,est:paidEst(s.id,today)}});
+  const has=I.filter(x=>x.days.length).sort((a,b)=>(a.fut[0]||'9')<(b.fut[0]||'9')?-1:1),none=I.filter(x=>!x.days.length);
+  const sumMon=I.reduce((a,x)=>a+x.mon,0),sumMonD=I.reduce((a,x)=>a+x.monD,0),sumFut=I.reduce((a,x)=>a+x.futH,0),sumFutD=I.reduce((a,x)=>a+x.fut.length,0),nAuto=I.reduce((a,x)=>a+x.auto,0);
+  const chip=(x,d)=>{const h=paidOf(d,x.s.id),au=paidAutoOn(d,x.s.id);return `<span class="${d>=today?'f':''}" title="${au?'直近の勤務から出した暫定の時間です。シフト表で時間を入れると、その時間になります':'シフト表で入れた時間です'}">${md(d)}（${WD[wd(d)]}）${n1(h)}h${au?'<small>暫定</small>':''}</span>`};
+  const card=x=>`<div class="h28c"><div class="h28top"><b>${esc(x.s.name)}</b>${x.s.limit28?'<span class="tag28 near">留学生</span>':''}${x.fut.length?`<span class="pill warn">予定 ${x.fut.length}日</span>`:''}</div>
+      <div style="font-size:13px">今月 <b>${n1(x.mon)}h</b>（${x.monD}日）／ これから <b>${n1(x.futH)}h</b>（${x.fut.length}日）</div>
+      ${x.fut.length?`<div class="pdays">${x.fut.map(d=>chip(x,d)).join('')}</div>`:''}
+      ${x.past.length?`<details><summary style="cursor:pointer;font-size:12px;color:var(--muted)">直近90日に使った有給（${x.past.length}日・${n1(x.pastH)}h）</summary><div class="pdays">${x.past.slice(-10).map(d=>chip(x,d)).join('')}</div></details>`:''}
+      <div class="muted" style="font-size:12px">今日入れた場合の暫定：1日 ${n1(x.est.h)}h${x.est.n?`（直近${x.est.span/7}週間・出勤${x.est.n}日の平均）`:'（直近の出勤がないため、名簿の時間から）'}</div></div>`;
+  return `<section class="panel"><div class="bar"><h2>有給</h2><span class="hint">シフト表（またはカレンダー）でポジションを「有給」にすると、ここに出ます。時間を入れなければ、直近4週間に出勤した日の平均（休憩を引いた時間）を暫定の時間として入れます</span></div>
+    <div class="kpis"><div class="kpi"><span class="k">今月の有給</span><span class="v">${n1(sumMon)}h<small style="font-size:13px">（${sumMonD}日）</small></span></div><div class="kpi"><span class="k">これからの予定</span><span class="v">${n1(sumFut)}h<small style="font-size:13px">（${sumFutD}日）</small></span></div>
+      <div class="kpi"><span class="k">暫定の時間で入っている日</span><span class="v">${nAuto}日</span></div></div>
+    ${has.length?`<div class="h28grid">${has.map(card).join('')}</div>`:'<div class="empty">直近90日とこれからの有給はありません。</div>'}
+    ${none.length?`<p class="hint">有給の登録がない人：${none.map(x=>esc(x.s.name)).join('、')}</p>`:''}
+    <label style="font-size:13px;font-weight:700"><input type="checkbox" id="paid28"${st.paid28?' checked':''}> 28時間管理に有給の時間も含める（「有給」と表示して数えます）</label>
+    <p class="hint">暫定の時間は、その日より前の直近4週間（出勤がなければ8週間）に出勤した日の、休憩を引いた時間の平均です。今日以降の暫定は、シフトが変わると自動で計算し直します。シフト表の有給の行に時間を入れると、その時間で固定されます（空にすると暫定に戻ります）。有給の時間は人件費に含め、労働時間・人時生産性には含めません。</p></section>`;
 }
 
 /* --- 個人別まとめ入力（LINEで回収した希望を1人ずつ一気に） --- */
@@ -2739,7 +2747,7 @@ function bulkInit(sid){
   const days={};
   for(const dt of weekDates(S.week)){const row=(dayDoc(dt).shifts||[]).find(x=>x.sid===sid);
     if(!row||row.gen)days[dt]={st:''};
-    else if(row.pos===PAID)days[dt]={st:'paid',h:row.paidH??null};
+    else if(row.pos===PAID)days[dt]={st:'paid',h:row.paidAuto?null:(row.paidH??null)};
     else if(isOff(row.pos))days[dt]={st:'off'};
     else if(row.start!=null&&row.end!=null){const r=row.req&&row.req.start!=null?row.req:row;days[dt]={st:'on',start:r.start,end:r.end,pin:!!row.pin}}
     else days[dt]={st:''}}
@@ -2951,7 +2959,7 @@ function bulkSave(){
     const emp=S.staff[B.sid]?.kind==='社員';delete row.gen;
     if(v.st==='on'){if(isOff(row.pos))row.pos=emp?(S.staff[B.sid].defPos||''):'';row.start=v.start;row.end=v.end;row.req={start:v.start,end:v.end};row.why='';row.bs=null;row.pin=emp?true:!!v.pin}
     else if(v.st==='off'){row.pos=offPos();row.start=null;row.end=null;row.req={off:true};row.why='';row.pin=false}
-    else{row.pos=PAID;row.paidH=Number(v.h)||0;row.start=null;row.end=null;delete row.req;row.why=''}
+    else{row.pos=PAID;row.start=null;row.end=null;delete row.req;row.why='';if(Number(v.h)>0){row.paidH=Number(v.h);row.paidAuto=false}else setPaidAuto(row,dt)}
     n++;saveDay(dt)}
   B.orig=JSON.stringify(B.days);
   const regen=n&&S.staff[B.sid]?.kind==='社員'&&weekDates(B.week).some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.gen&&S.staff[x.sid]?.kind==='社員'));
@@ -3037,12 +3045,12 @@ function vCal(){
   return `<section class="panel"><div class="bar"><h2>カレンダー</h2>${nav}<span class="hint">日をタップすると、記入・タスク・有給の予定を入れられます</span></div>${cal}</section>
     <div class="ccols">${detail}<div>${tlist}${rsec}</div></div>`}
 // 有給の予定をシフトに入れる
-function addPaid(sid,from,to,h){const s=S.staff[sid];if(!s)throw 'スタッフを選んでください';const hh=h>0?h:Number(s.paidDayH)||8;let n=0,skip=[];
+function addPaid(sid,from,to,h){const s=S.staff[sid];if(!s)throw 'スタッフを選んでください';const hh=h>0?h:null;let n=0,skip=[];const put=(r,dt)=>{if(hh){r.paidH=hh;r.paidAuto=false}else setPaidAuto(r,dt)};
   for(let dt=from;dt<=(to&&to>=from?to:from);dt=addDays(dt,1)){if(n>31)break;if(dayLocked(dt)){skip.push(md(dt)+'（確定）');continue}const d=newDay(dt);d.shifts=d.shifts||[];const i=d.shifts.findIndex(x=>x.sid===sid);
-    if(i>=0&&d.shifts[i].pos===PAID){d.shifts[i].paidH=hh;saveDay(dt);n++;continue}
+    if(i>=0&&d.shifts[i].pos===PAID){put(d.shifts[i],dt);saveDay(dt);n++;continue}
     if(i>=0&&!d.shifts[i].gen&&calcShift(d.shifts[i]).on){skip.push(md(dt));continue}
-    const row={sid,start:null,end:null,pos:PAID,paidH:hh,bs:null};if(i>=0)d.shifts[i]=row;else d.shifts.push(row);saveDay(dt);n++}
-  return `${s.name}さんの有給を${n}日登録しました（1日${n1(hh)}時間）${skip.length?`。${skip.join('、')}は出勤が入っているので入れていません`:''}`}
+    const row={sid,start:null,end:null,pos:PAID,paidH:null,bs:null};put(row,dt);if(i>=0)d.shifts[i]=row;else d.shifts.push(row);saveDay(dt);n++}
+  return `${s.name}さんの有給を${n}日登録しました（${hh?`1日${n1(hh)}時間`:'時間は直近の勤務から暫定で計算'}）${skip.length?`。${skip.join('、')}は出勤が入っているので入れていません`:''}`}
 /* ---------- 月間予算：1か月分の売上予算を先に入れる ----------
  月の合計を曜日の比率で振り分けるか、日ごとに直接入れる。保存先は各日の売上予算（シフト作成の売上予算と同じ） */
 const ymOf=d=>d.slice(0,7);
@@ -3375,7 +3383,7 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
       if(c.on){l+=c.labor;on=true;brk+=c.brk;st0=st0==null?r.start:Math.min(st0,r.start);en0=en0==null?r.end:Math.max(en0,r.end)}else if(isOther(r.pos))meet=r.pos}
     const fut=d>=today,f=fut?'fu':'ac';
     if(on||paidH){cum[e.id]+=l+paidH;
-      return `<td class="num ${f} s0">${on?tLabel(st0):''}</td><td class="num ${f}">${on?tLabel(en0):''}</td><td class="num ${f}">${on?(brk?Math.round(brk*60)+'分':'0'):''}</td><td class="num ${f} s1">${on?`<b>${n1(l)}</b>`:''}${paidH?`<span class="pd">有${n1(paidH)}</span>`:''}<div class="cu">${n1(cum[e.id])}</div></td>`}
+      return `<td class="num ${f} s0">${on?tLabel(st0):''}</td><td class="num ${f}">${on?tLabel(en0):''}</td><td class="num ${f}">${on?(brk?Math.round(brk*60)+'分':'0'):''}</td><td class="num ${f} s1">${on?`<b>${n1(l)}</b>`:''}${paidH?`<span class="pd"${paidAutoOn(d,e.id)?' title="直近の勤務から出した暫定の時間"':''}>有給${n1(paidH)}${paidAutoOn(d,e.id)?'暫':''}</span>`:''}<div class="cu">${n1(cum[e.id])}</div></td>`}
     if(off)return `<td class="of s0 s1" colspan="4">${esc(off)}</td>`;
     if(meet)return `<td class="mu s0 s1" colspan="4">${esc(meet)}</td>`;
     return fut?'<td class="un s0 s1" colspan="4">未定</td>':'<td class="mu s0 s1" colspan="4">—</td>'};
@@ -3462,11 +3470,11 @@ function v28(){
       <div class="h28big"><span class="k">残り</span><span class="v">${x.left<0?'−'+n1(-x.left):n1(x.left)}<small>時間</small></span></div>
       <div class="h28bar"><i style="width:${pct}%"></i><b style="left:100%"></b></div>
       <div class="muted" style="font-size:12px">一番多い7日間：<b style="color:var(--fg)">${n1(x.R.m)}h</b>${x.R.at?`（${md(addDays(x.R.at,-6))}〜${md(x.R.at)}）`:''}</div>
-      <div class="h28days">${ds.map((dt,i)=>`<span class="${x.h[i]?'on':''}${x.win.has(dt)?' w':''}" title="${md(dt)} ${n1(x.h[i])}h${x.cut[i]?`（調整で${n1(x.cut[i])}hカット済み）`:''}／この日にあと${n1(Math.max(0,capOn(x.s.id,dt)))}h入れられます"><i>${WD[wd(dt)]}</i>${x.h[i]?n1(x.h[i]):'—'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}</span>`).join('')}</div>
+      <div class="h28days">${ds.map((dt,i)=>`<span class="${x.h[i]?'on':''}${x.win.has(dt)?' w':''}" title="${md(dt)} ${n1(x.h[i])}h${x.cut[i]?`（調整で${n1(x.cut[i])}hカット済み）`:''}／この日にあと${n1(Math.max(0,capOn(x.s.id,dt)))}h入れられます"><i>${WD[wd(dt)]}</i>${x.h[i]?n1(x.h[i]):'—'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}${pm28(dt,x.s.id)}</span>`).join('')}</div>
       <div class="muted" style="font-size:12px">この週 ${n1(x.wkH)}h ／ 次の週 ${n1(x.nxH)}h${x.cut.slice(0,7).some(Boolean)?`・カット ${n1(x.cut.slice(0,7).reduce((a,b)=>a+b,0))}h（反映済み）`:''}</div></div>`};
   const tbl=`<details${S.h28Open?' open':''} id="h28Det"><summary style="cursor:pointer;font-weight:700;font-size:13px">2週間の表で見る（${md(ds[0])}〜${md(nx[6])}）</summary>
     <div class="scroll" style="margin-top:6px"><table class="t ewk"><thead><tr><th>名前</th>${all.map((dt,i)=>`<th style="${i===7?'border-left:2px solid var(--muted)':''}">${WD[wd(dt)]}<br>${md(dt)}</th>`).join('')}<th class="r">この週</th><th class="r">次の週</th><th class="r">残り</th></tr></thead><tbody>
-    ${D.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${x.win.has(all[i])?' w28':''}" style="${i===7?'border-left:2px solid var(--muted)':''}"${x.cut[i]?` title="調整で${n1(x.cut[i])}hカット済み"`:''}>${v?n1(v):'<span class="muted">—</span>'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}</td>`).join('')}<td class="num"><b>${n1(x.wkH)}</b></td><td class="num">${n1(x.nxH)}</td><td class="num" style="font-weight:700;color:var(--${lvl(x)})">${x.left<0?'−'+n1(-x.left):n1(x.left)}h</td></tr>`).join('')}</tbody></table></div>
+    ${D.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${x.win.has(all[i])?' w28':''}" style="${i===7?'border-left:2px solid var(--muted)':''}"${x.cut[i]?` title="調整で${n1(x.cut[i])}hカット済み"`:''}>${v?n1(v):'<span class="muted">—</span>'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}${pm28(all[i],x.s.id)}</td>`).join('')}<td class="num"><b>${n1(x.wkH)}</b></td><td class="num">${n1(x.nxH)}</td><td class="num" style="font-weight:700;color:var(--${lvl(x)})">${x.left<0?'−'+n1(-x.left):n1(x.left)}h</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">色のついたマスは、その人の「一番多い7日間」です。マスに指を乗せると、その日にあと何時間入れられるかが出ます。</p></details>`;
   return `<section class="panel">${head}${sum}<div class="h28grid">${D.map(card).join('')}</div>${tbl}
     <p class="hint">残り＝${lim}時間 −（この週を含む、一番多い連続7日間の合計）。緑＝余裕あり、黄＝残り${n1(W28)}時間未満、赤＝残り${n1(A28)}時間未満または超えています。「カット」は調整で短くした日で、カット後の時間で数えています。超えている人は「シフト作成 → 3 28時間の修正」で自動で短くできます。</p></section>`;
@@ -3595,8 +3603,8 @@ app.addEventListener('change',e=>{
     else if(f==='ideal'){d.ideal[+el.dataset.h]=Number(el.value)||0;d.idealSet=true}
     else if(f==='posIdeal'){d.posIdeal[el.dataset.p]=Number(el.value)||0;d.idealSet=true}
     else{const sh=d.shifts[+el.dataset.i];
-      if(f==='sid')sh.sid=el.value; else if(f==='pos'){sh.pos=el.value;if(isOff(sh.pos)){if(sh.pos===PAID&&sh.paidH==null)sh.paidH=Number(S.staff[sh.sid]?.paidDayH)||null;sh.start=null;sh.end=null;if(!sh.req&&sh.sid&&sh.pos!==PAID)sh.req={off:true}}}
-      else if(f==='paidH'){sh.paidH=el.value===''?null:Math.max(0,Number(el.value))}
+      if(f==='sid')sh.sid=el.value; else if(f==='pos'){sh.pos=el.value;if(isOff(sh.pos)){if(sh.pos===PAID&&sh.paidH==null&&sh.sid)setPaidAuto(sh,curDate());sh.start=null;sh.end=null;if(!sh.req&&sh.sid&&sh.pos!==PAID)sh.req={off:true}}}
+      else if(f==='paidH'){if(el.value===''){if(sh.sid)setPaidAuto(sh,curDate());else sh.paidH=null}else{sh.paidH=Math.max(0,Number(el.value));sh.paidAuto=false}}
       else if(f==='helpTo'){sh.helpTo=el.value.trim()}
       else if(f==='oNote'){sh.oNote=el.value.trim().slice(0,40)}
       else{sh[f]=el.value===''?null:Number(el.value);sh.bs=null;if(sh[f]!=null&&isOff(sh.pos)&&sh.pos!==PAID){sh.pos='';if(sh.req&&sh.req.off)sh.req=null} // 公休の行に時間を入れたら出勤に
@@ -3930,7 +3938,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v82';
+  const APP_SW='v83';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
