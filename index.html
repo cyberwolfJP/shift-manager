@@ -650,17 +650,17 @@ function enter(store,role){
   subscribeStore();render();
 }
 function clearSession(){S.unsubs.forEach(u=>{try{u()}catch(_){}});S.unsubs=[];S.admin=null;S.adminErr='';S.showPw=false;S.dek=null;S.dekRaw=null;S.crypt=null;S.payRaw={};S.unlockAsk=false;encCache.clear();
-  S.store=null;S.role=null;S.staff={};S.base={};S.pay={};S.days={};S.settings=null;S.requests={};S.draft=null;S.stores={}}
+  S.store=null;S.role=null;S.staff={};S.base={};S.pay={};S.days={};S.settings=null;S.settingsLoaded=false;S.requests={};S.draft=null;S.stores={}}
 function logout(){AU().signOut()}
 function mergeStaff(){const m={};for(const [id,b] of Object.entries(S.base))m[id]={...b,...(S.pay[id]||{})};S.staff=m}
 function subscribeStore(){
-  S.unsubs.forEach(u=>{try{u()}catch(_){}});S.unsubs=[];S.staff={};S.base={};S.pay={};S.days={};S.settings=null;S.requests={};
+  S.unsubs.forEach(u=>{try{u()}catch(_){}});S.unsubs=[];S.staff={};S.base={};S.pay={};S.days={};S.settings=null;S.settingsLoaded=false;S.requests={};
   const db=S.db,fail=e=>{status('err');if(e&&e.code==='permission-denied'){toast('この店舗のデータを開く権限がありません。ログインし直してください')}};
   S.unsubs.push(db.doc('stores/'+S.store).onSnapshot(sn=>{S.stores[S.store]=sn.exists?{id:S.store,...sn.data()}:{id:S.store,name:''};render()},fail));
   S.unsubs.push(db.collection(P('staff')).onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{m[d.id]={id:d.id,...d.data()}});S.base=m;mergeStaff();render()},fail));
   if(S.role==='manager')S.unsubs.push(db.collection(P('pay')).onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.payRaw=m;decPay().then(render)},fail));
   S.unsubs.push(db.doc(P('config/crypt')).onSnapshot(sn=>{S.crypt=sn.exists?sn.data():null;if(!S.crypt){S.dek=null;S.dekRaw=null}decPay().then(()=>decDays()).then(render)},()=>{}));
-  S.unsubs.push(db.doc(P('config/settings')).onSnapshot(snap=>{if(S.pending.has('settings'))return;
+  S.unsubs.push(db.doc(P('config/settings')).onSnapshot(snap=>{if(S.pending.has('settings')&&S.settingsLoaded)return;S.settingsLoaded=true;
     S.settings=snap.exists?Object.assign(clone(DEFAULT_SETTINGS),clone(snap.data())):null;
     // 休憩ルールの見直し（6時間以上は45分）：古い初期値（30分）のままの店舗は一度だけ45分に切り替える
     // 「会議」「その他」のポジションを一度だけ追加（決め打ち・人数に数えない）
@@ -1450,7 +1450,8 @@ let toastT;function toast(m){const el=document.getElementById('toast');el.textCo
 const app=document.getElementById('app');
 /* 初期設定のままの店舗：名簿・シフトで使っているポジション名を設定に引き継ぐ（名前はプログラムに持たない） */
 function healPositions(){try{
-  if(S.settings||S.role!=='manager'||!S.store||!Object.keys(S.staff||{}).length)return;
+  // 設定がまだ読み込まれていないうちは何もしない（読み込み前に初期値で上書きしてしまうのを防ぐ）
+  if(!S.settingsLoaded||S.settings||S.role!=='manager'||!S.store||!Object.keys(S.staff||{}).length)return;
   const used=new Set();
   Object.values(S.staff).forEach(e=>{if(e.defPos)used.add(e.defPos);Object.keys(e.levels||{}).forEach(k=>used.add(k));(e.skills||[]).forEach(k=>used.add(k))});
   Object.values(S.days||{}).forEach(d=>{(d.shifts||[]).forEach(x=>{if(x&&typeof x.pos==='string'&&x.pos)used.add(x.pos)});Object.keys(d.posIdeal||{}).forEach(k=>used.add(k))});
@@ -2722,7 +2723,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.74'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.75'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3998,7 +3999,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v86';
+  const APP_SW='v87';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
