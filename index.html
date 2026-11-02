@@ -232,7 +232,8 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
-.h28days span.on{color:var(--fg)}.paidtag{font-size:12px;font-weight:700;color:#7a4fb5;background:var(--p-violet);border-radius:4px;padding:1px 6px}
+.h28days span.on{color:var(--fg)}.riskgrid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.riskc{border:1px solid var(--line);border-left:5px solid var(--good);border-radius:10px;padding:8px 12px;background:var(--surface);font-size:13px}.riskc.warn{border-left-color:var(--warn)}.riskc.bad{border-left-color:var(--bad);background:var(--bad-bg,var(--surface))}.risktips{margin:6px 0 0;padding-left:18px;font-size:12px}.risktips li{margin:2px 0}
+.paidtag{font-size:12px;font-weight:700;color:#7a4fb5;background:var(--p-violet);border-radius:4px;padding:1px 6px}
 .paid28{display:block;font-style:normal;font-size:9px;font-weight:700;color:#7a4fb5;line-height:1.1}td .paid28{margin:1px 0 0}
 .cut28{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--warn);line-height:1.1}td .cut28{display:block;margin:1px 0 0}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
 .pdays{display:flex;flex-wrap:wrap;gap:4px}.pdays span{font-size:11px;background:var(--sunk);border-radius:4px;padding:1px 6px}.pdays span small{margin-left:3px;font-size:10px;color:#7a4fb5;font-weight:700}
@@ -493,7 +494,7 @@ const DEFAULT_SETTINGS = {
   nightFrom: 22, nightTo: 29,
   peakFrom: 16, peakTo: 23,
   targetRate: {1:22,2:22,3:22,4:22,5:22,6:22,0:22}, rateMode: 'month', monthRate: 24, budgetWeights: {1:1,2:1,3:1,4:1,5:1.27,6:1.27,0:1.18},
-  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: true, brk28: false, warn28: 2, alert28: 1, minEmp: 2,
+  minShift: 4, fairMaxDay: 2, fairMaxRatio: 25, adjustEmployees: false, paid28: true, otLimit: 45, otWarn: 36, offMonth: 9, brk28: false, warn28: 2, alert28: 1, minEmp: 2,
   dailyOT: 8, weeklyOT: 40, nightRate: 0.25, otMode: 'dw'
 };
 const COLORS = ['yellow','blue','green','teal','pink','red','violet','gray','orange'];
@@ -1735,6 +1736,7 @@ function vShift(){
     ${subStatus()}</section>
   ${empWeekPanel(date)}
   ${intlWeekPanel(date)}
+  ${(()=>{const {y,m}=monthOf(date);return empRiskHtml(y,m,true)})()}
   ${shoteiPanel(date)}
   <section class="panel" aria-label="${md(date)}の集計">
     <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
@@ -2719,7 +2721,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.72'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.73'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3233,9 +3235,9 @@ function empRules(){
   const st=set(),emps=staffList().filter(x=>x.kind==='社員');if(!emps.length)return '';
   const posSel=(id,v)=>`<select data-sf="defPos" data-id="${id}" aria-label="基本のポジション"><option value="">（自動配置）</option>${st.positions.filter(p=>p.kind!=='off').map(p=>`<option${v===p.name?' selected':''}>${esc(p.name)}</option>`).join('')}</select>`;
   return `<section class="panel"><div class="bar"><h2>社員の勤務ルール</h2><label class="field" style="margin-left:auto"><span>1日の最低社員数</span><input type="number" min="0" max="10" id="s_minEmp" data-sset="minEmp" value="${st.minEmp??2}" style="width:80px"></label></div>
-    <div class="scroll"><table class="t"><thead><tr><th>社員</th><th class="r">週の出勤日数</th><th>基本の開始</th><th>基本の終了</th><th>基本のポジション</th><th class="r">月の所定労働時間</th></tr></thead><tbody>
+    <div class="scroll"><table class="t"><thead><tr><th>社員</th><th class="r">週の出勤日数</th><th>基本の開始</th><th>基本の終了</th><th>基本のポジション</th><th class="r">月の所定労働時間</th><th class="r">月の公休日数</th></tr></thead><tbody>
     ${emps.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td class="r"><input type="number" min="0" max="7" data-sf="workDays" data-id="${e.id}" value="${e.workDays??5}" style="width:60px" aria-label="週の出勤日数"></td>
-      <td><select data-sf="defStart" data-id="${e.id}" aria-label="基本の開始">${tOptions(Number(e.defStart??12),8,31.5)}</select></td><td><select data-sf="defEnd" data-id="${e.id}" aria-label="基本の終了">${tOptions(Number(e.defEnd??23.5),8.5,32)}</select></td><td>${posSel(e.id,e.defPos||'')}</td><td class="r"><input type="number" min="0" step="0.5" data-sf="shotei" data-id="${e.id}" value="${e.shotei??173}" style="width:80px" aria-label="月の所定労働時間"> h</td></tr>`).join('')}</tbody></table></div>
+      <td><select data-sf="defStart" data-id="${e.id}" aria-label="基本の開始">${tOptions(Number(e.defStart??12),8,31.5)}</select></td><td><select data-sf="defEnd" data-id="${e.id}" aria-label="基本の終了">${tOptions(Number(e.defEnd??23.5),8.5,32)}</select></td><td>${posSel(e.id,e.defPos||'')}</td><td class="r"><input type="number" min="0" step="0.5" data-sf="shotei" data-id="${e.id}" value="${e.shotei??173}" style="width:80px" aria-label="月の所定労働時間"> h</td><td class="r"><input type="number" min="0" max="31" data-sf="offDays" data-id="${e.id}" value="${e.offDays??''}" placeholder="${st.offMonth??9}" style="width:60px" aria-label="月の公休日数"> 日</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">「シフト作成」の「社員シフトを自動作成」で使います。決め打ち（固定）と休み希望は動かさず、残りの日をこの出勤日数・時間で埋めます。月の所定労働時間（初期値173時間＝週40時間×52週÷12か月）は、シフト作成と希望入力で「今月あと何時間か」を出すのに使います。</p></section>`;
 }
 function vRoster(){
@@ -3337,7 +3339,7 @@ function idealPanel(date){
  予測（着地）＝実績＋予定＋有給＋まだ決まっていない日×（週の出勤日数÷7）×1日の平均労働時間 */
 function empMonthStat(e,y,m){const st=set(),pre=`${y}-${pad(m)}`,days=[];
   for(let d=`${pre}-01`;d.slice(0,7)===pre;d=addDays(d,1))days.push(d);
-  let act=0,actD=0,plan=0,planD=0,paid=0,paidD=0,off=0,und=0,night=0,dOT=0,lab=[],allSegs=[],dNOT=0;
+  let offP=0,act=0,actD=0,plan=0,planD=0,paid=0,paidD=0,off=0,und=0,night=0,dOT=0,lab=[],allSegs=[],dNOT=0;
   for(const d of days){const mine=(dayDoc(d).shifts||[]).filter(x=>x.sid===e.id);
     if(!mine.length){if(d>=today)und++;continue}
     let l=0,n=0,on=false,isOffDay=false,hasPaid=false,meet=false,sg=[];
@@ -3346,18 +3348,62 @@ function empMonthStat(e,y,m){const st=set(),pre=`${y}-${pad(m)}`,days=[];
     sg.sort((a,b)=>a[0]-b[0]);allSegs.push(...sg);if(on&&otDaily())dNOT+=nightOf(tailSegs(sg,Math.max(0,l-Number(st.otAfter??8))));
     if(!on&&!isOffDay&&!hasPaid&&!meet&&d>=today)und++;
     if(on){if(d<today){act+=l;actD++}else{plan+=l;planD++}night+=n;if(otDaily())dOT+=Math.max(0,l-Number(st.otAfter??8));lab.push(l)}
-    else if(isOffDay)off++}
+    else if(isOffDay){off++;if(d<today)offP++}}
   // 週40時間超（1日8時間超の分を除く）：月曜がこの月にある週で数える
   let wOT=0,wNOT=0;for(let w=monday(days[0]);w<=days[days.length-1];w=addDays(w,7)){if(w.slice(0,7)!==pre&&w<days[0])continue;const r=otWeek(e,w);wOT+=r.wOT;wNOT+=r.wNOT}
   const avg=lab.length?lab.reduce((a,b)=>a+b,0)/lab.length:Math.max(0,Number(e.defEnd??23.5)-Number(e.defStart??12)-breakHours(Number(e.defEnd??23.5)-Number(e.defStart??12)));
-  const rate=Math.min(1,Number(e.workDays??5)/7),fore=act+plan+paid+und*rate*avg,shotei=Number(e.shotei??173);
+  // 未定の日：公休の所定日数に届くまでは公休、残りは出勤として見込む（未定がなければ週の出勤日数の割合）
+  const offReq=Number(e.offDays??st.offMonth??9),offTake=Math.max(0,Math.min(und,offReq-off)),rate=und?(und-offTake)/und:Math.min(1,Number(e.workDays??5)/7),fore=act+plan+paid+und*rate*avg,shotei=Number(e.shotei??173);
   // 月単位：所定を超えた労働時間（有給は含めない）。実績＋予定＋見込みで
   const laborFore=act+plan+und*rate*avg,mOT=otMonthly()?Math.max(0,laborFore-shotei):0,ot=otMode()==='none'?0:otMonthly()?mOT:dOT+wOT;
   // 深夜残業：月単位なら、月の最後の勤務の後ろの方から（見込みの分は深夜かどうか分からないので、シフトが入っている分だけ）
   const nightOT=otMode()==='none'?0:otMonthly()?nightOf(tailSegs(allSegs,Math.min(mOT,segLen(allSegs)))):dNOT+wNOT;
   const wage=Number(e.wage)||0,oR=Number(st.otRate??1.25),nR=Number(st.nightRate??0.25);
   const otPay=wage*oR*Math.max(0,ot-nightOT),nightOTPay=wage*(oR+nR)*nightOT,nightPay=wage*nR*Math.max(0,night-nightOT);
-  return {nightOT,otPay,nightOTPay,nightPay,payTotal:otPay+nightOTPay+nightPay,e,act,actD,plan,planD,paid,paidD,off,und,night,dOT,wOT,mOT,ot,avg,rate,fore,shotei,diff:fore-shotei,addDays:und*rate,total:days.length}}
+  return {nightOT,otPay,nightOTPay,nightPay,payTotal:otPay+nightOTPay+nightPay,e,act,actD,plan,planD,paid,paidD,off,und,night,dOT,wOT,mOT,ot,avg,rate,fore,shotei,diff:fore-shotei,addDays:und*rate,total:days.length,offP,days,lab,offReq,offTake}}
+/* 社員の残業（上限45時間など）と公休の見込み・アドバイス
+ 残業の見込み＝シフトが入っている分の残業＋未定の日の見込み（未定の日×出勤の割合×1日平均で、週・1日の基準を超える分）
+ 公休：未定の日は所定日数に届くまで公休として見込む。決まっている日の割合のままのペースで取りすぎ・足りないも判定 */
+function empRisk(e,y,m){const st=set(),r=empMonthStat(e,y,m),lim=Number(st.otLimit??45),warn=Number(st.otWarn??36),oA=Number(st.otAfter??8),wk=Number(st.weeklyOT??40),pre=`${y}-${pad(m)}`;
+  let sched=0,extra=0;
+  if(otMode()==='none'){sched=0;extra=0}
+  else if(otMonthly()){sched=Math.max(0,r.act+r.plan-r.shotei);extra=Math.max(0,r.mOT-sched)}
+  else{sched=r.dOT+r.wOT;
+    for(let w=monday(r.days[0]);w<=r.days[r.days.length-1];w=addDays(w,7)){if(w.slice(0,7)!==pre&&w<r.days[0])continue;
+      const ds=weekDates(w),undW=ds.filter(d=>d.slice(0,7)===pre&&d>=today&&!(dayDoc(d).shifts||[]).some(x=>x.sid===e.id)).length;if(!undW)continue;
+      const Lw=ds.reduce((a,d)=>a+laborOf(d,e.id),0),add=undW*r.rate*r.avg,dPart=otDaily()?undW*r.rate*Math.max(0,r.avg-oA):0,wPart=otWeekly()?Math.max(0,Lw+add-wk)-Math.max(0,Lw-wk):0;extra+=Math.max(dPart,wPart)}}
+  const fore=sched+extra,lv=fore>=lim?'bad':fore>=warn?'warn':'good';
+  const workLeft=r.planD+r.und*r.rate; // これから出勤する見込みの日数
+  const offReq=r.offReq,offFore=r.off+r.offTake,offNeed=offReq-r.off,offDiff=offFore-offReq;
+  // ペース：決まっている日の公休の割合のまま月末までいくと何日か（7日以上決まっているとき）
+  const dec=r.total-r.und,pace=dec>=7?r.off/dec*r.total:null,paceDiff=pace==null?0:pace-offReq;
+  const offLv=r.off>offReq||offNeed>r.und?'bad':Math.abs(paceDiff)>=1.5?'warn':'good';
+  const tips=[];
+  if(otMode()!=='none'){
+    if(fore>=warn){const cut=Math.max(0,fore-(lv==='bad'?lim-1:warn));
+      if(cut>0&&workLeft>0)tips.push(`これからの出勤（見込み${n1(workLeft)}日）を1日あたり${n1(cut/workLeft)}h短くする`);
+      if(cut>0&&r.avg>0){const k=Math.ceil(cut/r.avg);tips.push(`出勤を${k}日減らす（公休にする）${offFore+k>offReq?`※公休が所定より${offFore+k-offReq}日多くなります`:''}`)}
+      if(otWeekly()&&!otMonthly())tips.push(`週${wk}時間を超えやすい週は、出勤日数を減らすのが一番効きます`)}
+  }
+    if(r.off>offReq)tips.push(`公休がすでに所定より${r.off-offReq}日多いので、残りの未定の日は出勤にする`);
+  else if(offNeed>r.und)tips.push(`未定の日を全部公休にしても${offNeed-r.und}日足りません。入っている出勤を公休に変える`);
+  else if(paceDiff>=1.5)tips.push(`今のペースだと月末に${n1(pace)}日になります。残り${r.und}日で公休はあと${offNeed}日だけ`);
+  else if(paceDiff<=-1.5)tips.push(`今のペースだと月末に${n1(pace)}日しか取れません。残り${r.und}日のうち${offNeed}日は公休に`);
+  return {r,lim,warn,sched,extra,fore,lv,cutTo:lim-fore,workLeft,offReq,offFore,offNeed,offDiff,offLv,pace,paceDiff,tips}}
+const lvTxt={bad:'cell-bad',warn:'cell-warn',good:''};
+function empRiskHtml(y,m,compact){const emps=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false);if(!emps.length)return '';
+  const L=emps.map(e=>({e,k:empRisk(e,y,m)})),st=set();
+  const card=({e,k})=>{const r=k.r,ot=otMode()==='none'?'':`<div><b>残業の見込み ${n1(k.fore)}h</b>／上限${n1(k.lim)}h <span class="pill ${k.lv}">${k.lv==='bad'?`${n1(k.fore-k.lim)}h超える見込み`:k.lv==='warn'?`上限まであと${n1(k.lim-k.fore)}h`:'余裕あり'}</span>
+        <div class="muted" style="font-size:12px">シフトが入っている分 ${n1(k.sched)}h＋未定${r.und}日の見込み ${n1(k.extra)}h</div></div>`;
+    const off=`<div style="margin-top:4px"><b>公休 ${r.off}日</b>（済${r.offP}日・予定${r.off-r.offP}日）／所定${k.offReq}日 <span class="pill ${k.offLv}">${r.off>k.offReq?`もう${r.off-k.offReq}日多い`:k.offNeed>r.und?`未定を全部休みにしても${k.offNeed-r.und}日足りない`:k.paceDiff>=1.5?`このペースだと${n1(k.paceDiff)}日取りすぎ`:k.paceDiff<=-1.5?`このペースだと${n1(-k.paceDiff)}日足りない`:'所定どおりの見込み'}</span>
+        ${r.und&&k.offNeed>=0&&k.offNeed<=r.und?`<div class="muted" style="font-size:12px">未定${r.und}日のうち、あと${k.offNeed}日を公休にすれば所定どおり</div>`:''}</div>`;
+    const tip=k.tips.length?`<ul class="risktips">${k.tips.map(t=>`<li>${t}</li>`).join('')}</ul>`:'';
+    return `<div class="riskc ${k.lv==='bad'||k.offLv==='bad'?'bad':k.lv==='warn'||k.offLv==='warn'?'warn':'good'}"><div class="h28top"><b>${esc(e.name)}</b><span class="muted" style="font-size:12px">着地 ${n1(r.fore)}h／所定${n1(r.shotei)}h</span></div>${ot}${off}${tip}</div>`};
+  const nBad=L.filter(x=>x.k.lv==='bad').length,nWarn=L.filter(x=>x.k.lv==='warn').length,nOff=L.filter(x=>x.k.offLv!=='good').length;
+  return `<section class="panel"${compact?' style="padding:10px 14px"':''}><div class="bar"><h2 style="font-size:16px">社員の残業と公休の見込み（${y}年${m}月）</h2>
+      ${nBad?`<span class="pill bad">残業${n1(Number(st.otLimit??45))}h超えの見込み ${nBad}人</span>`:''}${nWarn?`<span class="pill warn">${n1(Number(st.otWarn??36))}h以上 ${nWarn}人</span>`:''}${nOff?`<span class="pill warn">公休の確認 ${nOff}人</span>`:''}
+      <span class="hint">今のシフトに、未定の日は「公休を所定日数まで取り、残りは1日平均の時間で出勤」として見込みを出しています。上限・注意の時間と公休日数は「マスタ → 設定」「名簿 → 社員の勤務ルール」で変えられます</span></div>
+    <div class="riskgrid">${L.map(card).join('')}</div></section>`}
 function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&&x.active!==false);if(!emps.length)return '';
   const ym=S.empYm||today.slice(0,7),y=+ym.slice(0,4),m=+ym.slice(5,7),past=ym<today.slice(0,7),fut=ym>today.slice(0,7);
   const R=emps.map(e=>({e,r:empMonthStat(e,y,m)}));
@@ -3392,7 +3438,8 @@ function empMonthPanel(){const emps=staffList(true).filter(x=>x.kind==='社員'&
   const body=days.map(d=>{const w=wd(d);return `<tr class="${d===today?'td':''} ${w===0?'sun':w===6?'sat':''}"><th class="num">${+d.slice(8)}<span>${WD[w]}</span></th>${emps.map(e=>cell(e,d)).join('')}</tr>`}).join('');
   const foot=[['所定労働時間',r=>`<b>${n1(r.shotei)}h</b>`],['実績（昨日まで）',r=>`${n1(r.act)}h`],['予定（シフト済み）＋有給',r=>`${n1(r.plan+r.paid)}h`],['未定の日の見込み',r=>r.und?`${n1(r.fore-r.act-r.plan-r.paid)}h<div class="muted" style="font-size:11px">${r.und}日中${n1(r.addDays)}日出勤</div>`:'—'],
     ['着地予測',r=>`<b style="font-size:16px">${n1(r.fore)}h</b>`],['所定との差',r=>{const d=r.diff;return `<b class="${d>8?'cell-bad':d<-8?'cell-warn':''}">${d>0?'+':''}${n1(d)}h</b><div style="font-size:11px">${d>8?'超える見込み':d<-8?'届かない見込み':'ほぼ所定どおり'}</div>`}],
-    [otMode()==='none'?'残業（計算しない）':otMonthly()?'残業（所定超・見込み）':'残業',r=>otMode()==='none'?'—':`${n1(r.ot)}h${otMode()==='dw'?`<div class="muted" style="font-size:11px">日${n1(r.dOT)}・週${n1(r.wOT)}</div>`:''}`],['深夜（うち深夜残業）',r=>`${n1(r.night)}h<div class="muted" style="font-size:11px">深夜残業${n1(r.nightOT)}h</div>`],['残業代・深夜残業代・深夜手当の目安',r=>Number(r.e?.wage)?`<b>${yen(Math.round(r.payTotal))}</b><div class="muted" style="font-size:11px">残業${yen(Math.round(r.otPay))}／深夜残業${yen(Math.round(r.nightOTPay))}／深夜${yen(Math.round(r.nightPay))}</div>`:'—']];
+    [otMode()==='none'?'残業（計算しない）':otMonthly()?'残業（所定超・見込み）':'残業',r=>otMode()==='none'?'—':`${n1(r.ot)}h${otMode()==='dw'?`<div class="muted" style="font-size:11px">日${n1(r.dOT)}・週${n1(r.wOT)}</div>`:''}`],['残業の見込み（上限）',r=>{if(otMode()==='none')return '—';const k=empRisk(r.e,y,m);return `<b class="${lvTxt[k.lv]}">${n1(k.fore)}h</b><div class="muted" style="font-size:11px">上限${n1(k.lim)}h・${k.lv==='bad'?'超える見込み':'あと'+n1(k.lim-k.fore)+'h'}</div>`}],
+    ['公休（所定）',r=>{const k=empRisk(r.e,y,m);return `<b class="${lvTxt[k.offLv]}">${r.off}日</b>／${k.offReq}日<div class="muted" style="font-size:11px">${k.pace!=null?'ペース'+n1(k.pace)+'日':'見込み'+n1(k.offFore)+'日'}</div>`}],['深夜（うち深夜残業）',r=>`${n1(r.night)}h<div class="muted" style="font-size:11px">深夜残業${n1(r.nightOT)}h</div>`],['残業代・深夜残業代・深夜手当の目安',r=>Number(r.e?.wage)?`<b>${yen(Math.round(r.payTotal))}</b><div class="muted" style="font-size:11px">残業${yen(Math.round(r.otPay))}／深夜残業${yen(Math.round(r.nightOTPay))}／深夜${yen(Math.round(r.nightPay))}</div>`:'—']];
   return `<section class="panel"><div class="bar"><h2>社員の月間実績と着地予測</h2>
       <div class="weeknav"><button class="btn sm" data-act="empYm" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${y}年${m}月</span><button class="btn sm" data-act="empYm" data-n="1" aria-label="次の月">›</button><button class="btn sm ghost" data-act="empYmNow">今月</button></div>
       <span class="hint">${past?'終わった月：実績で確定しています':fut?'これからの月：シフトと見込みで予測しています':`${md(today)}時点`}</span></div>
@@ -3413,7 +3460,7 @@ function vEmp(){
   const st=set(),D=empWeeksData(S.week),emps=D.emps;
   const rows=D.rows.map(r=>`<tr${r.m===S.week?' style="outline:2px solid var(--accent);outline-offset:-2px"':''}><td class="num">${md(r.m)}–${md(addDays(r.m,6))}</td>${r.hs.map(h=>`<td class="num ${h<st.border?'cell-bad':''}">${n1(h)}</td>`).join('')}<td class="num">${st.border}</td><td class="num"><b>${n1(r.tot)}</b></td></tr>`).join('')
     +`<tr class="tot"><td><b>合計</b></td>${D.colTot.map(h=>`<td class="num"><b>${n1(h)}</b></td>`).join('')}<td></td><td class="num"><b>${n1(D.all)}</b></td></tr>`;
-  return empMonthPanel()+`<section class="panel"><div class="bar"><h2>社員勤務時間</h2><span class="hint">週（月〜日）の労働時間。ボーダー（${st.border}時間）未満は赤で表示</span></div>
+  return empRiskHtml(+(S.empYm||today.slice(0,7)).slice(0,4),+(S.empYm||today.slice(0,7)).slice(5,7))+empMonthPanel()+`<section class="panel"><div class="bar"><h2>社員勤務時間</h2><span class="hint">週（月〜日）の労働時間。ボーダー（${st.border}時間）未満は赤で表示</span></div>
   ${emps.length?`<div class="scroll"><table class="t"><thead><tr><th>週</th>${emps.map(e=>`<th class="r">${esc(e.name)}</th>`).join('')}<th class="r">ボーダー</th><th class="r">合計</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">名簿に「社員」区分のスタッフがいません。</div>'}
   <p class="hint">期間は「集計 → 週間・月間」の月間見込みの開始日〜終了日に合わせています。ボーダーは「マスタ → 設定」で変更できます。</p></section>
   ${empOT()}`;
@@ -3551,7 +3598,7 @@ function vSettings(){
     <div class="bar">${num('minShift','調整後も残す最短勤務（h）',0.5)}${num('fairMaxDay','公平：1日で削る上限（h）',0.5)}${num('fairMaxRatio','公平：週で削る上限（希望の%）',5)}<label style="font-size:13px"><input type="checkbox" id="adjEmp"${st.adjustEmployees?' checked':''}> 社員も調整の対象にする</label></div>
     <p class="hint">「シフト作成」の「目標に合わせる」は、売上予算×目標人件費率を上限に、時間帯ごとの理想人数を下回らない範囲でだけ勤務を短くします。</p></section>
   <section class="panel"><h2>計算ルール</h2>
-    <div class="kpis">${num('border','社員ボーダー（週h）',0.5)}${num('limit28','28h管理の上限（h）',0.5)}${num('warn28','28h：黄色にする残り（h未満）',0.5)}${num('alert28','28h：警告にする残り（h未満）',0.5)}
+    <div class="kpis">${num('border','社員ボーダー（週h）',0.5)}${num('limit28','28h管理の上限（h）',0.5)}${num('otLimit','社員の残業上限（月h）',1)}${num('otWarn','社員の残業 注意（月h以上）',1)}${num('offMonth','社員の公休 所定（月の日数・基本）',1)}${num('warn28','28h：黄色にする残り（h未満）',0.5)}${num('alert28','28h：警告にする残り（h未満）',0.5)}
     <label style="font-size:13px;align-self:end"><input type="checkbox" id="brk28"${st.brk28===true?' checked':''}> 28時間を休憩込みで数える（ふつうは外したまま＝休憩を引いて数える）</label>
     <label class="field"><span>立ち上げの時刻（空欄＝その日一番早い出勤）</span><input type="number" step="0.5" min="0" max="31" id="s_openAt" data-ocset="openAt" value="${st.openAt??''}" placeholder="例 11"></label>
     <label class="field"><span>締めの時刻（空欄＝その日一番遅い退勤）</span><input type="number" step="0.5" min="0" max="31" id="s_closeAt" data-ocset="closeAt" value="${st.closeAt??''}" placeholder="例 23.5"></label>
@@ -3624,7 +3671,7 @@ app.addEventListener('change',e=>{
     if(k==='active'&&!el.checked){const fut=Object.keys(S.days).filter(dt=>dt>=today&&(S.days[dt].shifts||[]).some(x=>x.sid===s.id)).sort();
       if(fut.length&&confirm(`${s.name}さんを在籍から外します。\n${md(today)}以降のシフト（${fut.length}日分：${fut.slice(0,5).map(md).join('、')}${fut.length>5?' ほか':''}）からも外しますか？\n（「キャンセル」なら、シフトはそのまま残します）`)){
         for(const dt of fut){S.days[dt].shifts=S.days[dt].shifts.filter(x=>x.sid!==s.id);saveDay(dt)}toast(`${fut.length}日分のシフトから外しました`)}}
-    if(el.type==='checkbox')s[k]=el.checked; else if(['wage','fare','paidGrant','paidDayH','workDays','defStart','defEnd','shotei'].includes(k))s[k]=el.value===''?null:Number(el.value); else s[k]=el.value==='P/A'?'PA':el.value;
+    if(el.type==='checkbox')s[k]=el.checked; else if(['wage','fare','paidGrant','paidDayH','workDays','defStart','defEnd','shotei','offDays'].includes(k))s[k]=el.value===''?null:Number(el.value); else s[k]=el.value==='P/A'?'PA':el.value;
     if(k==='kind'&&s.kind==='PA')s.paCount=false;
     saveStaff(s.id);return render()}
   if(el.dataset.pf){S.settings=S.settings||clone(DEFAULT_SETTINGS);const p=S.settings.positions[+el.dataset.i],old=p.name;p[el.dataset.pf]=el.value;
@@ -3940,7 +3987,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v84';
+  const APP_SW='v85';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
