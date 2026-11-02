@@ -232,7 +232,8 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
-.h28days span.on{color:var(--fg)}.riskgrid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.riskc{border:1px solid var(--line);border-left:5px solid var(--good);border-radius:10px;padding:8px 12px;background:var(--surface);font-size:13px}.riskc.warn{border-left-color:var(--warn)}.riskc.bad{border-left-color:var(--bad);background:var(--bad-bg,var(--surface))}.risktips{margin:6px 0 0;padding-left:18px;font-size:12px}.risktips li{margin:2px 0}
+.h28days span.on{color:var(--fg)}.lockfs{border:0;padding:0;margin:0;min-width:0;display:contents}.lockfs:disabled section{opacity:.62}.lockbar.on{border-left:5px solid var(--warn)}.lockbar.off{border-left:5px solid var(--good)}
+.riskgrid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.riskc{border:1px solid var(--line);border-left:5px solid var(--good);border-radius:10px;padding:8px 12px;background:var(--surface);font-size:13px}.riskc.warn{border-left-color:var(--warn)}.riskc.bad{border-left-color:var(--bad);background:var(--bad-bg,var(--surface))}.risktips{margin:6px 0 0;padding-left:18px;font-size:12px}.risktips li{margin:2px 0}
 .paidtag{font-size:12px;font-weight:700;color:#7a4fb5;background:var(--p-violet);border-radius:4px;padding:1px 6px}
 .paid28{display:block;font-style:normal;font-size:9px;font-weight:700;color:#7a4fb5;line-height:1.1}td .paid28{margin:1px 0 0}
 .cut28{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--warn);line-height:1.1}td .cut28{display:block;margin:1px 0 0}.h28days span.w{outline:2px solid var(--accent);outline-offset:-2px}.h28days i{font-style:normal;font-size:10px;font-weight:400;color:var(--muted)}
@@ -1460,7 +1461,7 @@ function healPositions(){try{
   miss.forEach((n,i)=>{st.positions.splice(Math.min(3+i,st.positions.length),0,{name:n,color:cols[i%cols.length],kind:'work'});st.summaryOrder.splice(i,0,n)});
   S.settings=st;saveSettings();
 }catch(_){}}
-function render(){healPositions();healPaid();rateCache.clear();
+function render(){if(S.tab!=='settings')S.setOpen=false;healPositions();healPaid();rateCache.clear();
   const a=document.activeElement;
   if(a&&app.contains(a)&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&!['checkbox','radio','file','button','date','time','month','week'].includes(a.type)))){S.deferRender=true;return}
   S.deferRender=false;
@@ -2721,7 +2722,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.73'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.74'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3549,6 +3550,7 @@ function vFare(){
 }
 
 /* --- 設定 --- */
+const setLocked=()=>set().setLock!==false&&!S.setOpen;
 function vSettings(){
   const st=set();
   const pos=st.positions.map((p,i)=>`<tr><td><input type="text" data-pf="name" data-i="${i}" value="${esc(p.name)}" aria-label="ポジション名"></td>
@@ -3576,7 +3578,12 @@ function vSettings(){
       <label class="btn sm" style="display:inline-flex;align-items:center">ファイルから取り込む<input type="file" id="importFile" accept=".json,application/json" hidden></label></div>
     ${S.importInfo?`<div class="confirm">${esc(S.importInfo.msg)}<button class="btn sm pri" data-act="importGo">取り込む</button><button class="btn sm" data-act="importCancel">やめる</button></div>`:''}
     <p class="hint">前回のバックアップ：${(()=>{try{return localStorage.getItem('shiftapp:lastBackup:'+S.store)||'まだありません'}catch(_){return '—'}})()}。30日たつとポップアップでお知らせします。取り込むと、同じ日付・同じスタッフのデータは上書きされます。</p></section>`;
-  return storeSec+`<section class="panel"><h2>各ポジションマスタ</h2>
+  const lk=setLocked(),hasPin=!!st.setPin;
+  const lockBar=`<section class="panel lockbar ${lk?'on':'off'}"><div class="bar" style="gap:8px;flex-wrap:wrap"><h2 style="font-size:16px">${lk?'🔒 設定に鍵がかかっています':'🔓 設定を編集中'}</h2>
+    ${lk?`${hasPin?'<input type="password" id="setPinIn" inputmode="numeric" placeholder="暗証番号" autocomplete="off" style="width:120px">':''}<button class="btn pri sm" data-act="setUnlock">鍵を開ける</button><span class="hint">ポジション・人件費率・計算ルールは、鍵を開けたときだけ変えられます</span>`
+      :`<button class="btn pri sm" data-act="setLock">鍵をかける</button><span class="hint">ほかのタブに移るか、アプリを開き直すと自動で鍵がかかります</span>
+      <details style="margin-left:auto"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">暗証番号${hasPin?'を変える・なくす':'をつける'}</summary><div class="bar" style="gap:6px;margin-top:6px"><input type="password" id="setPinNew" inputmode="numeric" placeholder="新しい暗証番号（4けた以上）" autocomplete="off" style="width:200px"><button class="btn sm" data-act="setPinSave">保存</button>${hasPin?'<button class="btn sm ghost" data-act="setPinClear">暗証番号をなくす</button>':''}</div></details>`}</div></section>`;
+  return lockBar+storeSec+`<fieldset class="lockfs"${lk?' disabled':''}><section class="panel"><h2>各ポジションマスタ</h2>
     <div class="scroll"><table class="t"><thead><tr><th>ポジション</th><th>色</th><th>扱い</th><th></th></tr></thead><tbody>${pos}</tbody></table></div>
     <div><button class="btn sm" data-act="addPos">＋ ポジションを追加</button></div></section>
   <div class="two">
@@ -3607,7 +3614,7 @@ function vSettings(){
     ${num('otAfter','残業：1日の基準（この時間を超えた分）',0.5)}${num('otRate','残業の割増率',0.05)}${num('weeklyOT','残業：週の基準（この時間を超えた分）',0.5)}${num('nightRate','深夜の割増率',0.05)}
     ${num('nightFrom','深夜の開始（時）',0.5)}${num('nightTo','深夜の終了（24+時）',0.5)}
     ${num('peakFrom','ピーク帯表示 開始',1)}${num('peakTo','ピーク帯表示 終了',1)}</div>
-    <p class="hint">残業の数え方：${otRuleText()}。${otDaily()?`日々の人件費 ＝ 時給 ×（労働時間のうち${st.otAfter}hまで）＋ 時給 × ${st.otRate} ×（${st.otAfter}hを超えた分）。`:'日々の人件費 ＝ 時給 × 労働時間（1日ごとの割増はつけません）。'}労働 ＝ 勤務 − 休憩。社員の残業・残業代は「集計 → 社員勤務時間」で、この数え方で計算します。</p></section></div>`;
+    <p class="hint">残業の数え方：${otRuleText()}。${otDaily()?`日々の人件費 ＝ 時給 ×（労働時間のうち${st.otAfter}hまで）＋ 時給 × ${st.otRate} ×（${st.otAfter}hを超えた分）。`:'日々の人件費 ＝ 時給 × 労働時間（1日ごとの割増はつけません）。'}労働 ＝ 勤務 − 休憩。社員の残業・残業代は「集計 → 社員勤務時間」で、この数え方で計算します。</p></section></fieldset></div>`;
 }
 
 /* ---------- 入力イベント ---------- */
@@ -3699,6 +3706,10 @@ app.addEventListener('click',e=>{
   if(a==='empYmNow'){S.empYm=null;return render()}
   if(a==='ocrDelImg'){const x=S.rc.find(y=>y.id===b.dataset.q);if(x){try{if(x.url)URL.revokeObjectURL(x.url)}catch(_){}S.rc=S.rc.filter(y=>y!==x);if(!S.rc.length){S.rcP=[];S.rcN=0}else rcRebuild()}return render()}
   if(a==='ocrReset'){if(!confirm('読み込んだスクショと下書きを全部消しますか？（登録済みのシフト希望はそのままです）'))return;S.rc.forEach(y=>{try{URL.revokeObjectURL(y.url)}catch(_){}});S.rc=[];S.rcP=[];S.rcN=0;return render()}
+  if(a==='setUnlock'){const st=set();if(st.setPin){const v=(document.getElementById('setPinIn')?.value||'').trim();if(sha256hex('setpin:'+v)!==st.setPin){toast('暗証番号が違います');return}}S.setOpen=true;toast('鍵を開けました');return render()}
+  if(a==='setLock'){S.setOpen=false;toast('鍵をかけました');return render()}
+  if(a==='setPinSave'){const v=(document.getElementById('setPinNew')?.value||'').trim();if(v.length<4)return toast('暗証番号は4けた以上にしてください');S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.setPin=sha256hex('setpin:'+v);saveSettings();toast('暗証番号を保存しました。次に鍵を開けるときに使います');return render()}
+  if(a==='setPinClear'){S.settings=S.settings||clone(DEFAULT_SETTINGS);delete S.settings.setPin;saveSettings();toast('暗証番号をなくしました');return render()}
   if(a==='ocrPaste'){const ta=document.getElementById('rcPaste'),t=(ta&&ta.value||'').trim();if(!t)return toast('文字を貼り付けてください');const q={id:rcId(),n:++S.rcN,status:'done',text:t,paste:true,url:''};S.rc.push(q);rcAnalyze(q);S.rcPasteOpen=false;toast(`${q.blocks}件のコメントを読み取りました`);return render()}
   if(a==='ocrDel'){S.rcP=S.rcP.filter(y=>y.id!==b.dataset.q);return render()}
   if(a==='ocrClear'){S.rcP=S.rcP.filter(y=>!y.applied);return render()}
@@ -3987,7 +3998,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v85';
+  const APP_SW='v86';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
