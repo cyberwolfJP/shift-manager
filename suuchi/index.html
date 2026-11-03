@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="数値マネージャー">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data:; worker-src 'self'; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
+<title>数値マネージャー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f4f3f0">
+<style>
+:root{
+  --bg:#f4f3f0; --surface:#fcfcfb; --line:#e3e1dc; --grid:#ecebe7;
+  --ink:#1b1b1a; --ink2:#52514e; --ink3:#8a8984;
+  --s1:#2a78d6; --s1-soft:#b7d3f6; --s2:#eb6834; --s3:#1baf7a; --s7:#6250d6;
+  --budget:#3b3a37;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --accent:#2a78d6;
+  --r:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%}
+h1,h2,h3,h4{font-weight:400;margin:0}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 14px}
+button:hover{border-color:#c9c7c1}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.ghost{background:transparent;border-color:transparent;color:var(--ink2)}
+button.danger{color:var(--crit)}
+button:disabled{opacity:.45;cursor:default}
+select,input[type=text],input[type=number],input[type=password],input[type=month],textarea{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 10px}
+textarea{width:100%;resize:vertical}
+input[type=number]{text-align:right}
+.num{font-variant-numeric:tabular-nums}
+
+header{position:sticky;top:0;z-index:20;background:rgba(244,243,240,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 18px calc(0px) 18px;padding-top:max(10px,env(safe-area-inset-top))}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-size:18px;letter-spacing:.04em}
+.brand small{color:var(--ink3);font-size:12px;margin-left:6px}
+.monthnav{display:flex;align-items:center;gap:4px;margin-left:auto}
+.monthnav button{padding:6px 11px}
+.monthnav select{padding:6px 8px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;margin-top:8px;scrollbar-width:none}
+nav.tabs button{border:none;background:transparent;border-radius:0;padding:9px 14px;color:var(--ink2);border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+main{max-width:1180px;margin:0 auto;padding:18px 18px 80px}
+.view{display:none}.view.on{display:block}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.card h2{font-size:16px;margin-bottom:10px;color:var(--ink)}
+.card h2 .sub{font-size:12px;color:var(--ink3);margin-left:8px}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.row>.card{flex:1 1 340px}
+.muted{color:var(--ink3);font-size:13px}
+.small{font-size:12.5px}
+.banner{background:#fff6e0;border:1px solid #f1d9a0;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner.info{background:#eef5fd;border-color:#cfe1f7}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.kpi .l{font-size:12.5px;color:var(--ink2)}
+.kpi .v{font-size:24px;letter-spacing:.01em;margin:2px 0 3px;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:13px;color:var(--ink2);margin-left:2px}
+.kpi .d{font-size:12.5px;color:var(--ink2);display:flex;flex-direction:column;gap:1px}
+.st{display:inline-flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+.st i{font-style:normal;display:inline-block;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;line-height:16px;text-align:center}
+.st.good i{background:var(--good)} .st.warn i{background:var(--warn);color:#3a2a00} .st.bad i{background:var(--crit)} .st.ser i{background:var(--serious)}
+.st.none{color:var(--ink3)}
+
+.meter{position:relative;height:14px;background:var(--grid);border-radius:7px;overflow:visible;margin:8px 0 4px}
+.meter .fill{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:7px}
+.meter .pace{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--budget)}
+.meter-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)}
+
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2);margin:0 0 6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px}
+.sw.line{height:2px;width:16px;border-radius:1px}
+.sw.tick{height:3px;width:14px;border-radius:1px}
+.sw.dash{height:0;width:16px;border-top:2px dashed}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#1f1f1e;color:#f3f2ee;font-size:12.5px;padding:8px 10px;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.18);display:none;max-width:260px;line-height:1.5}
+#tip b{font-weight:500}
+#tip .tr{display:flex;justify-content:space-between;gap:14px}
+#tip .tr span:first-child{display:inline-flex;align-items:center;gap:6px;color:#cfcdc6}
+#tip .sw{width:9px;height:9px}
+
+.evals{list-style:none;margin:0;padding:0}
+.evals li{display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.evals li:last-child{border-bottom:none}
+.evals li .st{flex:0 0 auto;margin-top:2px}
+
+.factor{display:grid;grid-template-columns:110px 1fr 120px;gap:6px 10px;align-items:center;font-size:13.5px}
+.fbar{position:relative;height:16px}
+.fbar .axis{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--ink3)}
+.fbar .b{position:absolute;top:0;bottom:0;border-radius:4px}
+
+table.grid{width:100%;border-collapse:collapse;font-size:13.5px}
+table.grid th{font-weight:400;color:var(--ink2);text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+table.grid td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--grid);white-space:nowrap;font-variant-numeric:tabular-nums}
+table.grid th:first-child,table.grid td:first-child{text-align:left}
+table.grid tr.click{cursor:pointer}
+table.grid tr.click:hover td{background:#f3f7fd}
+table.grid tr.sel td{background:#eaf2fc}
+table.grid tr.tot td{border-top:1px solid var(--ink3);background:#f7f6f3}
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap{max-height:70vh;overflow:auto}
+
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink2)}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px 14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{border:none;border-radius:0;padding:8px 14px;background:transparent}
+.seg button.on{background:var(--accent);color:#fff}
+.steps{counter-reset:s;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;position:relative;padding-left:30px;margin:6px 0;font-size:13.5px;color:var(--ink2)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;text-align:center;line-height:20px}
+.preview{overflow:auto;max-height:340px;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.preview table{border-collapse:collapse;font-size:12.5px;min-width:100%}
+.preview th{background:#f3f2ee;padding:6px;position:sticky;top:0}
+.preview th select{font-size:12.5px;padding:4px 6px;min-width:110px}
+.preview td{padding:5px 8px;border-top:1px solid var(--grid);white-space:nowrap}
+.preview tr.skip td{color:var(--ink3);text-decoration:line-through}
+.msg{margin-top:10px;font-size:13.5px}
+.msg.ok{color:#0a7a0a}.msg.ng{color:var(--crit)}
+
+.cov{border-collapse:collapse;font-size:12px}
+.cov th{font-weight:400;color:var(--ink3);padding:3px 5px}
+.cov td{padding:3px;text-align:center}
+.cov .c{display:flex;gap:2px;justify-content:center}
+.cov .dot{width:9px;height:9px;border-radius:2px;background:var(--grid)}
+.cov .dot.on1{background:var(--s1)}.cov .dot.on2{background:var(--s3)}.cov .dot.on3{background:var(--s2)}.cov .dot.on4{background:var(--budget)}.cov .dot.on5{background:var(--s7)}.cov .dot.on5c{background:#c9c3f2}
+
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .h{font-size:12px;color:var(--ink3);text-align:center}
+.cal .d{background:#fff;border:1px solid var(--line);border-radius:8px;padding:4px 6px;min-height:58px;font-size:12px;cursor:pointer;user-select:none}
+.cal .d.sat .n{color:#2a78d6}.cal .d.sun .n,.cal .d.hol .n{color:var(--crit)}
+.cal .d.closed{background:#eeedea;color:var(--ink3)}
+.cal .d.closed .t{text-decoration:line-through}
+.cal .d .t{font-variant-numeric:tabular-nums;text-align:right;margin-top:6px;font-size:12.5px;color:var(--ink)}
+.cal .pre{font-size:10.5px;color:#c98500;border:1px solid #f1d9a0;border-radius:4px;padding:0 3px}
+table.daily td,table.daily th{text-align:right}
+table.daily th{vertical-align:bottom}
+table.daily tr.sat td:nth-child(2){color:#2a78d6} table.daily tr.sun td:nth-child(2){color:var(--crit)}
+table.daily tr.cl td{color:var(--ink3)}
+table.daily td:nth-child(3){text-align:left;color:#c98500;font-size:12.5px}
+button.cp{margin-top:4px;padding:3px 8px;font-size:12px}
+button.ok{background:var(--good);border-color:var(--good);color:#fff}
+.cal .d.empty{background:transparent;border:none;cursor:default}
+
+.methods{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.method{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;cursor:pointer}
+.method.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;background:#f4f8fe}
+.method.dis{opacity:.45;cursor:default}
+.method .t{font-size:13px;color:var(--ink2)}
+.method .v{font-size:20px;font-variant-numeric:tabular-nums}
+.method .x{font-size:12px;color:var(--ink3)}
+.big{font-size:30px;font-variant-numeric:tabular-nums}
+
+.note-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.note-grid textarea{min-height:110px}
+.act{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:start;padding:8px 0;border-bottom:1px dashed var(--line)}
+.act .res{display:flex;gap:4px}
+.act .res button{padding:4px 10px;font-size:13px}
+.act .res button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.act input{grid-column:1 / -1;width:100%}
+.timeline .item{border-left:2px solid var(--line);padding:0 0 14px 14px;position:relative}
+.timeline .item::before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--s1)}
+.timeline .ym{font-size:14px;color:var(--ink)}
+.timeline .k{color:var(--ink3);font-size:12px;margin-top:4px}
+.timeline .tx{white-space:pre-wrap;font-size:13.5px}
+
+.diag-top .dg{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.dsum{flex:1 1 380px}
+.lead{font-size:15.5px;line-height:1.8;margin:4px 0 8px}
+.impact{background:#eef5fd;border-radius:8px;padding:8px 12px;font-size:14px}
+.parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px 18px;margin-top:14px}
+.part .pk{font-size:13px;display:flex;justify-content:space-between;gap:6px}
+.part .pk .muted{font-size:11.5px}
+.pbar{height:8px;background:var(--grid);border-radius:4px;margin-top:4px;overflow:hidden}
+.pbar div{height:100%;border-radius:4px}
+.rec{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff}
+.rh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rt{font-size:15.5px;flex:1 1 auto}
+.ri{font-size:15px;color:var(--ink)}
+.pri{font-size:11.5px;border-radius:999px;padding:2px 9px;color:#fff}
+.pri.p高{background:var(--crit)}.pri.p中{background:#c98500}.pri.p低{background:var(--ink3)}
+.cat{font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink2)}
+.why{margin:8px 0;font-size:14px;line-height:1.7}
+.acts ul{margin:4px 0 6px;padding-left:20px;font-size:14px}
+.acts li{margin:3px 0}
+.kpiline{border-top:1px dashed var(--line);padding-top:6px}
+.dl{list-style:none;margin:0;padding:0;font-size:14px}
+.dl li{padding:4px 0;border-bottom:1px dashed var(--line)}
+.ptitle{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:10px}
+#lock{position:fixed;inset:0;background:var(--bg);z-index:100;display:none;align-items:center;justify-content:center}
+#lock .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;width:min(340px,90vw);text-align:center}
+#lock input{width:100%;margin:14px 0;text-align:center;font-size:20px;letter-spacing:.3em}
+
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:12mm}
+  body{background:#fff;font-size:11.5px}
+  body.printing>*:not(#printArea){display:none!important}
+  body.printing #printArea{display:block}
+  #printArea .rec,#printArea .kpi{break-inside:avoid}
+  #printArea .card{break-inside:avoid;border-color:#ddd;padding:10px 12px;margin-bottom:8px}
+  #printArea .kpis{grid-template-columns:repeat(4,1fr)}
+  #printArea .kpi .v{font-size:18px}
+  #printArea h1{font-size:18px;margin-bottom:6px}
+}
+@media (max-width:640px){
+  main{padding:12px 10px 80px}
+  .kpi .v{font-size:20px}
+  .factor{grid-template-columns:80px 1fr 96px}
+}
+</style>
+</head>
+<body>
+<div id="lock"><div class="box"><div style="font-size:17px">数値マネージャー</div><div class="muted">パスコードを入力してください</div><input id="lockIn" type="password" inputmode="numeric" autocomplete="off"><button class="primary" id="lockBtn" style="width:100%">開く</button><div id="lockMsg" class="msg ng"></div></div></div>
+
+<header>
+  <div class="top">
+    <div class="brand">数値マネージャー<small>オフライン・この端末だけに保存</small></div>
+    <div class="monthnav">
+      <button id="mPrev" aria-label="前の月">◀</button>
+      <select id="mSel" aria-label="表示する月"></select>
+      <button id="mNext" aria-label="次の月">▶</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-v="dash" class="on">ダッシュボード</button>
+    <button data-v="diag">経営診断</button>
+    <button data-v="list">月次一覧</button>
+    <button data-v="fc">翌月見込み</button>
+    <button data-v="imp">データ取込</button>
+    <button data-v="set">設定・バックアップ</button>
+  </nav>
+</header>
+
+<main>
+  <div id="backupBanner"></div>
+  <section class="view on" id="v-dash"></section>
+  <section class="view" id="v-list"></section>
+  <section class="view" id="v-fc"></section>
+  <section class="view" id="v-diag"></section>
+  <section class="view" id="v-imp"></section>
+  <section class="view" id="v-set"></section>
+</main>
+<div id="tip"></div>
+<div id="printArea"></div>
+
+<script>
+'use strict';
+/* ========== 保存 ========== */
+const KEY = 'suuchi-manager-v1';
+function defaultState(){
+  return {
+    settings:{laborTarget:24, costTarget:30, empCost:0, passHash:'', budgetPriority:'month', storeName:'', seats:0, fixedCost:0, flTarget:60},
+    days:{},    // 'YYYY-MM-DD': {budget,sales,guests}
+    months:{},  // 'YYYY-MM': {budget,sales,guests,unit,labor,laborHours,laborDetail,cost,costDetail,notes,plan,forecast}
+    lastBackup:null
+  };
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return defaultState();
+    const d = JSON.parse(raw), def = defaultState();
+    d.settings = Object.assign(def.settings, d.settings||{});
+    d.days = d.days||{}; d.months = d.months||{};
+    return d;
+  }catch(e){ return defaultState(); }
+}
+let S = load();
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch(e){ alert('この端末に保存できませんでした。設定からバックアップを書き出してください。'); }
+}
+
+/* ========== 日付・祝日 ========== */
+const HOL = new Set([
+ '2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24','2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06','2025-07-21','2025-08-11','2025-09-15','2025-09-23','2025-10-13','2025-11-03','2025-11-23','2025-11-24',
+ '2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23',
+ '2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11','2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23'
+]);
+const WD = ['日','月','火','水','木','金','土','祝'];
+const pad = n => String(n).padStart(2,'0');
+const ymOf = (y,m) => y+'-'+pad(m);
+function addMonth(ym,n){ let [y,m]=ym.split('-').map(Number); m+=n; while(m>12){m-=12;y++} while(m<1){m+=12;y--} return ymOf(y,m); }
+function dim(ym){ const [y,m]=ym.split('-').map(Number); return new Date(y,m,0).getDate(); }
+function ymLabel(ym,short){ const [y,m]=ym.split('-').map(Number); return short? (String(y).slice(2)+'/'+m) : (y+'年'+m+'月'); }
+function dateObj(ds){ const [y,m,d]=ds.split('-').map(Number); return new Date(y,m-1,d); }
+function dstr(dt){ return dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate()); }
+function shiftDate(ds,n){ const d=dateObj(ds); d.setDate(d.getDate()+n); return dstr(d); }
+function dayType(ds){ return HOL.has(ds) ? 7 : dateObj(ds).getDay(); }
+// 祝前日：翌日が祝日の日（その日が祝日でも翌日が祝日なら祝前日）
+function isPreHol(ds){ return HOL.has(shiftDate(ds,1)); }
+// 売れ方が変わる祝前日（平日・日曜で、その日自体は祝日でない）
+function preWeekday(ds){ const w=dateObj(ds).getDay(); return !HOL.has(ds) && isPreHol(ds) && w!==5 && w!==6; }
+function dayKind(ds){ const h=HOL.has(ds), p=isPreHol(ds); return h&&p?'祝日・祝前日': h?'祝日': p?'祝前日':''; }
+const TODAY = dstr(new Date());
+const TODAY_YM = TODAY.slice(0,7);
+
+/* ========== 書式 ========== */
+const isNum = v => typeof v==='number' && isFinite(v);
+function yen(v){ return isNum(v) ? '¥'+Math.round(v).toLocaleString('ja-JP') : '—'; }
+function man(v){ if(!isNum(v)) return '—'; const a=Math.abs(v); if(a>=1e8) return (v/1e8).toFixed(2)+'億'; if(a>=1e4) return (v/1e4).toFixed(a>=1e6?0:1)+'万'; return Math.round(v).toLocaleString('ja-JP'); }
+function int(v){ return isNum(v) ? Math.round(v).toLocaleString('ja-JP') : '—'; }
+function pct(v,d=1){ return isNum(v) ? (v*100).toFixed(d)+'%' : '—'; }
+function signYen(v){ return isNum(v) ? (v>=0?'+':'−')+'¥'+Math.abs(Math.round(v)).toLocaleString('ja-JP') : '—'; }
+function ratio(a,b){ return isNum(a)&&isNum(b)&&b!==0 ? a/b : null; }
+function avg(arr){ const a=arr.filter(isNum); return a.length? a.reduce((s,x)=>s+x,0)/a.length : null; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// 比率の評価（高いほど良い）
+function stHigh(r, good=1, warn=.97){ if(!isNum(r)) return '<span class="st none">—</span>'; const c = r>=good?'good':(r>=warn?'warn':'bad'); const ic = r>=good?'↑':(r>=warn?'→':'↓'); return `<span class="st ${c}"><i>${ic}</i>${pct(r)}</span>`; }
+// 比率の評価（低いほど良い。target=目標率）
+function stLow(r, target){ if(!isNum(r)) return '<span class="st none">—</span>'; if(!isNum(target)) return `<span class="st">${pct(r)}</span>`; const c = r<=target?'good':(r<=target+0.015?'warn':'bad'); const ic = r<=target?'✓':'!'; return `<span class="st ${c}"><i>${ic}</i>${pct(r)}</span>`; }
+
+/* ========== 集計 ========== */
+function daysOf(ym){ return Object.keys(S.days).filter(d=>d.startsWith(ym)).sort(); }
+// 月ごとの経費（入力がない月は直近の入力月を引き継ぐ）
+function expList(ym){ const m=S.months[ym]; return m&&Array.isArray(m.expenses)&&m.expenses.length? m.expenses : null; }
+function expSource(ym){ for(let i=0;i<60;i++){ const x=addMonth(ym,-i); if(expList(x)) return x; } return null; }
+function expOf(ym){
+  const src=expSource(ym);
+  if(src){ const l=expList(src); return {emp:l.filter(x=>x.t==='emp').reduce((a,x)=>a+(Number(x.v)||0),0), fix:l.filter(x=>x.t==='fix').reduce((a,x)=>a+(Number(x.v)||0),0), src, carry:src!==ym}; }
+  return {emp:Number(S.settings.empCost)||0, fix:Number(S.settings.fixedCost)||0, src:null, carry:false};
+}
+function getM(ym){
+  const m = S.months[ym]||{};
+  const r = {ym, budget:m.budget??null, sales:m.sales??null, guests:m.guests??null, unit:m.unit??null,
+    labor:m.labor??null, laborHours:m.laborHours??null, cost:m.cost??null, daily:false, lastDay:null, elapsed:0, estGuests:false};
+  const ds = daysOf(ym);
+  if(ds.length){
+    let b=0,s=0,g=0,hb=0,hs=0,hg=0,last=null;
+    ds.forEach(d=>{ const x=S.days[d];
+      if(isNum(x.budget)){b+=x.budget;hb++}
+      if(isNum(x.sales)){s+=x.sales;hs++; last=d}
+      if(isNum(x.guests)){g+=x.guests;hg++}
+    });
+    if(hs){ r.sales=s; r.daily=true; r.lastDay=last; r.elapsed=Number(last.slice(8)); }
+    if(hg) r.guests=g;
+    if(hb && (S.settings.budgetPriority==='day' || !isNum(m.budget))) r.budget=b;
+  }
+  if(isNum(r.sales)&&isNum(r.guests)&&r.guests>0) r.unit = r.sales/r.guests;
+  else if(isNum(r.sales)&&isNum(r.unit)&&r.unit>0){ r.guests = r.sales/r.unit; r.estGuests=true; }
+  r.complete = isComplete(ym, r);
+  const ex = expOf(ym); const emp = ex.emp; r.emp=ex.emp; r.fix=ex.fix;
+  r.laborTotal = isNum(r.labor) ? r.labor + emp : null;
+  r.laborRate = ratio(r.laborTotal, r.sales);
+  r.baitoRate = ratio(r.labor, r.sales);
+  r.costRate = ratio(r.cost, r.sales);
+  return r;
+}
+function isComplete(ym, r){
+  if(!isNum(r.sales)) return false;
+  if(r.daily) return r.elapsed>=dim(ym) || ym<TODAY_YM && r.elapsed>=dim(ym)-1;
+  return ym < TODAY_YM;
+}
+function allYMs(){
+  const set = new Set(Object.keys(S.months));
+  Object.keys(S.days).forEach(d=>set.add(d.slice(0,7)));
+  return [...set].sort();
+}
+function latestSalesYM(){ const a=allYMs().filter(ym=>isNum(getM(ym).sales)); return a.length? a[a.length-1] : null; }
+
+// 曜日別プロファイル（指定日より前、直近8週）
+function weekdayProfile(beforeDate, field){
+  const keys = Object.keys(S.days).filter(d=>d<beforeDate && isNum(S.days[d][field]) && S.days[d][field]>0).sort();
+  if(keys.length<14) return null;
+  const last = keys[keys.length-1], from = shiftDate(last,-55);
+  const use = keys.filter(d=>d>=from);
+  const sum=Array(8).fill(0), cnt=Array(8).fill(0);
+  use.forEach(d=>{ const t=dayType(d); sum[t]+=S.days[d][field]; cnt[t]++; });
+  // 祝前日は直近1年分から拾う（数が少ないため）
+  const pre = keys.filter(d=>d>=shiftDate(last,-365) && preWeekday(d)).map(d=>S.days[d][field]);
+  const all = use.reduce((s,d)=>s+S.days[d][field],0)/use.length;
+  const a = sum.map((s,i)=>cnt[i]? s/cnt[i] : null);
+  for(let i=0;i<7;i++) if(a[i]==null) a[i]=all;
+  if(cnt[7]===0) a[7]=a[0]; else if(cnt[7]<3) a[7]=(a[7]*cnt[7]+a[0]*2)/(cnt[7]+2);
+  return {avg:a, cnt, n:use.length, from, to:last, all, pre: pre.length>=2? avg(pre):null, preN:pre.length};
+}
+// その日の重み（曜日平均。祝前日は実績があればそれ、なければ金曜／土曜寄りに補正）
+function dayWeight(ds, prof){
+  const t=dayType(ds);
+  if(preWeekday(ds)){ if(isNum(prof.pre)) return prof.pre; const w=dateObj(ds).getDay(); return (prof.avg[t] + prof.avg[w===0?6:5])/2; }
+  return prof.avg[t];
+}
+
+/* ========== 見込み ========== */
+function completeBefore(T, k){ // T より前の完了月、新しい順に k 件
+  const out=[]; let ym=addMonth(T,-1);
+  for(let i=0;i<24 && out.length<k;i++,ym=addMonth(ym,-1)){ const r=getM(ym); if(r.complete) out.push(r); }
+  return out;
+}
+function forecast(T){
+  const nd = dim(T), first = T+'-01';
+  const LY = getM(addMonth(T,-12));
+  const res = {T, methods:{}, notes:[]};
+  // A: 前年同月 × 直近の前年比
+  const yoys = completeBefore(T,3).map(r=>{ const l=getM(addMonth(r.ym,-12)); return l.complete? ratio(r.sales,l.sales):null; }).filter(isNum);
+  const yoyG = completeBefore(T,3).map(r=>{ const l=getM(addMonth(r.ym,-12)); return l.complete? ratio(r.guests,l.guests):null; }).filter(isNum);
+  if(isNum(LY.sales) && yoys.length){
+    const k=avg(yoys);
+    res.methods.A = {key:'A', name:'前年同月×前年比トレンド', sales:LY.sales*k, guests: isNum(LY.guests)&&yoyG.length? LY.guests*avg(yoyG):null, basis:`前年${ymLabel(LY.ym)} ${man(LY.sales)} × 直近${yoys.length}ヶ月の前年比平均 ${pct(k)}`};
+  }
+  // B: 曜日構成（直近8週の曜日平均 × 来月のカレンダー）＋季節補正
+  const pS = weekdayProfile(first,'sales'), pG = weekdayProfile(first,'guests');
+  const plan = (S.months[T]||{}).plan||{};
+  const closed = new Set(plan.closed||[]);
+  if(pS){
+    let s=0,g=0;
+    for(let d=1; d<=nd; d++){ const ds=T+'-'+pad(d); if(closed.has(ds)) continue; s+=dayWeight(ds,pS); if(pG) g+=dayWeight(ds,pG); }
+    res.methods.B = {key:'B', name:'曜日構成（直近8週）', sales:s, guests:pG?g:null, basis:`${pS.from.slice(5).replace('-','/')}〜${pS.to.slice(5).replace('-','/')}の曜日別平均 × ${T.slice(5)}月の曜日・祝日${closed.size?'（休業'+closed.size+'日を除く）':''}`};
+    // 季節補正：前年の「当月の日販」÷「直前2ヶ月の日販」
+    const ly1=getM(addMonth(T,-13)), ly2=getM(addMonth(T,-14));
+    const lyT = isNum(LY.sales)? LY.sales/nd : null;
+    const lyBase = avg([isNum(ly1.sales)? ly1.sales/dim(ly1.ym):null, isNum(ly2.sales)? ly2.sales/dim(ly2.ym):null]);
+    if(isNum(lyT)&&isNum(lyBase)&&lyBase>0){
+      const si = lyT/lyBase;
+      const lyTg = isNum(LY.guests)? LY.guests/nd:null;
+      const lyBg = avg([isNum(ly1.guests)? ly1.guests/dim(ly1.ym):null, isNum(ly2.guests)? ly2.guests/dim(ly2.ym):null]);
+      const sig = isNum(lyTg)&&isNum(lyBg)&&lyBg>0 ? lyTg/lyBg : si;
+      res.methods.C = {key:'C', name:'曜日構成＋季節補正', sales:s*si, guests:pG? g*sig:null, basis:`曜日構成 × 前年の季節変動 ${pct(si)}（前年${T.slice(5)}月の日販 ÷ その前2ヶ月の日販）`};
+    }
+  }
+  // D: 直近3ヶ月平均（日販×日数）
+  const rec = completeBefore(T,3);
+  if(rec.length){
+    const dps = avg(rec.map(r=>r.sales/dim(r.ym)));
+    const dpg = avg(rec.map(r=>isNum(r.guests)? r.guests/dim(r.ym):null));
+    res.methods.D = {key:'D', name:'直近3ヶ月の日販平均', sales:dps*(nd-closed.size), guests:isNum(dpg)? dpg*(nd-closed.size):null, basis:`直近${rec.length}ヶ月の平均日販 ${man(dps)} × ${nd-closed.size}日`};
+  }
+  // E: 予算
+  const TB = getM(T);
+  if(isNum(TB.budget)) res.methods.E = {key:'E', name:'予算どおり', sales:TB.budget, guests:null, basis:'入力済みの予算'};
+  res.recommended = ['C','B','A','D','E'].find(k=>res.methods[k]) || null;
+  res.profile = pS; res.profileG = pG;
+  // 人件費・仕入れ比率
+  const lab = completeBefore(T,6).filter(r=>isNum(r.labor)).slice(0,3);
+  res.baitoRate = avg(lab.map(r=>r.baitoRate));
+  res.hourly = avg(lab.map(r=>isNum(r.laborHours)&&r.laborHours>0? r.labor/r.laborHours : null));
+  res.labBasis = lab.map(r=>ymLabel(r.ym,true)).join('・');
+  const cst = completeBefore(T,6).filter(r=>isNum(r.cost)).slice(0,3);
+  res.costRate = avg(cst.map(r=>r.costRate));
+  res.costBasis = cst.map(r=>ymLabel(r.ym,true)).join('・');
+  res.LY = LY;
+  return res;
+}
+// 日別の目標（月合計を曜日の重みで配分）
+function dailyTargets(ym, total, closed, field){
+  const prof = weekdayProfile(ym+'-01',field||'sales');
+  const nd = dim(ym), w=[];
+  for(let d=1; d<=nd; d++){ const ds=ym+'-'+pad(d); w.push(closed&&closed.has(ds)?0:(prof? dayWeight(ds,prof) : 1)); }
+  const sw = w.reduce((a,b)=>a+b,0)||1;
+  return w.map(x=>isNum(total)? total*x/sw : null);
+}
+
+// 端数を調整して合計を保ったまま丸める
+function roundKeep(vals, unit){
+  const r=vals.map(v=>isNum(v)? Math.round(v/unit)*unit : null);
+  const total=Math.round(vals.reduce((a,v)=>a+(v||0),0)/unit)*unit, diff=total-r.reduce((a,v)=>a+(v||0),0);
+  if(diff){ let mi=-1; r.forEach((v,i)=>{ if(isNum(v)&&v>0&&(mi<0||v>r[mi])) mi=i; }); if(mi>=0) r[mi]+=diff; }
+  return r;
+}
+function dailyPlan(T, sales, guests, cost, labor, closed, unit){
+  const nd=dim(T), sw=dailyTargets(T, sales, closed,'sales');
+  const gw = isNum(guests)? (weekdayProfile(T+'-01','guests')? dailyTargets(T, guests, closed,'guests') : sw.map(v=>isNum(v)&&isNum(sales)&&sales>0? guests*v/sales:null)) : sw.map(()=>null);
+  const open=[...Array(nd).keys()].filter(i=>!closed.has(T+'-'+pad(i+1))).length||1;
+  const rows=[];
+  for(let d=1; d<=nd; d++){ const ds=T+'-'+pad(d), cl=closed.has(ds), i=d-1, share=isNum(sw[i])&&sales>0? sw[i]/sales:0;
+    rows.push({d, ds, w:dateObj(ds).getDay(), wd:WD[dateObj(ds).getDay()], hol:HOL.has(ds), kind:dayKind(ds), closed:cl,
+      sales: cl?0:sw[i], guests: cl?0:gw[i], cost: cl?0:(isNum(cost)? cost*share:null), labor: cl?0:(isNum(labor)? labor*(0.4/open + 0.6*share):null)}); }
+  const sr=roundKeep(rows.map(r=>r.sales), unit||1), gr=roundKeep(rows.map(r=>r.guests),1), cr=roundKeep(rows.map(r=>r.cost),1), lr=roundKeep(rows.map(r=>r.labor),1);
+  rows.forEach((r,i)=>{ r.sales=sr[i]; r.guests=gr[i]; r.cost=cr[i]; r.labor=lr[i]; });
+  return rows;
+}
+function copyText(t, btn){
+  const done=()=>{ const o=btn.dataset.label||btn.textContent; btn.dataset.label=o; btn.textContent='コピーしました'; btn.classList.add('ok'); setTimeout(()=>{btn.textContent=o; btn.classList.remove('ok');},1500); };
+  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='-1000px'; ta.style.fontSize='16px'; document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0,t.length); let ok=false; try{ ok=document.execCommand('copy'); }catch(e){} ta.remove(); if(ok) done(); else alert('コピーできませんでした。'); };
+  if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fallback); else fallback();
+}
+
+/* ========== グラフ（SVG） ========== */
+const charts = {};
+let chartSeq = 0;
+function niceMax(v){ if(!(v>0)) return 1; const e=Math.pow(10,Math.floor(Math.log10(v))); const f=v/e; const n = f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10; return n*e; }
+function ticks(max, n=4){ const step=niceMax(max/n); const top=Math.ceil(max/step)*step; const out=[]; for(let v=0; v<=top+1e-9; v+=step) out.push(v); return out; }
+/* series: {name, type:'bar'|'line'|'tick', values, color, dash, soft:[idx..]} */
+function chart(o){
+  const id='c'+(++chartSeq);
+  const W=o.width||760, H=o.height||240, L=o.left||54, R=12, T=12, B=26;
+  const n=o.labels.length, pw=W-L-R, ph=H-T-B, slot=pw/Math.max(n,1);
+  let mx=0, mn=0;
+  o.series.forEach(s=>s.values.forEach(v=>{ if(isNum(v)){ mx=Math.max(mx,v); mn=Math.min(mn,v);} }));
+  if(isNum(o.min)) mn=o.min;
+  if(isNum(o.maxHint)) mx=Math.max(mx,o.maxHint);
+  let tk;
+  if(mn>0){ const step=niceMax(((mx||1)-mn)/(o.nt||4)); const st0=Math.floor(mn/step)*step; tk=[]; for(let v=st0; v<=Math.ceil(mx/step)*step+1e-9; v+=step) tk.push(v); mn=st0; }
+  else tk = ticks(mx||1, o.nt||4);
+  const top=tk[tk.length-1];
+  const y = v => T + ph - (v-mn)/(top-mn)*ph;
+  const xc = i => L + slot*i + slot/2;
+  const fa = o.fmtAxis||man;
+  let g = '';
+  tk.forEach(v=>{ g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink3)">${fa(v)}</text>`; });
+  (o.refs||[]).forEach(rf=>{ if(isNum(rf.value)) g+=`<line x1="${L}" x2="${W-R}" y1="${y(rf.value)}" y2="${y(rf.value)}" stroke="${rf.color||'var(--ink2)'}" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-R}" y="${y(rf.value)-5}" text-anchor="end" font-size="11" fill="var(--ink2)">${esc(rf.label)}</text>`; });
+  const bars = o.series.filter(s=>s.type==='bar');
+  const bw = Math.min(slot*0.62/Math.max(bars.length,1), 34);
+  bars.forEach((s,bi)=>{
+    s.values.forEach((v,i)=>{ if(!isNum(v)||v<=0) return;
+      const x = xc(i) - bw*bars.length/2 + bw*bi + 1, w=Math.max(bw-2,2), y0=y(v), h=y(mn)-y0, r=Math.min(4,w/2,h);
+      const col = (s.colorAt&&s.colorAt(i)) || s.color;
+      g+=`<path d="M${x},${y(mn)} V${y0+r} Q${x},${y0} ${x+r},${y0} H${x+w-r} Q${x+w},${y0} ${x+w},${y0+r} V${y(mn)} Z" fill="${col}"/>`;
+    });
+  });
+  o.series.filter(s=>s.type==='tick').forEach(s=>{
+    const tw = Math.max(Math.min(slot*0.8, 40), 6);
+    s.values.forEach((v,i)=>{ if(isNum(v)&&v>0) g+=`<line x1="${xc(i)-tw/2}" x2="${xc(i)+tw/2}" y1="${y(v)}" y2="${y(v)}" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round"/>`; });
+  });
+  o.series.filter(s=>s.type==='line').forEach(s=>{
+    let d='', pen=false;
+    s.values.forEach((v,i)=>{ if(isNum(v)){ d+=(pen?'L':'M')+xc(i).toFixed(1)+','+y(v).toFixed(1)+' '; pen=true; } else pen=false; });
+    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" ${s.dash?'stroke-dasharray="5 4"':''}/>`;
+    if(n<=40) s.values.forEach((v,i)=>{ if(isNum(v)) g+=`<circle cx="${xc(i)}" cy="${y(v)}" r="3.6" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`; });
+  });
+  const every = n>24? Math.ceil(n/12) : (n>14?2:1);
+  o.labels.forEach((lb,i)=>{ if(i%every===0||i===o.hi) g+=`<text x="${xc(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="${i===o.hi?'var(--ink)':'var(--ink3)'}">${esc(lb)}</text>`; });
+  g+=`<line x1="${L}" x2="${W-R}" y1="${y(mn)}" y2="${y(mn)}" stroke="var(--ink3)" stroke-width="1"/>`;
+  if(isNum(o.hi)) g = `<rect x="${L+slot*o.hi}" y="${T}" width="${slot}" height="${ph}" fill="#eaf2fc"/>`+g;
+  for(let i=0;i<n;i++) g+=`<rect class="hit" data-c="${id}" data-i="${i}" x="${L+slot*i}" y="${T}" width="${slot}" height="${ph+B}" fill="transparent"/>`;
+  charts[id] = {o};
+  const leg = o.series.filter(s=>!s.noLegend).map(s=>`<span><i class="sw ${s.type==='line'?(s.dash?'dash':'line'):(s.type==='tick'?'tick':'')}" style="${s.type==='line'&&s.dash?'border-color':'background'}:${s.color}"></i>${esc(s.name)}</span>`).concat((o.refs||[]).filter(r=>isNum(r.value)).map(r=>`<span><i class="sw dash" style="border-color:${r.color||'var(--ink2)'}"></i>${esc(r.label)}</span>`)).join('');
+  return `<div class="legend">${leg}</div><div class="chart" role="img" aria-label="${esc(o.title||'グラフ')}"><svg viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
+}
+function tipHtml(c,i){
+  const o=charts[c].o, fv=o.fmtVal||yen;
+  let h=`<b>${esc((o.tipLabels||o.labels)[i])}</b>`;
+  o.series.forEach(s=>{ const v=s.values[i]; h+=`<div class="tr"><span><i class="sw" style="background:${s.color}"></i>${esc(s.name)}</span><span>${isNum(v)?fv(v):'—'}</span></div>`; });
+  if(o.tipExtra){ const x=o.tipExtra(i); if(x) h+=x; }
+  return h;
+}
+const tip = document.getElementById('tip');
+function showTip(e){
+  const t=e.target; if(!(t instanceof Element) || !t.classList.contains('hit')){ tip.style.display='none'; return; }
+  const c=t.dataset.c, i=+t.dataset.i; if(!charts[c]) return;
+  tip.innerHTML = tipHtml(c,i); tip.style.display='block';
+  const w=tip.offsetWidth, h=tip.offsetHeight;
+  let x=e.clientX+14, yy=e.clientY-h-12;
+  if(x+w>innerWidth-8) x=e.clientX-w-14;
+  if(yy<8) yy=e.clientY+16;
+  tip.style.left=x+'px'; tip.style.top=yy+'px';
+}
+document.addEventListener('pointermove', showTip);
+document.addEventListener('pointerdown', showTip);
+document.addEventListener('scroll', ()=>tip.style.display='none', true);
+
+/* ========== 画面状態 ========== */
+let cur = (()=>{ const l=latestSalesYM(); return l || TODAY_YM; })();
+let view = 'dash';
+let fcTarget = null;
+function monthRange(){
+  const a = allYMs(); let lo = a[0] || addMonth(TODAY_YM,-12); let hi = addMonth(TODAY_YM,2);
+  if(a.length && a[a.length-1]>hi) hi=a[a.length-1];
+  if(lo>'2025-01') lo='2025-01';
+  const out=[]; for(let ym=lo; ym<=hi; ym=addMonth(ym,1)) out.push(ym); return out;
+}
+function fillMonthSel(){
+  const sel=document.getElementById('mSel');
+  sel.innerHTML = monthRange().map(ym=>`<option value="${ym}" ${ym===cur?'selected':''}>${ymLabel(ym)}</option>`).join('');
+}
+function setCur(ym){ cur=ym; render(); }
+document.getElementById('mSel').onchange = e=>setCur(e.target.value);
+document.getElementById('mPrev').onclick = ()=>setCur(addMonth(cur,-1));
+document.getElementById('mNext').onclick = ()=>setCur(addMonth(cur,1));
+document.getElementById('tabs').onclick = e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  view=b.dataset.v;
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on', v.id==='v-'+view));
+  render(); scrollTo(0,0);
+};
+function render(){
+  for(const k in charts) delete charts[k];
+  fillMonthSel();
+  renderBanner();
+  const f = {dash:renderDash, list:renderList, fc:renderFc, diag:renderDiag, imp:renderImp, set:renderSet}[view];
+  f();
+}
+function renderBanner(){
+  const el=document.getElementById('backupBanner');
+  const has = Object.keys(S.months).length || Object.keys(S.days).length;
+  const old = !S.lastBackup || (Date.now()-S.lastBackup) > 14*86400000;
+  el.innerHTML = has && old ? `<div class="banner"><span>データはこの端末の中だけにあります。${S.lastBackup?'前回のバックアップから2週間以上たっています。':'まだバックアップがありません。'}</span><button onclick="exportJSON()">今すぐバックアップ</button></div>` : '';
+}
+
+/* ========== ダッシュボード ========== */
+function evaluations(r, ly, prev){
+  const out=[]; const st=S.settings;
+  const add=(c,ic,t)=>out.push(`<li><span class="st ${c}"><i>${ic}</i></span><span>${t}</span></li>`);
+  if(!isNum(r.sales)){ add('ser','!','この月の実績がまだありません。「データ取込」から貼り付けてください。'); return out; }
+  const inprog = !r.complete;
+  if(isNum(r.budget)){
+    if(inprog && r.daily){
+      const tg = dailyTargets(r.ym, r.budget); const pace = tg.slice(0,r.elapsed).reduce((a,b)=>a+(b||0),0);
+      const pr = ratio(r.sales,pace);
+      if(pr>=1) add('good','↑',`${r.elapsed}日時点で予算ペースを上回っています（ペース比 ${pct(pr)}）。`);
+      else add(pr>=.97?'warn':'bad', pr>=.97?'→':'↓', `${r.elapsed}日時点で予算ペースに ${yen(pace-r.sales)} 届いていません（ペース比 ${pct(pr)}）。残り${dim(r.ym)-r.elapsed}日の必要日販は ${yen((r.budget-r.sales)/Math.max(dim(r.ym)-r.elapsed,1))}。`);
+    } else {
+      const br = ratio(r.sales,r.budget);
+      if(br>=1) add('good','↑',`予算達成（予算比 ${pct(br)}、${signYen(r.sales-r.budget)}）。`);
+      else add(br>=.97?'warn':'bad', br>=.97?'→':'↓', `予算未達（予算比 ${pct(br)}、あと ${yen(r.budget-r.sales)}）。`);
+    }
+  }
+  if(r.complete && ly.complete && isNum(ly.sales)){
+    const yr=ratio(r.sales,ly.sales);
+    const gr=ratio(r.guests,ly.guests), ur=ratio(r.unit,ly.unit);
+    let t=`前年比 ${pct(yr)}（${signYen(r.sales-ly.sales)}）。`;
+    if(isNum(gr)&&isNum(ur)){
+      t+=` 客数 ${pct(gr)}・客単価 ${pct(ur)}。`;
+      if(gr>=1&&ur<1) t+=' 伸びは客数によるもので、客単価が前年を下回っています。';
+      else if(gr<1&&ur>=1) t+=' 客単価は上がっていますが、客数が前年を下回っています。';
+      else if(gr>=1&&ur>=1) t+=' 客数・客単価ともに前年超え。';
+      else t+=' 客数・客単価ともに前年割れ。';
+    }
+    add(yr>=1?'good':(yr>=.97?'warn':'bad'), yr>=1?'↑':(yr>=.97?'→':'↓'), t);
+  }
+  if(r.daily){
+    const ds=daysOf(r.ym).filter(d=>isNum(S.days[d].sales)&&S.days[d].sales>0);
+    const wk=[],we=[]; ds.forEach(d=>{ const t=dayType(d); (t===0||t===6||t===7? we:wk).push(S.days[d].sales); });
+    if(wk.length>=3&&we.length>=2){ const rr=avg(we)/avg(wk); add(rr>=1?'good':'ser', rr>=1?'↑':'!', `土日祝の平均日販は平日の ${pct(rr,0)}（平日 ${man(avg(wk))} / 土日祝 ${man(avg(we))}）。`); }
+  }
+  if(isNum(r.laborRate)){
+    const tg=st.laborTarget/100;
+    add(r.laborRate<=tg?'good':(r.laborRate<=tg+.015?'warn':'bad'), r.laborRate<=tg?'✓':'!', `人件費率 ${pct(r.laborRate)}（目標 ${pct(tg,0)}${r.emp? '・社員分込み':''}）。${r.laborRate>tg? '目標を '+yen(r.laborTotal-r.sales*tg)+' 超過。':''}`);
+  }
+  if(isNum(r.costRate)){
+    const tg=st.costTarget/100;
+    add(r.costRate<=tg?'good':(r.costRate<=tg+.015?'warn':'bad'), r.costRate<=tg?'✓':'!', `仕入率 ${pct(r.costRate)}（目標 ${pct(tg,0)}）。`);
+  }
+  const fc=(S.months[r.ym]||{}).forecast;
+  if(fc&&isNum(fc.sales)&&r.complete){ const a=ratio(r.sales,fc.sales); add(Math.abs(a-1)<=.03?'good':'ser', Math.abs(a-1)<=.03?'✓':'!', `前月に立てた見込み ${yen(fc.sales)} に対して実績は ${pct(a)}。${a>1?'見込みより上振れ。':'見込みより下振れ。'}`); }
+  return out;
+}
+function kpi(label, value, lines){ return `<div class="kpi"><div class="l">${label}</div><div class="v">${value}</div><div class="d">${lines.filter(Boolean).map(x=>`<span>${x}</span>`).join('')}</div></div>`; }
+function renderDash(){
+  const el=document.getElementById('v-dash');
+  const r=getM(cur), ly=getM(addMonth(cur,-12)), prev=getM(addMonth(cur,-1));
+  const st=S.settings;
+  if(!allYMs().length){
+    el.innerHTML = `<div class="card"><h2>はじめに</h2><ol class="steps">
+      <li>「データ取込」で売上データ（予算・実績・稼働・客単価）を貼り付けます。月ごとの表でも日ごとの表でも読めます。</li>
+      <li>アルバイトの給与実績と仕入れ実績を貼り付けます。</li>
+      <li>「設定」で目標人件費率・目標仕入率を確認します（人件費率は24%で設定済み）。</li>
+      <li>「経営診断」で、課題・打ち手・改善余地の金額・来月の目標KPIが自動で出ます。入力は数字だけです。</li></ol>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="primary" onclick="goView('imp')">データ取込へ</button><button onclick="loadSample()">サンプルデータで試す</button></div></div>`;
+    return;
+  }
+  const inprog = isNum(r.sales) && !r.complete;
+  let landing=null;
+  if(inprog && r.daily){
+    const prof = weekdayProfile(r.lastDay ? shiftDate(r.lastDay,1) : cur+'-01','sales');
+    if(prof){ let rest=0; for(let d=r.elapsed+1; d<=dim(cur); d++) rest+=prof.avg[dayType(cur+'-'+pad(d))]; landing=r.sales+rest; }
+  }
+  // KPI
+  let h='';
+  if(inprog) h+=`<div class="banner info">${ymLabel(cur)}は集計途中です（${r.daily? r.elapsed+'日まで':'月の途中'}）。前年比は月が締まってから比べます。</div>`;
+  h+='<div class="kpis">';
+  h+=kpi('売上実績', `${man(r.sales)}<small>円</small>`, [
+    isNum(r.budget)? `予算 ${man(r.budget)}　${inprog? '進捗 '+pct(ratio(r.sales,r.budget)) : '予算比 '+stHigh(ratio(r.sales,r.budget))}`:'予算 未入力',
+    !inprog && isNum(ly.sales)? `前年比 ${stHigh(ratio(r.sales,ly.sales))}`: (isNum(ly.sales)? `前年同月 ${man(ly.sales)}`:'')
+  ]);
+  if(inprog && r.daily){
+    const remain = dim(cur)-r.elapsed;
+    h+=kpi('着地見込み', `${man(landing)}<small>円</small>`, [
+      isNum(r.budget)&&isNum(landing)? `予算比 ${stHigh(ratio(landing,r.budget))}`:'',
+      isNum(r.budget)? `残り${remain}日の必要日販 ${man((r.budget-r.sales)/Math.max(remain,1))}`:''
+    ]);
+  } else {
+    h+=kpi('予算差', isNum(r.budget)&&isNum(r.sales)? signYen(r.sales-r.budget):'—', [isNum(ly.sales)&&isNum(r.sales)? `前年差 ${signYen(r.sales-ly.sales)}`:'', isNum(r.sales)? `日販 ${man(r.sales/(r.daily? r.elapsed: dim(cur)))}`:'']);
+  }
+  h+=kpi('稼働（客数）', `${int(r.guests)}<small>人</small>`, [r.estGuests?'客単価から逆算':'', !inprog&&isNum(ly.guests)? `前年比 ${stHigh(ratio(r.guests,ly.guests))}`:'', isNum(r.guests)? `1日平均 ${int(r.guests/(r.daily? r.elapsed: dim(cur)))}人`:'']);
+  h+=kpi('客単価', `${int(r.unit)}<small>円</small>`, [isNum(ly.unit)? `前年 ${int(ly.unit)}円　${stHigh(ratio(r.unit,ly.unit),1,.98)}`:'', isNum(prev.unit)? `前月 ${int(prev.unit)}円`:'']);
+  h+=kpi('人件費率', isNum(r.laborRate)? pct(r.laborRate):'—', [`目標 ${st.laborTarget}%　${stLow(r.laborRate, st.laborTarget/100)}`, isNum(r.labor)? `アルバイト ${man(r.labor)}${isNum(r.laborHours)? '・'+int(r.laborHours)+'h':''}`:'給与 未入力']);
+  h+=kpi('仕入率', isNum(r.costRate)? pct(r.costRate):'—', [`目標 ${st.costTarget}%　${stLow(r.costRate, st.costTarget/100)}`, isNum(r.cost)? `仕入れ ${man(r.cost)}`:'仕入れ 未入力']);
+  h+='</div>';
+
+  // 評価 + 要因分解
+  h+='<div class="row">';
+  h+=`<div class="card"><h2>今月の評価<span class="sub">自動</span></h2><ul class="evals">${evaluations(r,ly,prev).join('')}</ul></div>`;
+  let fac='';
+  if(r.complete&&ly.complete&&isNum(r.guests)&&isNum(ly.guests)&&isNum(r.unit)&&isNum(ly.unit)){
+    const gEff=(r.guests-ly.guests)*ly.unit, uEff=(r.unit-ly.unit)*r.guests, tot=r.sales-ly.sales;
+    const mxv=Math.max(Math.abs(gEff),Math.abs(uEff),Math.abs(tot))||1;
+    const bar=(v,c)=>{ const w=Math.abs(v)/mxv*50; return `<div class="fbar"><div class="axis"></div><div class="b" style="background:${c};${v>=0?`left:50%;width:${w}%`:`right:50%;width:${w}%`}"></div></div>`; };
+    fac=`<div class="card"><h2>前年差の要因分解<span class="sub">売上 = 客数 × 客単価</span></h2>
+      <div class="factor">
+        <span>客数の影響</span>${bar(gEff,'var(--s1)')}<span class="num" style="text-align:right">${signYen(gEff)}</span>
+        <span>客単価の影響</span>${bar(uEff,'var(--s3)')}<span class="num" style="text-align:right">${signYen(uEff)}</span>
+        <span>前年差 合計</span>${bar(tot,'var(--budget)')}<span class="num" style="text-align:right">${signYen(tot)}</span>
+      </div>
+      <p class="muted" style="margin:10px 0 0">客数 ${int(ly.guests)} → ${int(r.guests)}人、客単価 ${int(ly.unit)} → ${int(r.unit)}円。</p></div>`;
+  } else {
+    fac=`<div class="card"><h2>前年差の要因分解</h2><p class="muted">月が締まり、前年同月の客数と客単価がそろうと表示されます。</p></div>`;
+  }
+  h+=fac+'</div>';
+
+  // 日別
+  if(r.daily){
+    const nd=dim(cur), lab=[], sal=[], tgt=[], tl=[];
+    const tg = isNum(r.budget)? dailyTargets(cur, r.budget, new Set(((S.months[cur]||{}).plan||{}).closed||[])) : [];
+    let cum=0, cumT=0;
+    for(let d=1; d<=nd; d++){ const ds=cur+'-'+pad(d); const x=S.days[ds]||{}; lab.push(String(d)); tl.push(`${Number(cur.slice(5))}/${d}（${WD[dayType(ds)]}）`); sal.push(isNum(x.sales)?x.sales:null); tgt.push(isNum(x.budget)&&S.settings.budgetPriority==='day'? x.budget : (tg[d-1]??null)); }
+    const elapsed=r.elapsed;
+    for(let i=0;i<elapsed;i++){ cum+=sal[i]||0; cumT+=tgt[i]||0; }
+    const meter = isNum(r.budget)? `<div class="meter"><div class="fill" style="width:${Math.min(cum/r.budget*100,100)}%"></div><div class="pace" style="left:${Math.min(cumT/r.budget*100,100)}%"></div></div>
+      <div class="meter-legend"><span>累計 ${man(cum)}（${pct(cum/r.budget)}）</span><span>${elapsed}日までの予算ペース ${man(cumT)}｜月予算 ${man(r.budget)}</span></div>` : '';
+    h+=`<div class="card"><h2>日別の売上<span class="sub">目標は月予算を曜日の売れ方で配分・薄い棒は土日祝</span></h2>${meter}${chart({title:'日別売上', labels:lab, tipLabels:tl, height:220,
+      series:[{name:'日別実績',type:'bar',values:sal,color:'var(--s1)', colorAt:i=>{const t=dayType(cur+'-'+pad(i+1));return (t===0||t===6||t===7)?'#5598e7':'var(--s1)'}},{name:'日別目標',type:'tick',values:tgt,color:'var(--budget)'}],
+      tipExtra:i=>{ const g=(S.days[cur+'-'+pad(i+1)]||{}).guests; return isNum(g)? `<div class="tr"><span>客数</span><span>${int(g)}人</span></div><div class="tr"><span>客単価</span><span>${isNum(sal[i])?int(sal[i]/g):'—'}円</span></div>`:''; }})}</div>`;
+  }
+
+  // 24ヶ月推移
+  const span=[]; for(let i=23;i>=0;i--) span.push(addMonth(cur,-i));
+  const rows=span.map(getM), lys=span.map(ym=>getM(addMonth(ym,-12)));
+  h+=`<div class="card"><h2>月別の売上推移<span class="sub">直近24ヶ月・薄い棒は集計途中の月</span></h2>${chart({title:'月別売上',labels:span.map(ym=>ymLabel(ym,true)), tipLabels:span.map(ym=>ymLabel(ym)), hi:23, height:250,
+    series:[{name:'実績',type:'bar',values:rows.map(x=>x.sales),color:'var(--s1)',colorAt:i=>rows[i].complete?null:'var(--s1-soft)'},{name:'予算',type:'tick',values:rows.map(x=>x.budget),color:'var(--budget)'},{name:'前年同月',type:'line',values:lys.map(x=>x.sales),color:'var(--s2)'}],
+    tipExtra:i=>{ const x=rows[i]; return `<div class="tr"><span>予算比</span><span>${pct(ratio(x.sales,x.budget))}</span></div><div class="tr"><span>前年比</span><span>${pct(ratio(x.sales,lys[i].sales))}</span></div>`; }})}</div>`;
+  // 客数・客単価
+  const s12=span.slice(12), r12=rows.slice(12), l12=lys.slice(12);
+  h+='<div class="row">';
+  h+=`<div class="card"><h2>稼働（客数）<span class="sub">直近12ヶ月・締まった月のみ</span></h2>${chart({title:'客数',labels:s12.map(ym=>ymLabel(ym,true)),tipLabels:s12.map(ymLabel),hi:11,height:200,width:520,fmtAxis:v=>int(v),fmtVal:v=>int(v)+'人',
+    series:[{name:'今年',type:'line',values:r12.map(x=>x.complete?x.guests:null),color:'var(--s1)'},{name:'前年',type:'line',values:l12.map(x=>x.guests),color:'var(--s2)'}]})}</div>`;
+  h+=`<div class="card"><h2>客単価<span class="sub">直近12ヶ月</span></h2>${chart({title:'客単価',labels:s12.map(ym=>ymLabel(ym,true)),tipLabels:s12.map(ymLabel),hi:11,height:200,width:520,fmtAxis:v=>int(v),fmtVal:v=>int(v)+'円',
+    min:Math.max(0, Math.floor((Math.min(...r12.concat(l12).map(x=>x.unit).filter(isNum), 1e9)*0.85)/100)*100) || 0,
+    series:[{name:'今年',type:'line',values:r12.map(x=>x.unit),color:'var(--s1)'},{name:'前年',type:'line',values:l12.map(x=>x.unit),color:'var(--s2)'}]})}</div>`;
+  h+='</div>';
+  // 比率
+  h+=`<div class="card"><h2>人件費率・仕入率<span class="sub">直近12ヶ月</span></h2>${chart({title:'比率',labels:s12.map(ym=>ymLabel(ym,true)),tipLabels:s12.map(ymLabel),hi:11,height:210,fmtAxis:v=>(v*100).toFixed(0)+'%',fmtVal:v=>pct(v),
+    maxHint:Math.max(st.laborTarget,st.costTarget)/100*1.15,
+    series:[{name:'人件費率',type:'line',values:r12.map(x=>x.laborRate),color:'var(--s1)'},{name:'仕入率',type:'line',values:r12.map(x=>x.costRate),color:'var(--s3)'}],
+    refs:[{value:st.laborTarget/100,label:'目標人件費率 '+st.laborTarget+'%',color:'var(--s1)'},{value:st.costTarget/100,label:'目標仕入率 '+st.costTarget+'%',color:'var(--s3)'}]})}</div>`;
+  // 診断の要点
+  const DM = r.complete? cur : lastComplete(cur);
+  if(DM){ const A=analyze(DM);
+    h+='<div class="row">';
+    h+=`<div class="card"><h2>重点課題 TOP3<span class="sub">${ymLabel(DM)}の経営診断より</span></h2>${A.recs.length? A.recs.slice(0,3).map((x,i)=>`<div class="rec" style="padding:9px 12px"><div class="rh"><span class="pri p${x.pri}">${x.pri}</span><span class="rt" style="font-size:14.5px">${i+1}. ${esc(x.title)}</span>${isNum(x.impact)?`<span class="ri num small">月 ${man(x.impact)}円</span>`:''}</div><div class="small" style="margin-top:4px">${esc(x.actions[0])}</div></div>`).join(''):'<p class="muted">大きな課題は見当たりません。</p>'}<button onclick="goView('diag')">経営診断をすべて見る</button></div>`;
+    h+=`<div class="card"><h2>総合評価</h2><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">${gauge(A.score,A.grade)}<p class="small" style="flex:1 1 220px;line-height:1.8;margin:0">${esc(A.summary)}</p></div></div>`;
+    h+='</div>';
+  }
+  h+=`<div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="printReport(getM(cur).complete?cur:lastComplete(cur))">診断レポートを印刷・PDF</button><button onclick="goView('fc')">翌月見込みへ</button></div>`;
+  el.innerHTML=h;
+}
+function goView(v){ document.querySelector(`#tabs button[data-v="${v}"]`).click(); }
+
+/* ========== 経営診断エンジン ========== */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function stdev(a){ a=a.filter(isNum); if(a.length<2) return null; const m=avg(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1)); }
+function linreg(xs,ys){ const n=xs.length; if(n<3) return null; const mx=avg(xs), my=avg(ys); let sxy=0,sxx=0; for(let i=0;i<n;i++){ sxy+=(xs[i]-mx)*(ys[i]-my); sxx+=(xs[i]-mx)**2; } if(!sxx) return null; const b=sxy/sxx; return {b, a:my-b*mx}; }
+function lastComplete(ym){ for(let i=0;i<36;i++){ const x=addMonth(ym,-i); if(getM(x).complete) return x; } return null; }
+function monthsBack(M,n){ const a=[]; for(let i=n-1;i>=0;i--) a.push(addMonth(M,-i)); return a; }
+function countType(ym, types){ let c=0; for(let d=1; d<=dim(ym); d++){ const t=dayType(ym+'-'+pad(d)); if(types.includes(t)) c++; } return c; }
+const WDFULL=['日曜','月曜','火曜','水曜','木曜','金曜','土曜','祝日'];
+
+// 月内の曜日別の実績
+function weekdayStats(ym){
+  const ds=daysOf(ym).filter(d=>isNum(S.days[d].sales)&&S.days[d].sales>0);
+  if(ds.length<14) return null;
+  const sum=Array(8).fill(0), cnt=Array(8).fill(0), gs=Array(8).fill(0), gc=Array(8).fill(0);
+  ds.forEach(d=>{ const t=dayType(d), x=S.days[d]; sum[t]+=x.sales; cnt[t]++; if(isNum(x.guests)&&x.guests>0){ gs[t]+=x.guests; gc[t]++; } });
+  const a=sum.map((s,i)=>cnt[i]? s/cnt[i]:null), g=gs.map((s,i)=>gc[i]? s/gc[i]:null);
+  const u=a.map((v,i)=>isNum(v)&&isNum(g[i])&&g[i]>0? v/g[i]:null);
+  const all=ds.reduce((s,d)=>s+S.days[d].sales,0)/ds.length;
+  return {avg:a, guests:g, unit:u, cnt, all, days:ds};
+}
+// 次月の目標KPI（その月より前のデータだけで決まる）
+function kpiTargets(T){
+  const st=S.settings, fc=forecast(T), TB=getM(T);
+  const m = fc.recommended? fc.methods[fc.recommended] : null;
+  const fs = m? m.sales : null, fg = m&&isNum(m.guests)? m.guests : null;
+  const sales = isNum(TB.budget)? TB.budget : fs;
+  if(!isNum(sales)) return null;
+  const nd=dim(T); const closed=((S.months[T]||{}).plan||{}).closed||[]; const od=nd-closed.length;
+  let unit = isNum(fs)&&isNum(fg)&&fg>0? fs/fg : null;
+  const lyU = fc.LY.unit;
+  if(isNum(unit)&&isNum(lyU)&&lyU>unit) unit = unit + (lyU-unit)*0.5; // 前年水準へ半分戻す
+  const guests = isNum(unit)&&unit>0? sales/unit : null;
+  const emp=expOf(T).emp;
+  const laborCap = sales*st.laborTarget/100 - emp;
+  const hours = isNum(fc.hourly)? laborCap/fc.hourly : null;
+  return {T, sales, daily:sales/od, guests, guestsDay: isNum(guests)? guests/od:null, unit, laborRate:st.laborTarget/100, laborCap, costRate:st.costTarget/100, costCap:sales*st.costTarget/100, hours, spmh: isNum(hours)&&hours>0? sales/hours:null, fromBudget:isNum(TB.budget), fs, fg, od};
+}
+
+function analyze(M){
+  const st=S.settings, r=getM(M), ly=getM(addMonth(M,-12)), pv=getM(addMonth(M,-1));
+  const A={M, r, ly, pv, recs:[], strengths:[], notes:[]};
+  const emp=r.emp, fixed=r.fix;
+  const lyOK = ly.complete && isNum(ly.sales);
+  A.yoy = lyOK? ratio(r.sales,ly.sales):null;
+  A.yoyG = lyOK? ratio(r.guests,ly.guests):null;
+  A.yoyU = lyOK? ratio(r.unit,ly.unit):null;
+  A.br = ratio(r.sales,r.budget);
+  // 収益構造
+  A.gp = isNum(r.cost)? r.sales-r.cost : null;
+  A.fl = isNum(r.cost)&&isNum(r.laborTotal)? (r.cost+r.laborTotal)/r.sales : null;
+  A.op = isNum(A.fl)&&fixed? r.sales-r.cost-r.laborTotal-fixed : null;
+  if(isNum(r.cost)&&isNum(r.labor)&&(fixed||emp)){
+    const vr=(r.cost+r.labor)/r.sales; // 変動費率（仕入＋アルバイト）
+    A.bep = vr<1? (fixed+emp)/(1-vr) : null;
+    A.safety = isNum(A.bep)? (r.sales-A.bep)/r.sales : null;
+  }
+  A.spmh = isNum(r.laborHours)&&r.laborHours>0? r.sales/r.laborHours : null;
+  A.gpmh = isNum(r.laborHours)&&r.laborHours>0&&isNum(r.guests)? r.guests/r.laborHours : null;
+  A.turn = st.seats>0&&isNum(r.guests)? r.guests/dim(M)/st.seats : null;
+  // 推移
+  const span = monthsBack(M,12).map(getM).filter(x=>x.complete);
+  A.span=span;
+  const yoyOf = x=>{ const l=getM(addMonth(x.ym,-12)); return l.complete? ratio(x.sales,l.sales):null; };
+  const last3=monthsBack(M,3).map(getM).filter(x=>x.complete).map(yoyOf).filter(isNum);
+  const prev3=monthsBack(addMonth(M,-3),3).map(getM).filter(x=>x.complete).map(yoyOf).filter(isNum);
+  A.mom3 = last3.length>=2? avg(last3):null; A.momPrev = prev3.length>=2? avg(prev3):null;
+  const ttm = monthsBack(M,12).map(getM), ttmL = monthsBack(addMonth(M,-12),12).map(getM);
+  if(ttm.every(x=>isNum(x.sales))&&ttmL.every(x=>isNum(x.sales))){ A.ttm=ttm.reduce((s,x)=>s+x.sales,0); A.ttmL=ttmL.reduce((s,x)=>s+x.sales,0); }
+  const withB = monthsBack(M,6).map(getM).filter(x=>x.complete&&isNum(x.budget));
+  A.hit = withB.length>=3? withB.filter(x=>x.sales>=x.budget).length/withB.length : null; A.hitN=withB.length;
+  // 曜日
+  A.wd = weekdayStats(M); A.wdLY = weekdayStats(addMonth(M,-12));
+  // 人件費の連動性
+  const lab = span.filter(x=>isNum(x.labor));
+  if(lab.length>=6){
+    const lr=linreg(lab.map(x=>x.sales), lab.map(x=>x.labor));
+    const med=[...lab].sort((a,b)=>a.sales-b.sales)[Math.floor(lab.length/2)].sales;
+    const lo=lab.filter(x=>x.sales<med), hi=lab.filter(x=>x.sales>=med);
+    A.elastic={lr, avgRate:avg(lab.map(x=>x.baitoRate)), loRate:avg(lo.map(x=>x.baitoRate)), hiRate:avg(hi.map(x=>x.baitoRate)), loSales:avg(lo.map(x=>x.sales)), n:lab.length};
+  }
+  const cr = monthsBack(M,6).map(getM).filter(x=>x.complete&&isNum(x.costRate)).map(x=>x.costRate);
+  A.costSd = cr.length>=4? stdev(cr):null;
+  const sp = monthsBack(addMonth(M,-1),3).map(getM).filter(x=>x.complete&&isNum(x.laborHours)&&x.laborHours>0).map(x=>x.sales/x.laborHours);
+  A.spmhPrev = sp.length? avg(sp):null;
+  // 異常日
+  if(A.wd){
+    A.lows=[]; A.highs=[];
+    A.wd.days.forEach(d=>{ const t=dayType(d), base=A.wd.avg[t]; if(!isNum(base)||A.wd.cnt[t]<2) return; const v=S.days[d].sales, k=v/base;
+      if(k<0.7) A.lows.push({d,v,k,base}); else if(k>1.35) A.highs.push({d,v,k,base}); });
+    A.lows.sort((a,b)=>a.k-b.k); A.highs.sort((a,b)=>b.k-a.k);
+  }
+  // 次月
+  A.T=addMonth(M,1); A.tg=kpiTargets(A.T); A.fcT=forecast(A.T);
+  // 前月目標の結果
+  const tPrev=kpiTargets(M);
+  if(tPrev){ const od=dim(M); A.prevT={t:tPrev, res:[
+    {k:'売上', t:tPrev.sales, a:r.sales, f:yen, good:r.sales>=tPrev.sales},
+    {k:'日販', t:tPrev.daily, a:r.sales/od, f:yen, good:r.sales/od>=tPrev.daily},
+    {k:'1日の客数', t:tPrev.guestsDay, a:isNum(r.guests)? r.guests/od:null, f:v=>int(v)+'人', good:isNum(r.guests)&&isNum(tPrev.guestsDay)? r.guests/od>=tPrev.guestsDay:null},
+    {k:'客単価', t:tPrev.unit, a:r.unit, f:v=>int(v)+'円', good:isNum(r.unit)&&isNum(tPrev.unit)? r.unit>=tPrev.unit:null},
+    {k:'人件費率', t:tPrev.laborRate, a:r.laborRate, f:v=>pct(v), good:isNum(r.laborRate)? r.laborRate<=tPrev.laborRate:null, low:true},
+    {k:'仕入率', t:tPrev.costRate, a:r.costRate, f:v=>pct(v), good:isNum(r.costRate)? r.costRate<=tPrev.costRate:null, low:true}
+  ].filter(x=>isNum(x.t)&&isNum(x.a))}; }
+
+  /* ---- スコア ---- */
+  const parts=[];
+  if(isNum(A.br)) parts.push({k:'予算達成', w:25, s:clamp((A.br-0.85)/0.15,0,1), v:pct(A.br)});
+  if(isNum(A.yoy)) parts.push({k:'成長性', w:20, s: A.yoy>=1.05?1 : A.yoy>=1? .7+.3*(A.yoy-1)/.05 : A.yoy>=.9? .7*(A.yoy-.9)/.1 : 0, v:'前年比 '+pct(A.yoy)});
+  if(isNum(r.laborRate)) parts.push({k:'人件費', w:20, s:clamp(1-((r.laborRate-st.laborTarget/100)*100)/4,0,1), v:pct(r.laborRate)});
+  if(isNum(r.costRate)) parts.push({k:'原価', w:15, s:clamp(1-((r.costRate-st.costTarget/100)*100)/4,0,1), v:pct(r.costRate)});
+  if(isNum(A.yoyG)&&isNum(A.yoyU)) parts.push({k:'客数・単価', w:10, s:(A.yoyG>=1&&A.yoyU>=1)?1:(A.yoyG>=1||A.yoyU>=1)?.6:.2, v:`${pct(A.yoyG,0)} / ${pct(A.yoyU,0)}`});
+  if(isNum(A.hit)) parts.push({k:'安定性', w:10, s:A.hit, v:`直近${A.hitN}ヶ月で${Math.round(A.hit*A.hitN)}回達成`});
+  const tw=parts.reduce((s,p)=>s+p.w,0);
+  A.parts=parts; A.score = tw? Math.round(parts.reduce((s,p)=>s+p.s*p.w,0)/tw*100) : null;
+  A.grade = !isNum(A.score)? '—' : A.score>=90?'S':A.score>=80?'A':A.score>=65?'B':A.score>=50?'C':'D';
+
+  /* ---- 打ち手 ---- */
+  const S0=r.sales; const add=(o)=>{ if(o.impact!=null && !o.pri) o.pri = o.impact/S0>=.03?'高':o.impact/S0>=.01?'中':'低'; A.recs.push(o); };
+  const days=dim(M);
+  // 客単価
+  const u6 = avg(monthsBack(addMonth(M,-1),6).map(getM).filter(x=>x.complete).map(x=>x.unit));
+  const unitRef = isNum(ly.unit)&&lyOK? ly.unit : u6;
+  if(isNum(r.unit)&&isNum(unitRef)&&r.unit<unitRef*0.985&&isNum(r.guests)){
+    const imp=(unitRef-r.unit)*r.guests;
+    add({cat:'売上', title:'客単価の立て直し', impact:imp,
+      why:`客単価 ${int(r.unit)}円は${isNum(ly.unit)&&lyOK?'前年':'直近6ヶ月平均'}の ${int(unitRef)}円より ${int(unitRef-r.unit)}円低く、今月の客数 ${int(r.guests)}人で換算すると月 ${yen(imp)} の差です。客数が増えている時期ほど、1人あたりの注文が薄くなりやすい点に注意が必要です。`,
+      actions:['売れ筋と利益の大きい商品から「今日のおすすめ3品」を決め、卓上・壁・入口のPOPで同じ3品を訴求する','追加注文の声かけを「ドリンクが残り3分の1になったら」とタイミングで全員統一する','迷ったときに選ばれる高単価のセット・盛り合わせを1つ用意し、メニューの一番目立つ位置に置く','締めの一品（デザート・〆の食事）を全卓で提案する'],
+      kpi:`客単価 ${int(unitRef)}円（+${int(unitRef-r.unit)}円）`});
+  }
+  // 客数
+  if(lyOK&&isNum(A.yoyG)&&A.yoyG<0.98&&isNum(r.unit)){
+    const imp=(ly.guests-r.guests)*r.unit;
+    add({cat:'売上', title:'客数の回復', impact:imp,
+      why:`客数は前年比 ${pct(A.yoyG)}（${int(ly.guests-r.guests)}人減）。今の客単価で換算すると月 ${yen(imp)} の差です。`,
+      actions:['空いている曜日・時間帯に「その時間に来る理由」（早い時間限定の価格・メニュー）をつくる','予約サイト・地図アプリの写真、営業時間、メニューを最新にし、口コミには必ず返信する','店の外からの見え方（看板の明るさ、入口のPOP、店内の活気が見えるか）を点検する','来店時に次回使える特典を渡し、再来店のきっかけをつくる'],
+      kpi:`1日平均客数 ${int(ly.guests/days)}人（+${int((ly.guests-r.guests)/days)}人）`});
+  }
+  // 弱い曜日
+  if(A.wd){
+    const wk=[0,1,2,3,4,5,6].map(i=>{ const tt=i===0?[0,7]:[i]; let s=0,c=0; tt.forEach(t=>{ if(isNum(A.wd.avg[t])){ s+=A.wd.avg[t]*A.wd.cnt[t]; c+=A.wd.cnt[t]; } }); return c? {i, avg:s/c, c} : null; }).filter(Boolean);
+    const mean=avg(wk.map(x=>x.avg));
+    const weak=wk.filter(x=>x.avg<mean*0.85).sort((a,b)=>a.avg-b.avg);
+    A.weekMean=mean; A.weak=weak;
+    if(weak.length){
+      const nextN = weak.reduce((s,x)=>s+countType(A.T, x.i===0?[0,7]:[x.i]),0);
+      const imp = weak.reduce((s,x)=>s+(mean*0.9-x.avg)*countType(A.T, x.i===0?[0,7]:[x.i]),0);
+      const names=weak.map(x=>x.i===0?'日曜・祝日':WDFULL[x.i]).join('、');
+      const wkd = weak.every(x=>x.i===0||x.i===6);
+      // 弱い曜日は客数と客単価のどちらが原因か
+      const t0=weak[0].i; const gW=A.wd.guests[t0], uW=A.wd.unit[t0];
+      const gAll=avg([1,2,3,4,5].map(i=>A.wd.guests[i])), uAll=avg([1,2,3,4,5].map(i=>A.wd.unit[i]));
+      const cause = isNum(gW)&&isNum(gAll)&&isNum(uW)&&isNum(uAll)? (gW/gAll < uW/uAll ? '客数' : '客単価') : null;
+      add({cat:'売上', title:`${names}の底上げ`, impact:imp,
+        why:`${names}の平均日販は ${man(weak[0].avg)}で、曜日平均 ${man(mean)}の ${pct(weak[0].avg/mean,0)}。${cause?`主な原因は${cause}です。`:''}曜日平均の9割まで上げると、来月（該当${nextN}日）で ${yen(imp)} の上積みになります。`,
+        actions: wkd? ['土日祝は早い時間から入れる店として、昼〜夕方の利用シーン（昼飲み・食事だけ・少人数）を店頭とネットで打ち出す','観光客・買い物客向けに、店の場所と看板商品がひと目でわかる案内を入口に置く','平日の常連客に週末の利用を誘う一言・特典を渡す','週末の人員は売れる時間帯に寄せ、空く時間は少人数で回す']
+          : ['その曜日だけの限定メニュー・価格をつくり、前日から店頭とネットで告知する','会社員の利用が多い曜日なら、宴会・グループ予約の誘致を優先する','その曜日の人員を売上見込みに合わせて最小限にし、利益を守る','来店客に「次の◯曜日」に使える特典を渡す'],
+        kpi:`${names}の日販 ${man(mean*0.9)}`});
+    }
+  }
+  // 人件費
+  const tgL=st.laborTarget/100;
+  if(isNum(r.laborRate)&&r.laborRate>tgL){
+    const imp=r.laborTotal-S0*tgL; const hrs=isNum(r.laborHours)&&r.laborHours>0? imp/(r.labor/r.laborHours):null;
+    add({cat:'人件費', title:'人件費率を目標内へ', impact:imp,
+      why:`人件費率 ${pct(r.laborRate)}は目標 ${pct(tgL,0)}を ${((r.laborRate-tgL)*100).toFixed(1)}ポイント超え、月 ${yen(imp)}${isNum(hrs)?`（約${int(hrs)}時間分）`:''} の超過です。${isNum(A.spmh)?`人時売上高は ${yen(A.spmh)}です。`:''}`,
+      actions:['曜日別の売上見込みから、日ごとの必要人数を先に決めてからシフトを組む','ピーク前後の出勤・退勤を30分単位で見直し、売上の少ない時間の人数に上限を設ける','仕込み・清掃などの作業を空いている時間帯にまとめ、作業のための出勤を減らす','人件費を下げるときは、ピーク帯の人数は削らない（提供の遅れは客単価に響くため）'],
+      kpi:`人件費率 ${pct(tgL,0)}以下${isNum(A.spmh)&&isNum(hrs)?`・人時売上高 ${yen(S0/(r.laborHours-hrs))}`:''}`});
+  } else if(isNum(r.laborRate)&&r.laborRate<tgL-0.03&&((isNum(A.yoyU)&&A.yoyU<1)||(isNum(A.br)&&A.br<1))){
+    const room=S0*tgL-r.laborTotal;
+    add({cat:'人件費', title:'ピーク帯への人員投資', impact:null, pri:'中',
+      why:`人件費率 ${pct(r.laborRate)}は目標を大きく下回り、月 ${yen(room)} の余裕があります。一方で${isNum(A.yoyU)&&A.yoyU<1?'客単価が前年を下回って':'予算に届いて'}おり、人手不足で売り逃している可能性があります。`,
+      actions:['金曜や週末のピーク帯に1人追加し、提供スピードと追加注文の声かけを増やす','追加した時間の売上・客単価の変化を翌月の診断で確認する'],
+      kpi:'ピーク帯の客単価・回転'});
+  }
+  if(A.elastic && isNum(A.elastic.loRate)&&isNum(A.elastic.hiRate) && A.elastic.loRate-A.elastic.hiRate>0.02){
+    const e=A.elastic; const imp=(e.loRate-e.hiRate)*e.loSales;
+    add({cat:'人件費', title:'閑散月のシフトを売上に連動させる', impact:imp,
+      why:`売上の少ない月の給与率は ${pct(e.loRate)}、多い月は ${pct(e.hiRate)}。売上が落ちても人員が減っておらず、閑散月は月 ${yen(imp)} ほど割高になっています（直近${e.n}ヶ月の分析）。${e.lr?`売上が1万円増えると給与は約${int(e.lr.b*10000)}円増える関係です。`:''}`,
+      actions:['翌月見込みが前月より低い月は、見込みの段階でシフトの総時間を先に減らす','閑散月は短時間勤務を増やし、長時間の固定シフトを減らす'],
+      kpi:'閑散月のアルバイト給与率'});
+  }
+  // 仕入
+  const tgC=st.costTarget/100;
+  if(isNum(r.costRate)&&r.costRate>tgC){
+    const imp=r.cost-S0*tgC;
+    add({cat:'原価', title:'仕入率を目標内へ', impact:imp,
+      why:`仕入率 ${pct(r.costRate)}は目標 ${pct(tgC,0)}を ${((r.costRate-tgC)*100).toFixed(1)}ポイント超え、月 ${yen(imp)} の超過です。`,
+      actions:['仕入額の大きい上位の取引先・品目から、単価と規格を見直す（相見積もり・代替品）','発注量を曜日別の売上見込みに合わせ、在庫を持ちすぎない','廃棄・ロスを毎日記録し、多い品目は仕込み量を調整する','原価率の高い商品は、価格・盛り付け・おすすめの順番を見直す'],
+      kpi:`仕入率 ${pct(tgC,0)}以下`});
+  }
+  if(isNum(A.costSd)&&A.costSd>0.015){
+    add({cat:'原価', title:'仕入率のブレを小さくする', impact:null, pri:'低',
+      why:`直近の仕入率は月ごとに ±${(A.costSd*100).toFixed(1)}ポイント動いています。月末の在庫量や棚卸しのタイミングで数字が揺れている可能性があります。`,
+      actions:['棚卸しを毎月同じ日・同じ手順で行う','月末に在庫を積み増さない発注ルールを決める'], kpi:'仕入率の月ごとの差 ±1ポイント以内'});
+  }
+  if(isNum(A.fl)&&A.fl>(st.flTarget||60)/100){
+    add({cat:'収益', title:'FL比率の改善（収益構造）', impact:(A.fl-(st.flTarget||60)/100)*S0,
+      why:`FL比率（仕入＋人件費）は ${pct(A.fl)}で、目安の ${st.flTarget||60}%を超えています。売上が増えても利益が残りにくい状態です。`,
+      actions:['人件費と原価のうち、目標からの超過が大きい方を先に手をつける','値上げ・メニュー構成の見直しで、売上側からFL比率を下げる'], kpi:`FL比率 ${st.flTarget||60}%以下`});
+  }
+  // 予算と見込みの差
+  if(A.tg&&A.tg.fromBudget&&isNum(A.tg.fs)&&A.tg.fs<A.tg.sales*0.97){
+    const gap=A.tg.sales-A.tg.fs, od=A.tg.od, uF=isNum(A.tg.fg)&&A.tg.fg>0? A.tg.fs/A.tg.fg:null;
+    add({cat:'計画', title:`${ymLabel(A.T)}の予算達成に向けた上積み`, impact:gap, pri:'高',
+      why:`今の売れ方のままだと ${ymLabel(A.T)}の見込みは ${yen(A.tg.fs)}で、予算 ${yen(A.tg.sales)}に ${yen(gap)} 足りません。1日あたり ${yen(gap/od)}の上積みが必要です。`,
+      actions:[ isNum(uF)? `客数で埋めるなら1日あたり +${Math.ceil(gap/od/uF)}人` : '客数の上積み計画を立てる', isNum(A.tg.fg)? `客単価で埋めるなら1人あたり +${int(gap/A.tg.fg)}円` : '客単価の上積み計画を立てる', '両方を半分ずつ狙うのが現実的。月初の1週間で進捗を確認する'],
+      kpi:`日販 ${yen(A.tg.daily)}`});
+  }
+  // 季節
+  if(A.fcT && isNum(A.fcT.LY.sales)){
+    const lyAvg=avg(monthsBack(addMonth(A.T,-12),12).map(getM).map(x=>x.sales));
+    const si=isNum(lyAvg)? A.fcT.LY.sales/lyAvg : null; A.si=si;
+    if(isNum(si)&&si>=1.08) add({cat:'計画', title:`${ymLabel(A.T)}は繁忙月。準備を前倒しに`, impact:null, pri:'中',
+      why:`前年の${Number(A.T.slice(5))}月は月平均の ${pct(si,0)}の売上でした。人員・仕入れ・予約の受け皿が足りないと売り逃しになります。`,
+      actions:['ピーク日の人員を先に確保し、シフトを早めに確定する','売れ筋商材の仕入れ・在庫を前倒しで手配する','団体・宴会の予約の受け方（人数・時間・コース）を事前に決めて告知する'], kpi:`${ymLabel(A.T)}の売上 ${yen(A.tg&&A.tg.sales)}`});
+    if(isNum(si)&&si<=0.93) add({cat:'計画', title:`${ymLabel(A.T)}は閑散月。固定費を意識した運営に`, impact:null, pri:'中',
+      why:`前年の${Number(A.T.slice(5))}月は月平均の ${pct(si,0)}の売上でした。売上が落ちる月は人件費率・仕入率が上がりやすくなります。`,
+      actions:['シフトの総時間を見込みに合わせて先に減らす','在庫を絞り、仕入れの発注単位を小さくする','閑散期向けの来店理由（限定メニュー・早い時間の特典）を用意する'], kpi:'人件費率・仕入率を目標内に維持'});
+  }
+  // 減速
+  if(isNum(A.mom3)&&isNum(A.momPrev)&&A.mom3<A.momPrev-0.03){
+    add({cat:'売上', title:'成長の減速に注意', impact:null, pri:'中',
+      why:`前年比は直前3ヶ月の平均 ${pct(A.momPrev)}から、直近3ヶ月の平均 ${pct(A.mom3)}へ下がっています。伸びていた要因の効果が薄れてきている可能性があります。`,
+      actions:['伸びていた時期に効いていた取り組み（集客・おすすめ・人員配置）が今も続いているか点検する','前年比の落ち幅が大きい曜日から手を打つ'], kpi:'前年比の3ヶ月平均'});
+  }
+  // 生産性
+  if(isNum(A.spmh)&&isNum(A.spmhPrev)&&A.spmh<A.spmhPrev*0.95){
+    add({cat:'人件費', title:'人時売上高の低下', impact:null, pri:'中',
+      why:`人時売上高（アルバイト時間ベース）は ${yen(A.spmh)}で、直近3ヶ月平均 ${yen(A.spmhPrev)}より ${pct(1-A.spmh/A.spmhPrev,0)}低下しています。売上に対して勤務時間が多くなっています。`,
+      actions:['売上の少ない曜日の勤務時間から見直す','1人で回せる時間帯の作業手順を決める'], kpi:`人時売上高 ${yen(A.spmhPrev)}`});
+  }
+  const pr={'高':0,'中':1,'低':2};
+  A.recs.sort((a,b)=> pr[a.pri]-pr[b.pri] || (b.impact||0)-(a.impact||0));
+  A.totalImpact = A.recs.filter(x=>isNum(x.impact)&&x.cat!=='計画'&&x.cat!=='収益').reduce((s,x)=>s+x.impact,0);
+
+  /* ---- 強み ---- */
+  const sg=s=>A.strengths.push(s);
+  if(isNum(A.br)&&A.br>=1) sg(`予算を ${pct(A.br)}で達成。`);
+  if(isNum(A.yoy)&&A.yoy>=1.03) sg(`売上は前年比 ${pct(A.yoy)}と伸びています。`);
+  if(isNum(A.yoyG)&&A.yoyG>=1.03) sg(`客数が前年比 ${pct(A.yoyG)}。集客は機能しています。`);
+  if(isNum(A.yoyU)&&A.yoyU>=1.02) sg(`客単価が前年比 ${pct(A.yoyU)}。おすすめ・追加注文が効いています。`);
+  if(isNum(r.laborRate)&&r.laborRate<=tgL) sg(`人件費率 ${pct(r.laborRate)}は目標内。`);
+  if(isNum(r.costRate)&&r.costRate<=tgC) sg(`仕入率 ${pct(r.costRate)}は目標内。`);
+  if(A.wd){ const best=[1,2,3,4,5,6,0].map(i=>({i,v:A.wd.avg[i]})).filter(x=>isNum(x.v)).sort((a,b)=>b.v-a.v)[0]; if(best) sg(`一番売れている曜日は${WDFULL[best.i]}（平均 ${man(best.v)}）。この曜日の人員と仕入れは最優先で確保。`); }
+  if(isNum(A.hit)&&A.hit>=.67) sg(`直近${A.hitN}ヶ月のうち${Math.round(A.hit*A.hitN)}ヶ月で予算達成。安定して計画どおりに運営できています。`);
+
+  /* ---- 総評 ---- */
+  let t=`${ymLabel(M)}の売上は ${yen(S0)}`;
+  const bits=[]; if(isNum(A.br)) bits.push(`予算比 ${pct(A.br)}`); if(isNum(A.yoy)) bits.push(`前年比 ${pct(A.yoy)}`);
+  if(bits.length) t+=`（${bits.join('、')}）`;
+  t+='。';
+  if(isNum(A.yoyG)&&isNum(A.yoyU)){
+    if(A.yoyG>=1&&A.yoyU<1) t+='伸びは客数によるもので、客単価が足を引っ張っています。';
+    else if(A.yoyG<1&&A.yoyU>=1) t+='客単価は上がっていますが、客数が前年を下回っています。';
+    else if(A.yoyG>=1&&A.yoyU>=1) t+='客数・客単価ともに前年を上回る良い形です。';
+    else t+='客数・客単価ともに前年を下回っており、早めの手当てが必要です。';
+  }
+  if(isNum(A.fl)) t+=`FL比率は ${pct(A.fl)}${A.fl<=(st.flTarget||60)/100?'で健全な範囲':'で目安を超えています'}。`;
+  const top=A.recs.find(x=>x.cat!=='計画')||A.recs[0];
+  if(top) t+=`最優先の課題は「${top.title}」${isNum(top.impact)?`で、改善余地は月 ${yen(top.impact)}`:''}です。`;
+  else t+='大きな課題は見当たりません。強みを維持しながら次月の目標を追いかけましょう。';
+  A.summary=t;
+  return A;
+}
+
+/* ========== 経営診断の画面 ========== */
+function gauge(score, grade){
+  const r=52, c=2*Math.PI*r, v=isNum(score)? score/100:0;
+  const col = !isNum(score)?'var(--grid)': score>=80?'var(--good)': score>=65?'var(--s1)': score>=50?'var(--warn)':'var(--crit)';
+  return `<svg viewBox="0 0 130 130" width="130" height="130" role="img" aria-label="総合スコア ${score}点"><circle cx="65" cy="65" r="${r}" fill="none" stroke="var(--grid)" stroke-width="10"/><circle cx="65" cy="65" r="${r}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c*v} ${c}" transform="rotate(-90 65 65)"/><text x="65" y="62" text-anchor="middle" font-size="34" fill="var(--ink)">${isNum(score)?score:'—'}</text><text x="65" y="86" text-anchor="middle" font-size="13" fill="var(--ink2)">ランク ${grade}</text></svg>`;
+}
+function diagHTML(M, print){
+  const A=analyze(M), r=A.r, st=S.settings;
+  if(!isNum(r.sales)) return '<div class="card"><p>この月の実績がありません。「データ取込」から売上を貼り付けてください。</p></div>';
+  let h='';
+  // 総合
+  h+=`<div class="card diag-top"><div class="dg">${gauge(A.score,A.grade)}<div class="dsum"><div class="muted">${ymLabel(M)}の総合評価</div><p class="lead">${esc(A.summary)}</p>
+    ${isNum(A.totalImpact)&&A.totalImpact>0?`<div class="impact">課題をすべて改善した場合の上積み・削減余地　<span class="num">月 ${yen(A.totalImpact)}</span>　<span class="muted">（年 ${man(A.totalImpact*12)}円相当）</span></div>`:''}</div></div>
+    <div class="parts">${A.parts.map(p=>`<div class="part"><div class="pk">${p.k}<span class="muted">${p.v}</span></div><div class="pbar"><div style="width:${Math.round(p.s*100)}%;background:${p.s>=.8?'var(--good)':p.s>=.5?'var(--s1)':p.s>=.3?'var(--warn)':'var(--crit)'}"></div></div></div>`).join('')}</div></div>`;
+  // 打ち手
+  h+=`<div class="card"><h2>重点課題と打ち手<span class="sub">影響の大きい順</span></h2>`;
+  if(!A.recs.length) h+='<p class="muted">数値上の大きな課題は見当たりません。</p>';
+  A.recs.forEach((x,i)=>{ h+=`<div class="rec"><div class="rh"><span class="pri p${x.pri}">優先度 ${x.pri}</span><span class="cat">${x.cat}</span><span class="rt">${i+1}. ${esc(x.title)}</span>${isNum(x.impact)?`<span class="ri num">月 ${yen(x.impact)}</span>`:''}</div>
+    <p class="why">${esc(x.why)}</p><div class="acts"><div class="muted small">打ち手</div><ul>${x.actions.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div><div class="kpiline small"><span class="muted">追う数字</span>　${esc(x.kpi)}</div></div>`; });
+  h+='</div>';
+  // 強み + 前月目標
+  h+='<div class="row">';
+  h+=`<div class="card"><h2>強み（続けること）</h2>${A.strengths.length? '<ul class="evals">'+A.strengths.map(s=>`<li><span class="st good"><i>✓</i></span><span>${esc(s)}</span></li>`).join('')+'</ul>':'<p class="muted">今月は目立った強みが数値に表れていません。</p>'}</div>`;
+  h+=`<div class="card"><h2>前月に設定した目標の結果<span class="sub">自動</span></h2>${A.prevT&&A.prevT.res.length? `<table class="grid"><thead><tr><th>項目</th><th>目標</th><th>実績</th><th>結果</th></tr></thead><tbody>${A.prevT.res.map(x=>`<tr><td>${x.k}</td><td>${x.low?'≤ ':''}${x.f(x.t)}</td><td>${x.f(x.a)}</td><td>${(()=>{ const k = x.low? x.t/x.a : x.a/x.t; return x.good==null?'—': k>=0.995?'<span class="st good"><i>○</i>達成</span>': k>=0.97?'<span class="st warn"><i>△</i>あと少し</span>':'<span class="st bad"><i>×</i>未達</span>'; })()}</td></tr>`).join('')}</tbody></table><p class="muted small" style="margin:6px 0 0">${A.prevT.t.fromBudget?'売上目標は予算、':'売上目標は見込み、'}客数・客単価は前月までの数値から自動で設定。</p>`:'<p class="muted">前月までのデータがそろうと表示されます。</p>'}</div>`;
+  h+='</div>';
+  // 次月KPI
+  if(A.tg){ const t=A.tg;
+    h+=`<div class="card"><h2>${ymLabel(A.T)}の目標KPI<span class="sub">シフト・発注・朝礼でそのまま使える数字</span></h2><div class="kpis" style="margin:0">
+      ${kpi('売上目標', man(t.sales)+'<small>円</small>', [t.fromBudget?'予算':'見込み（予算未入力）', isNum(t.fs)&&t.fromBudget?`見込み ${man(t.fs)}（${pct(ratio(t.fs,t.sales))}）`:''])}
+      ${kpi('日販目標', man(t.daily)+'<small>円</small>', [`営業${t.od}日`])}
+      ${kpi('1日の客数', int(t.guestsDay)+'<small>人</small>', [isNum(t.guests)?`月 ${int(t.guests)}人`:'客数データ不足'])}
+      ${kpi('客単価', int(t.unit)+'<small>円</small>', [isNum(A.fcT.LY.unit)?`前年 ${int(A.fcT.LY.unit)}円`:''])}
+      ${kpi('アルバイト給与の上限', man(t.laborCap)+'<small>円</small>', [`人件費率 ${st.laborTarget}%`, isNum(t.hours)?`約 ${int(t.hours)}時間まで`:''])}
+      ${kpi('仕入れの上限', man(t.costCap)+'<small>円</small>', [`仕入率 ${st.costTarget}%`])}
+      ${isNum(t.spmh)?kpi('人時売上高', man(t.spmh)+'<small>円</small>', ['この水準で人を配置']):''}
+    </div></div>`; }
+  // 収益構造
+  const span=monthsBack(M,12), rows=span.map(getM);
+  const fx=r.fix;
+  h+=`<div class="row"><div class="card"><h2>収益構造</h2><table class="grid"><tbody>
+    <tr><td>売上</td><td>${yen(r.sales)}</td><td>100%</td></tr>
+    <tr><td>仕入れ</td><td>${yen(r.cost)}</td><td>${pct(r.costRate)}</td></tr>
+    <tr><td>粗利</td><td>${yen(A.gp)}</td><td>${pct(ratio(A.gp,r.sales))}</td></tr>
+    <tr><td>人件費${r.emp?'（社員込み）':'（アルバイト）'}</td><td>${yen(r.laborTotal)}</td><td>${pct(r.laborRate)}</td></tr>
+    <tr><td>FL比率</td><td></td><td>${stLow(A.fl,(st.flTarget||60)/100)}</td></tr>
+    ${fx?`<tr><td>固定費（家賃など）</td><td>${yen(fx)}</td><td>${pct(fx/r.sales)}</td></tr><tr class="tot"><td>営業利益（概算）</td><td>${yen(A.op)}</td><td>${pct(ratio(A.op,r.sales))}</td></tr>`:''}
+    ${isNum(A.bep)?`<tr><td>損益分岐点売上</td><td>${yen(A.bep)}</td><td>安全余裕 ${pct(A.safety)}</td></tr>`:''}
+    ${isNum(A.spmh)?`<tr><td>人時売上高</td><td>${yen(A.spmh)}</td><td>人時客数 ${A.gpmh? A.gpmh.toFixed(1)+'人':'—'}</td></tr>`:''}
+    ${isNum(A.turn)?`<tr><td>1日の回転数</td><td>${A.turn.toFixed(2)}回</td><td>${st.seats}席</td></tr>`:''}
+  </tbody></table>${fx||r.emp?'':'<p class="muted small" style="margin:8px 0 0">「データ取込」の経費で社員人件費・固定費を入れると、営業利益と損益分岐点も出ます。</p>'}</div>
+  <div class="card"><h2>FL比率の推移<span class="sub">仕入＋人件費 ÷ 売上</span></h2>${chart({labels:span.map(ym=>ymLabel(ym,true)),tipLabels:span.map(ymLabel),hi:11,height:220,width:520,fmtAxis:v=>(v*100).toFixed(0)+'%',fmtVal:v=>pct(v),maxHint:.7,
+    series:[{name:'FL比率',type:'line',values:rows.map(x=>isNum(x.cost)&&isNum(x.laborTotal)? (x.cost+x.laborTotal)/x.sales:null),color:'var(--s7)'}],refs:[{value:(st.flTarget||60)/100,label:'目安 '+(st.flTarget||60)+'%'}]})}</div></div>`;
+  // 成長
+  const yoyS=rows.map(x=>{const l=getM(addMonth(x.ym,-12)); return x.complete&&l.complete? ratio(x.sales,l.sales):null;});
+  const yoyG=rows.map(x=>{const l=getM(addMonth(x.ym,-12)); return x.complete&&l.complete? ratio(x.guests,l.guests):null;});
+  const yoyU=rows.map(x=>{const l=getM(addMonth(x.ym,-12)); return x.complete&&l.complete? ratio(x.unit,l.unit):null;});
+  const yv=[...yoyS,...yoyG,...yoyU].filter(isNum);
+  if(yv.length){
+    h+=`<div class="card"><h2>前年比の推移<span class="sub">売上・客数・客単価のどれが動いているか</span></h2>${chart({labels:span.map(ym=>ymLabel(ym,true)),tipLabels:span.map(ymLabel),hi:11,height:230,fmtAxis:v=>(v*100).toFixed(0)+'%',fmtVal:v=>pct(v),min:Math.floor(Math.min(...yv,1)*20)/20-0.05,
+      series:[{name:'売上',type:'line',values:yoyS,color:'var(--s1)'},{name:'客数',type:'line',values:yoyG,color:'var(--s2)'},{name:'客単価',type:'line',values:yoyU,color:'var(--s3)'}],refs:[{value:1,label:'前年並み 100%'}]})}
+      <p class="muted small" style="margin:6px 0 0">${isNum(A.mom3)?`直近3ヶ月の前年比平均 ${pct(A.mom3)}${isNum(A.momPrev)?`（その前の3ヶ月 ${pct(A.momPrev)}）`:''}。`:''}${isNum(A.ttm)?`直近12ヶ月の累計売上 ${man(A.ttm)}円（前年 ${man(A.ttmL)}円、${pct(A.ttm/A.ttmL)}）。`:''}</p></div>`;
+  }
+  // 曜日
+  if(A.wd){
+    const lab=['月','火','水','木','金','土','日','祝'], idx=[1,2,3,4,5,6,0,7];
+    h+=`<div class="card"><h2>曜日別の平均日販<span class="sub">${ymLabel(M)}${A.wdLY?'・前年同月と比較':''}</span></h2>${chart({labels:lab,height:210,
+      series:[{name:'今年',type:'bar',values:idx.map(i=>A.wd.avg[i]),color:'var(--s1)'}].concat(A.wdLY?[{name:'前年同月',type:'tick',values:idx.map(i=>A.wdLY.avg[i]),color:'var(--s2)'}]:[]),refs:[{value:A.weekMean,label:'曜日平均'}],
+      tipExtra:i=>{ const t=idx[i]; return `<div class="tr"><span>日数</span><span>${A.wd.cnt[t]}日</span></div><div class="tr"><span>平均客数</span><span>${int(A.wd.guests[t])}人</span></div><div class="tr"><span>客単価</span><span>${int(A.wd.unit[t])}円</span></div>`; }})}</div>`;
+  }
+  // 生産性
+  const sp=rows.map(x=>x.complete&&isNum(x.laborHours)&&x.laborHours>0? x.sales/x.laborHours:null);
+  if(sp.filter(isNum).length>=2){
+    h+=`<div class="card"><h2>人時売上高の推移<span class="sub">売上 ÷ アルバイト勤務時間</span></h2>${chart({labels:span.map(ym=>ymLabel(ym,true)),tipLabels:span.map(ymLabel),hi:11,height:200,fmtAxis:v=>int(v),fmtVal:v=>yen(v),min:Math.floor(Math.min(...sp.filter(isNum))*0.85/500)*500,
+      series:[{name:'人時売上高',type:'line',values:sp,color:'var(--s1)'}]})}${A.elastic&&A.elastic.lr?`<p class="muted small" style="margin:6px 0 0">売上が1万円増えるとアルバイト給与は約${int(A.elastic.lr.b*10000)}円増える関係（直近${A.elastic.n}ヶ月）。売上の少ない月の給与率 ${pct(A.elastic.loRate)}／多い月 ${pct(A.elastic.hiRate)}。</p>`:''}</div>`;
+  }
+  // 要注意日
+  if(A.wd&&(A.lows.length||A.highs.length)){
+    const li=x=>`<li><span class="num">${Number(x.d.slice(5,7))}/${Number(x.d.slice(8))}（${WD[dayType(x.d)]}）</span>　${yen(x.v)}　<span class="muted">同じ曜日の平均の ${pct(x.k,0)}</span></li>`;
+    h+=`<div class="row"><div class="card"><h2>売上が大きく落ちた日</h2>${A.lows.length?`<ul class="dl">${A.lows.slice(0,6).map(li).join('')}</ul><p class="muted small" style="margin:6px 0 0">天候・近隣の行事・人員不足・提供遅れなど、原因を確認しておくと翌年の見込みが正確になります。</p>`:'<p class="muted">ありません。</p>'}</div>
+      <div class="card"><h2>売上が大きく伸びた日</h2>${A.highs.length?`<ul class="dl">${A.highs.slice(0,6).map(li).join('')}</ul><p class="muted small" style="margin:6px 0 0">伸びた日の条件（予約・天候・イベント）は再現できるものがないか確認を。</p>`:'<p class="muted">ありません。</p>'}</div></div>`;
+  }
+  // 見通し
+  const out=[]; const yk=avg(monthsBack(M,3).map(getM).filter(x=>x.complete).map(x=>{const l=getM(addMonth(x.ym,-12)); return l.complete? ratio(x.sales,l.sales):null;}).filter(isNum));
+  const lyAvg=avg(monthsBack(addMonth(M,-11),12).map(getM).map(x=>x.sales));
+  for(let k=1;k<=3;k++){ const T=addMonth(M,k), L=getM(addMonth(T,-12)), B=getM(T);
+    let f=null; if(k===1&&A.fcT.recommended) f=A.fcT.methods[A.fcT.recommended].sales; else if(isNum(L.sales)&&isNum(yk)) f=L.sales*yk;
+    out.push({T, ly:L.sales, si: isNum(L.sales)&&isNum(lyAvg)? L.sales/lyAvg:null, f, b:B.budget}); }
+  h+=`<div class="card"><h2>この先3ヶ月の見通し</h2><table class="grid"><thead><tr><th>月</th><th>前年実績</th><th>季節の強さ</th><th>見込み</th><th>予算</th><th>予算との差</th></tr></thead><tbody>${out.map(o=>`<tr><td>${ymLabel(o.T)}</td><td>${man(o.ly)}</td><td>${isNum(o.si)? (o.si>=1.08?'<span class="st good"><i>↑</i>繁忙 ':o.si<=0.93?'<span class="st ser"><i>↓</i>閑散 ':'<span class="st">')+pct(o.si,0)+'</span>':'—'}</td><td>${man(o.f)}</td><td>${man(o.b)}</td><td>${isNum(o.f)&&isNum(o.b)? signYen(o.f-o.b):'—'}</td></tr>`).join('')}</tbody></table><p class="muted small" style="margin:6px 0 0">季節の強さ＝前年のその月の売上 ÷ 前年の月平均。2ヶ月目以降の見込みは前年実績 × 直近の前年比${isNum(yk)?'（'+pct(yk)+'）':''}。</p></div>`;
+  h+=`<p class="muted small">この診断は取り込んだ数値だけから自動で作成しています。金額の影響は概算です。</p>`;
+  return h;
+}
+function renderDiag(){
+  const el=document.getElementById('v-diag');
+  const M = getM(cur).complete? cur : lastComplete(cur);
+  if(!M){ el.innerHTML='<div class="card"><h2>経営診断</h2><p class="muted">締まった月の売上データが必要です。「データ取込」から貼り付けるか、設定からサンプルデータで試してください。</p><button onclick="goView(\'imp\')">データ取込へ</button></div>'; return; }
+  let h='';
+  if(M!==cur) h+=`<div class="banner info">${ymLabel(cur)}は集計途中のため、締まっている ${ymLabel(M)}を診断しています。途中経過はダッシュボードで確認できます。</div>`;
+  h+=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px"><button onclick="printReport('${M}')">診断レポートを印刷・PDF</button></div>`;
+  h+=diagHTML(M);
+  el.innerHTML=h;
+}
+
+/* ========== 月次一覧 ========== */
+let listSpan='24';
+function renderList(){
+  const el=document.getElementById('v-list'); const st=S.settings;
+  let yms = allYMs().filter(ym=>{ const r=getM(ym); return isNum(r.sales)||isNum(r.budget)||isNum(r.labor)||isNum(r.cost); });
+  if(listSpan!=='all') yms = yms.slice(-Number(listSpan));
+  let h=`<div class="card"><h2>月次一覧<span class="sub">行を押すとその月のダッシュボードへ</span></h2>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div class="seg" id="spanSeg">${[['12','12ヶ月'],['24','24ヶ月'],['all','全期間']].map(([k,l])=>`<button data-k="${k}" class="${listSpan===k?'on':''}">${l}</button>`).join('')}</div><button onclick="exportCSV()">CSVで書き出し</button></div>
+  <div class="scrollx tbl-wrap"><table class="grid"><thead><tr><th>月</th><th>予算</th><th>実績</th><th>予算比</th><th>前年比</th><th>稼働</th><th>前年比</th><th>客単価</th><th>前年比</th><th>アルバイト給与</th><th>人件費率</th><th>仕入れ</th><th>仕入率</th><th>見込み精度</th></tr></thead><tbody>`;
+  const tot={budget:0,sales:0,guests:0,labor:0,cost:0,salesB:0,salesL:0,salesC:0,laborN:0};
+  [...yms].reverse().forEach(ym=>{
+    const r=getM(ym), ly=getM(addMonth(ym,-12)), fc=(S.months[ym]||{}).forecast;
+    const cmp = r.complete && ly.complete;
+    h+=`<tr class="click ${ym===cur?'sel':''}" data-ym="${ym}"><td>${ymLabel(ym)}${r.complete?'':' <span class="muted">途中</span>'}</td><td>${man(r.budget)}</td><td>${man(r.sales)}</td>
+      <td>${r.complete? stHigh(ratio(r.sales,r.budget)) : '<span class="muted">'+pct(ratio(r.sales,r.budget))+'</span>'}</td><td>${cmp? stHigh(ratio(r.sales,ly.sales)):'—'}</td>
+      <td>${int(r.guests)}</td><td>${cmp? stHigh(ratio(r.guests,ly.guests)):'—'}</td><td>${int(r.unit)}</td><td>${cmp? stHigh(ratio(r.unit,ly.unit),1,.98):'—'}</td>
+      <td>${man(r.labor)}</td><td>${stLow(r.laborRate, st.laborTarget/100)}</td><td>${man(r.cost)}</td><td>${stLow(r.costRate, st.costTarget/100)}</td>
+      <td>${fc&&r.complete? pct(ratio(r.sales,fc.sales)):'—'}</td></tr>`;
+    if(isNum(r.sales)){ tot.sales+=r.sales; if(isNum(r.budget)){tot.budget+=r.budget; tot.salesB+=r.sales;} if(isNum(r.guests)) tot.guests+=r.guests; }
+    if(isNum(r.labor)&&isNum(r.sales)){ tot.labor+=r.labor; tot.salesL+=r.sales; tot.laborN++; tot.emp=(tot.emp||0)+r.emp; }
+    if(isNum(r.cost)&&isNum(r.sales)){ tot.cost+=r.cost; tot.salesC+=r.sales; }
+  });
+  const emp=tot.emp||0;
+  h+=`<tr class="tot"><td>期間計</td><td>${man(tot.budget)}</td><td>${man(tot.sales)}</td><td>${pct(ratio(tot.salesB,tot.budget))}</td><td></td><td>${int(tot.guests)}</td><td></td><td>${int(ratio(tot.sales,tot.guests))}</td><td></td><td>${man(tot.labor)}</td><td>${pct(ratio(tot.labor+emp,tot.salesL))}</td><td>${man(tot.cost)}</td><td>${pct(ratio(tot.cost,tot.salesC))}</td><td></td></tr>`;
+  h+='</tbody></table></div><p class="muted" style="margin:8px 0 0">↑ 前年・予算を上回る　→ 3%以内の不足　↓ それ以上の不足。比率は目標以下で ✓。見込み精度＝実績 ÷ 前月に確定した見込み。</p></div>';
+  // 年比較
+  const years=[...new Set(allYMs().map(ym=>ym.slice(0,4)))].slice(-3);
+  if(years.length){
+    const pal=['var(--s7)','var(--s2)','var(--s1)'].slice(-years.length);
+    h+=`<div class="card"><h2>年ごとの月別売上</h2>${chart({title:'年比較',labels:Array.from({length:12},(_,i)=>(i+1)+'月'),height:240,
+      series:years.map((y,k)=>({name:y+'年',type:'line',values:Array.from({length:12},(_,i)=>getM(y+'-'+pad(i+1)).sales),color:pal[k]}))})}</div>`;
+  }
+  el.innerHTML=h;
+  el.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>{ cur=tr.dataset.ym; goView('dash'); });
+  el.querySelectorAll('#spanSeg button').forEach(b=>b.onclick=()=>{ listSpan=b.dataset.k; renderList(); });
+}
+
+/* ========== 翌月見込み ========== */
+function renderFc(){
+  const el=document.getElementById('v-fc'); const st=S.settings;
+  if(!fcTarget) fcTarget = addMonth(TODAY_YM,1);
+  const T=fcTarget; const M=S.months[T]=S.months[T]||{}; M.plan=M.plan||{};
+  const plan=M.plan; const closed=new Set(plan.closed||[]);
+  const fc=forecast(T);
+  const mk = plan.method && fc.methods[plan.method] ? plan.method : fc.recommended;
+  const adj = Number(plan.adj)||0;
+  const base = mk? fc.methods[mk] : null;
+  const sales = base? base.sales*(1+adj/100) : null;
+  let guests = base&&isNum(base.guests)? base.guests*(1+adj/100) : null;
+  const unit = ratio(sales,guests);
+  const emp = expOf(T).emp;
+  const baito = isNum(fc.baitoRate)&&isNum(sales)? sales*fc.baitoRate : null;
+  const laborCap = isNum(sales)? sales*st.laborTarget/100 - emp : null;
+  const laborRate = isNum(baito)? (baito+emp)/sales : null;
+  const hours = isNum(baito)&&isNum(fc.hourly)? baito/fc.hourly : null;
+  const capHours = isNum(laborCap)&&isNum(fc.hourly)? laborCap/fc.hourly : null;
+  const cost = isNum(fc.costRate)&&isNum(sales)? sales*fc.costRate : null;
+  const costCap = isNum(sales)? sales*st.costTarget/100 : null;
+  const TB=getM(T);
+  let h=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">見込みを立てる月</h2>
+    <button onclick="fcTarget=addMonth(fcTarget,-1);renderFc()">◀</button><span class="big" style="font-size:20px">${ymLabel(T)}</span><button onclick="fcTarget=addMonth(fcTarget,1);renderFc()">▶</button>
+    <span class="muted">${dim(T)}日間・祝日${Array.from({length:dim(T)},(_,i)=>T+'-'+pad(i+1)).filter(d=>HOL.has(d)).length}日・土日${Array.from({length:dim(T)},(_,i)=>dateObj(T+'-'+pad(i+1)).getDay()).filter(w=>w===0||w===6).length}日</span></div></div>`;
+  if(!Object.keys(fc.methods).length){
+    h+=`<div class="card"><p>見込みを出すためのデータが足りません。前年同月の売上、または直近の日別売上（2週間以上）を取り込んでください。</p><button onclick="goView('imp')">データ取込へ</button></div>`;
+    el.innerHTML=h; return;
+  }
+  h+=`<div class="card"><h2>1. 売上の見込み方を選ぶ<span class="sub">おすすめ：${fc.methods[fc.recommended].name}</span></h2><div class="methods">`;
+  ['C','B','A','D','E'].forEach(k=>{ const m=fc.methods[k];
+    h+= m? `<div class="method ${k===mk?'on':''}" data-k="${k}"><div class="t">${m.name}${k===fc.recommended?'（おすすめ）':''}</div><div class="v">${man(m.sales)}</div><div class="x">${esc(m.basis)}</div></div>`
+      : '';
+  });
+  h+=`</div><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px">
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px">上乗せ・調整 <input id="fcAdj" type="number" step="0.5" value="${adj}" style="width:90px"> %</label>
+      <span class="muted">特別な事情がある月だけ使います（通常は0%のまま）</span></div>
+      </div>`;
+  // 結果
+  h+=`<div class="kpis">
+    ${kpi('売上見込み', man(sales)+'<small>円</small>', [isNum(TB.budget)? `予算 ${man(TB.budget)}　予算比 ${stHigh(ratio(sales,TB.budget))}`:'予算 未入力', isNum(fc.LY.sales)? `前年 ${man(fc.LY.sales)}　前年比 ${pct(ratio(sales,fc.LY.sales))}`:''])}
+    ${kpi('稼働（客数）見込み', int(guests)+'<small>人</small>', [isNum(guests)? `1日平均 ${int(guests/(dim(T)-closed.size))}人`:'客数データ不足', isNum(fc.LY.guests)? `前年 ${int(fc.LY.guests)}人`:''])}
+    ${kpi('客単価見込み', int(unit)+'<small>円</small>', [isNum(fc.LY.unit)? `前年 ${int(fc.LY.unit)}円`:''])}
+    ${kpi('アルバイト給与見込み', man(baito)+'<small>円</small>', [isNum(fc.baitoRate)? `直近の給与率 ${pct(fc.baitoRate)}（${fc.labBasis}）`:'給与データ不足', isNum(hours)? `約 ${int(hours)}時間（平均時給 ${int(fc.hourly)}円）`:''])}
+    ${kpi('人件費率見込み', pct(laborRate), [`目標 ${st.laborTarget}%　${stLow(laborRate, st.laborTarget/100)}`, isNum(laborCap)? `目標内のアルバイト給与 ${man(laborCap)}${isNum(capHours)?'（約'+int(capHours)+'h）':''}`:''])}
+    ${kpi('仕入れ見込み', man(cost)+'<small>円</small>', [isNum(fc.costRate)? `直近の仕入率 ${pct(fc.costRate)}（${fc.costBasis}）`:'仕入れデータ不足', isNum(costCap)? `目標${st.costTarget}%なら ${man(costCap)}`:''])}
+  </div>`;
+  if(isNum(baito)&&isNum(laborCap)){
+    const diff=laborCap-baito;
+    h+=`<div class="banner ${diff>=0?'info':''}">${diff>=0? `直近の働き方のままなら、目標人件費率まで ${yen(diff)}${isNum(fc.hourly)?'（約'+int(diff/fc.hourly)+'時間）':''} の余裕があります。`:`直近の働き方のままだと目標人件費率を ${yen(-diff)}${isNum(fc.hourly)?'（約'+int(-diff/fc.hourly)+'時間）':''} 超える見込みです。シフト作成時の目安にしてください。`}</div>`;
+  }
+  // 日別目標カレンダー
+  const tg=dailyTargets(T, sales, closed);
+  const off=dateObj(T+'-01').getDay();
+  let cal='<div class="cal">'+['日','月','火','水','木','金','土'].map(w=>`<div class="h">${w}</div>`).join('');
+  for(let i=0;i<off;i++) cal+='<div class="d empty"></div>';
+  for(let d=1; d<=dim(T); d++){ const ds=T+'-'+pad(d), t=dayType(ds), w=dateObj(ds).getDay();
+    cal+=`<div class="d ${w===6?'sat':''} ${w===0?'sun':''} ${t===7?'hol':''} ${closed.has(ds)?'closed':''}" data-ds="${ds}"><div class="n">${d}${t===7?' 祝':''}${isPreHol(ds)?' <span class="pre">祝前</span>':''}</div><div class="t">${closed.has(ds)?'休業':man(tg[d-1])}</div></div>`; }
+  cal+='</div>';
+  h+=`<div class="card"><h2>2. 日別の目標<span class="sub">日付を押すと休業日・貸切日として除外</span></h2>${cal}
+    <p class="muted" style="margin:8px 0 0">${fc.profile? `曜日の売れ方（${fc.profile.from.slice(5).replace('-','/')}〜${fc.profile.to.slice(5).replace('-','/')}）で月の見込みを配分しています。祝日は日曜に近い扱い、祝前日は${fc.profile.pre!=null?'過去の祝前日の実績（'+fc.profile.preN+'日分）':'金曜・土曜に近い扱い'}です。`:'日別データがないため均等に配分しています。'}</p></div>`;
+  // 日別の見込み表
+  const rows=dailyPlan(T, sales, guests, cost, baito, closed, plan.round||1000);
+  const cols=[['kind','区分'],['sales','店舗予算'],['guests','稼働予測'],['cost','仕入れ予測'],['labor','アルバイト人件費予測']];
+  const tot=k=>rows.reduce((a,r)=>a+(r[k]||0),0);
+  h+=`<div class="card"><h2>3. 日別の見込み表<span class="sub">列ごとに縦でコピーして、エクセル・スプレッドシートの1日の行に貼り付け</span></h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <label class="field" style="flex-direction:row;align-items:center;gap:6px">店舗予算のまるめ<select id="fcRound">${[[1,'1円'],[1000,'1,000円'],[10000,'10,000円']].map(([v,l])=>`<option value="${v}" ${(plan.round||1000)==v?'selected':''}>${l}</option>`).join('')}</select></label>
+      <button data-copy="all">表をまるごとコピー（見出し付き）</button>
+      <span class="muted small">コピーされるのは数字だけ（円・カンマなし）。休業日は0、1日〜月末まで${dim(T)}行。</span></div>
+    <div class="scrollx tbl-wrap"><table class="grid daily"><thead><tr><th>日付</th><th>曜日</th>${cols.map(([k,l])=>`<th>${l}<br><button class="cp" data-copy="${k}">縦にコピー</button></th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r=>`<tr class="${r.closed?'cl':''} ${r.w===6?'sat':''} ${r.w===0||r.hol?'sun':''}"><td>${Number(T.slice(5))}/${r.d}</td><td>${r.wd}</td><td>${r.closed?'休業':r.kind}</td><td>${int(r.sales)}</td><td>${int(r.guests)}</td><td>${int(r.cost)}</td><td>${int(r.labor)}</td></tr>`).join('')}
+    <tr class="tot"><td>合計</td><td></td><td></td><td>${int(tot('sales'))}</td><td>${int(tot('guests'))}</td><td>${int(tot('cost'))}</td><td>${int(tot('labor'))}</td></tr></tbody></table></div>
+    <p class="muted small" style="margin:8px 0 0">稼働は客数の曜日の傾向、仕入れは売上に比例、アルバイト人件費は最低限の人員分（4割）を毎日均等に、残り（6割）を売上に比例させて配分しています。</p></div>`;
+  // 曜日プロファイル
+  if(fc.profile){
+    const p=fc.profile;
+    h+=`<div class="card"><h2>曜日ごとの平均日販<span class="sub">見込みの元データ</span></h2>${chart({title:'曜日別平均',labels:WD,height:190,width:620,
+      series:[{name:'平均日販',type:'bar',values:p.avg,color:'var(--s1)'}],tipExtra:i=>`<div class="tr"><span>日数</span><span>${p.cnt[i]}日</span></div>`+(fc.profileG?`<div class="tr"><span>平均客数</span><span>${int(fc.profileG.avg[i])}人</span></div>`:'')})}</div>`;
+  }
+  h+=`<div class="card"><h2>4. 見込みを確定する</h2><p class="muted" style="margin-top:0">確定すると、月が締まったあとに「見込みに対して実績がどうだったか」を自動で評価します。${M.forecast? `<br>前回の確定：${new Date(M.forecast.savedAt).toLocaleString('ja-JP')}　売上 ${yen(M.forecast.sales)}`:''}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="fcSave">この内容で確定</button>${!isNum(TB.budget)&&isNum(sales)?'<button id="fcBudget">見込みを予算として登録</button>':''}<button onclick="printForecast()">見込みを印刷・PDF</button></div><div id="fcMsg" class="msg"></div></div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('.method[data-k]').forEach(d=>d.onclick=()=>{ plan.method=d.dataset.k; save(); renderFc(); });
+  document.getElementById('fcAdj').onchange=e=>{ plan.adj=Number(e.target.value)||0; save(); renderFc(); };
+  el.querySelectorAll('.cal .d[data-ds]').forEach(d=>d.onclick=()=>{ const ds=d.dataset.ds; const s=new Set(plan.closed||[]); s.has(ds)?s.delete(ds):s.add(ds); plan.closed=[...s].sort(); save(); renderFc(); });
+  document.getElementById('fcSave').onclick=()=>{
+    M.forecast={sales, guests, unit, baito, laborRate, cost, hours, method:mk, adj, savedAt:Date.now()}; save();
+    document.getElementById('fcMsg').className='msg ok'; document.getElementById('fcMsg').textContent='確定しました。'; };
+  const fb=document.getElementById('fcBudget'); if(fb) fb.onclick=()=>{ M.budget=Math.round(sales); save(); renderFc(); };
+  window._fcNow={T,sales,guests,unit,baito,laborRate,laborCap,cost,costCap,hours,fc,mk,adj,tg,closed,plan,rows};
+  document.getElementById('fcRound').onchange=e=>{ plan.round=Number(e.target.value); save(); renderFc(); };
+  el.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.copy; let t;
+    const val=(r,c)=> c==='kind'? (r.closed?'休業':r.kind) : (isNum(r[c])? String(Math.round(r[c])) : '');
+    if(k==='all') t=['日付\t曜日\t'+cols.map(c=>c[1]).join('\t')].concat(rows.map(r=>`${T.replace('-','/')}/${r.d}\t${r.wd}\t`+cols.map(c=>val(r,c[0])).join('\t'))).join('\n');
+    else t=rows.map(r=>val(r,k)).join('\n');
+    copyText(t,b);
+  });
+}
+
+/* ========== データ取込 ========== */
+const IMP = { kind:'sales', text:'', rows:null, map:[], header:false, year:Number(TODAY.slice(0,4))-1, month:addMonth(TODAY_YM,-1), mode:'replace' };
+const COLS = {
+  sales:[['skip','使わない'],['date','日付・年月'],['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['lySales','前年売上（空いている日だけ補完）'],['lyGuests','前年客数（空いている日だけ補完）'],['cost','仕入れ（複数列は合計）']],
+  labor:[['skip','使わない'],['date','日付・年月'],['name','名前'],['hours','時間'],['amount','給与額']],
+  cost:[['skip','使わない'],['date','日付・年月'],['name','取引先・品目'],['amount','仕入れ額']]
+};
+function parseNum(s){
+  if(s==null) return null; let t=String(s).trim(); if(!t) return null;
+  t=t.replace(/[０-９．－，]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  let neg=/^[△▲\-−]/.test(t)||/^\(.*\)$/.test(t);
+  t=t.replace(/[¥￥円,，\s　()（）△▲\-−人名組%時間hH]/g,'');
+  if(!/^\d+(\.\d+)?$/.test(t)) return null;
+  const v=parseFloat(t); return neg?-v:v;
+}
+function parseDateCell(s, ctx){
+  if(s==null) return null; let t=String(s).trim().replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[（(].*?[）)]/g,'').replace(/\s/g,'');
+  if(!t) return null;
+  let m;
+  const y2=y=>{ y=Number(y); return y<100? 2000+y : y; };
+  if((m=t.match(/^(\d{2,4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})日?$/))) return {kind:'day', key:ymOf(y2(m[1]),Number(m[2]))+'-'+pad(m[3])};
+  if((m=t.match(/^(\d{4})[\/\-.年](\d{1,2})月?$/))) return {kind:'month', key:ymOf(Number(m[1]),Number(m[2]))};
+  if((m=t.match(/^(\d{4})(\d{2})(\d{2})$/))) return {kind:'day', key:m[1]+'-'+m[2]+'-'+m[3]};
+  if((m=t.match(/^(\d{4})(\d{2})$/))&&Number(m[2])<=12) return {kind:'month', key:m[1]+'-'+m[2]};
+  if((m=t.match(/^(\d{1,2})[\/月](\d{1,2})日?$/))){ const mo=Number(m[1]); if(ctx.lastM && mo<ctx.lastM-6) ctx.year++; ctx.lastM=mo; return {kind:'day', key:ymOf(ctx.year,mo)+'-'+pad(m[2])}; }
+  if((m=t.match(/^(\d{1,2})月$/))){ const mo=Number(m[1]); if(ctx.lastM && mo<ctx.lastM-6) ctx.year++; ctx.lastM=mo; return {kind:'month', key:ymOf(ctx.year,mo)}; }
+  if((m=t.match(/^(\d{1,2})日?$/)) && ctx.month){ const d=Number(m[1]); if(d>=1&&d<=31) return {kind:'day', key:ctx.month+'-'+pad(d)}; }
+  if(/^\d{5}$/.test(t)){ const n=Number(t); if(n>40000&&n<60000){ const d=new Date(Date.UTC(1899,11,30)+n*86400000); return {kind:'day', key:d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())}; } }
+  return null;
+}
+function validKey(p){ if(!p) return false; const [y,m,d]=p.key.split('-').map(Number); if(m<1||m>12||y<2000||y>2100) return false; if(p.kind==='day'){ return d>=1&&d<=dim(ymOf(y,m)); } return true; }
+function parseTSV(text){
+  const rows=[]; let row=[], f='', q=false, i=0; text=text.replace(/\r\n?/g,'\n');
+  while(i<text.length){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i+=2; continue; } q=false; i++; continue; } f+=c; i++; continue; }
+    if(c==='"' && f===''){ q=true; i++; continue; }
+    if(c==='\t'){ row.push(f); f=''; i++; continue; }
+    if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; i++; continue; }
+    f+=c; i++;
+  }
+  row.push(f); rows.push(row);
+  return rows.map(r=>r.map(x=>x.replace(/\n/g,''))).filter(r=>r.some(x=>x.trim()!==''));
+}
+function splitRows(text){
+  if(text.includes('\t')) return parseTSV(text);
+  const lines=text.replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
+  const tab = lines.some(l=>l.includes('\t'));
+  return lines.map(l=> tab? l.split('\t') : (l.includes(',')&&!/\d,\d{3}/.test(l)? l.split(',') : l.trim().split(/\s{2,}|　+/)));
+}
+function guessMap(rows, kind){
+  const w=Math.max(...rows.map(r=>r.length));
+  const first=rows[0]||[];
+  const ctx={year:IMP.year,lastM:0};
+  const headerLike = first.filter(c=>c&&c.trim()).length>0 && first.every(c=>parseNum(c)==null) && !parseDateCell(first[0],{...ctx});
+  IMP.header=headerLike;
+  const map=Array(w).fill('skip');
+  if(headerLike){
+    first.forEach((c,i)=>{ c=String(c||'');
+      let k='skip';
+      if(kind==='sales'){
+        if(/累計|比|手数料|メモ|曜|備品|消耗|Amazon|アスクル/i.test(c)) k='skip';
+        else if(/前年/.test(c)){ k = /単価/.test(c)?'skip': /客数|稼働/.test(c)?'lyGuests': /売上/.test(c)?'lySales':'skip'; }
+        else if(/仕入|原価|食材/.test(c)) k='cost';
+        else if(/店舗予算/.test(c)) k=map.includes('budget')?'skip':'budget';
+        else if(/予算|目標/.test(c)) k='budget';
+        else if(/客単価|単価/.test(c)) k='unit'; else if(/稼働|客数|人数|来客|組/.test(c)) k='guests'; else if(/実績|売上|売り上げ|純売/.test(c)) k='sales'; else if(/日付|年月|^月$|^日$|date/i.test(c)) k='date'; }
+      else { if(/日付|年月|^月$|date/i.test(c)) k='date'; else if(/名前|氏名|スタッフ|従業員|取引先|業者|仕入先|品目|商品|^名/.test(c)) k='name'; else if(/時間|h$/i.test(c)) k=kind==='labor'?'hours':'skip'; else if(/給与|支給|金額|総額|額|仕入|合計|計$/.test(c)) k='amount'; }
+      if(k!=='skip' && k!=='date' && k!=='cost' && map.includes(k) && kind==='sales') k='skip';
+      map[i]=k;
+    });
+    if(!map.includes('date')){ const body=rows.slice(1,6); const dc=[...Array(w).keys()].find(i=>map[i]==='skip' && body.some(r=>validKey(parseDateCell(r[i],{year:IMP.year,lastM:0})))); if(dc!=null) map[dc]='date'; }
+  } else {
+    const body=rows.slice(0,5);
+    const dateCol = [...Array(w).keys()].find(i=>body.some(r=>validKey(parseDateCell(r[i],{year:IMP.year,lastM:0}))));
+    if(dateCol!=null) map[dateCol]='date';
+    const order = kind==='sales'? ['budget','sales','guests','unit'] : kind==='labor'? ['name','hours','amount'] : ['name','amount'];
+    let k=0;
+    for(let i=0;i<w && k<order.length;i++){ if(i===dateCol) continue;
+      const numeric = body.some(r=>parseNum(r[i])!=null);
+      if(order[k]==='name' && numeric) k++;
+      if(order[k]==='name' || numeric) map[i]=order[k++];
+    }
+  }
+  return map;
+}
+function readPaste(){
+  IMP.text=document.getElementById('impText').value;
+  const rows=splitRows(IMP.text);
+  if(!rows.length){ IMP.rows=null; renderImp(); return; }
+  IMP.rows=rows; IMP.map=guessMap(rows, IMP.kind); renderImp();
+}
+function transposeRows(){
+  if(!IMP.rows) return; const w=Math.max(...IMP.rows.map(r=>r.length));
+  IMP.rows = Array.from({length:w},(_,i)=>IMP.rows.map(r=>r[i]??''));
+  IMP.map=guessMap(IMP.rows, IMP.kind); renderImp();
+}
+function buildRecords(){
+  const rows = IMP.header? IMP.rows.slice(1) : IMP.rows;
+  const ctx={year:IMP.year,lastM:0,month:IMP.month}; const di=IMP.map.indexOf('date');
+  const recs=[];
+  rows.forEach(r=>{
+    const rec={raw:r, ok:false};
+    const label=r.map(c=>String(c||'')).join('');
+    if(/^(合計|総計|小計|計|累計|平均)/.test(String(r[0]||'').trim()) || (di>=0&&/合計|総計|小計|累計|平均/.test(String(r[di]||'')))){ rec.reason='合計行'; recs.push(rec); return; }
+    if(di>=0){ const p=parseDateCell(r[di],ctx); if(!validKey(p)){ rec.reason='日付なし'; recs.push(rec); return; } rec.p=p; }
+    else if(IMP.kind==='sales'){ rec.reason='日付の列がない'; recs.push(rec); return; }
+    IMP.map.forEach((k,i)=>{ if(k==='skip'||k==='date') return;
+      if(k==='cost'){ const v=parseNum(r[i]); if(isNum(v)&&v!==0){ rec.cost=(rec.cost||0)+v; rec.costParts=rec.costParts||{}; const nm=(IMP.header? String(IMP.rows[0][i]||'').trim():'')||('列'+(i+1)); rec.costParts[nm]=(rec.costParts[nm]||0)+v; } return; }
+      rec[k]= k==='name'? String(r[i]||'').trim() : parseNum(r[i]); });
+    if(IMP.kind==='sales'){ ['sales','guests','lySales','lyGuests'].forEach(k=>{ if(rec[k]===0) rec[k]=null; }); rec.ok=['budget','sales','guests','unit','lySales','lyGuests','cost'].some(k=>isNum(rec[k])); }
+    else { rec.ok=isNum(rec.amount)||isNum(rec.hours); if(rec.name&&/^(合計|総計|小計|計)$/.test(rec.name)){rec.ok=false;rec.reason='合計行';} }
+    if(!rec.ok&&!rec.reason) rec.reason='数字なし';
+    recs.push(rec);
+  });
+  return recs;
+}
+function doImport(){
+  const recs=buildRecords().filter(r=>r.ok);
+  const msg=document.getElementById('impMsg');
+  if(!recs.length){ msg.className='msg ng'; msg.textContent='取り込める行がありません。列の割り当てを確認してください。'; return; }
+  const touched=new Set();
+  if(IMP.kind==='sales'){
+    let nd=0,nm=0,nly=0; const costAgg={};
+    recs.forEach(r=>{
+      if(r.cost!=null){ const ym=r.p.key.slice(0,7); const a=costAgg[ym]=costAgg[ym]||{sum:0,det:{}}; a.sum+=r.cost; Object.entries(r.costParts||{}).forEach(([n,v])=>a.det[n]=(a.det[n]||0)+v); }
+      if(r.p.kind==='day'){ const x=S.days[r.p.key]=S.days[r.p.key]||{};
+        ['budget','sales','guests'].forEach(k=>{ if(isNum(r[k])) x[k]=r[k]; });
+        if(isNum(r.unit)&&isNum(r.sales)&&!isNum(r.guests)&&r.unit>0) x.guests=Math.round(r.sales/r.unit);
+        if(isNum(r.lySales)||isNum(r.lyGuests)){ const [yy,mm,dd]=r.p.key.split('-'); const lk=(Number(yy)-1)+'-'+mm+'-'+dd;
+          if(validKey({kind:'day',key:lk})){ const y=S.days[lk]=S.days[lk]||{}; let u=false;
+            if(isNum(r.lySales)&&!isNum(y.sales)){ y.sales=r.lySales; u=true; } if(isNum(r.lyGuests)&&!isNum(y.guests)){ y.guests=r.lyGuests; u=true; } if(u) nly++; if(!Object.keys(y).length) delete S.days[lk]; } }
+        nd++; touched.add(r.p.key.slice(0,7));
+      } else { const x=S.months[r.p.key]=S.months[r.p.key]||{};
+        ['budget','sales','guests','unit'].forEach(k=>{ if(isNum(r[k])) x[k]=r[k]; });
+        nm++; touched.add(r.p.key);
+      }
+    });
+    Object.entries(costAgg).forEach(([ym,a])=>{ const x=S.months[ym]=S.months[ym]||{}; x.cost=a.sum; x.costDetail=Object.entries(a.det).map(([name,amount])=>({name,amount})).sort((p,q)=>q.amount-p.amount); });
+    save(); msg.className='msg ok'; msg.textContent=`取り込みました：${nd?nd+'日分':''}${nd&&nm?'・':''}${nm?nm+'ヶ月分':''}（${[...touched].sort().map(ym=>ymLabel(ym,true)).join('、')}）${Object.keys(costAgg).length?'。仕入れ '+Object.entries(costAgg).map(([ym,a])=>ymLabel(ym,true)+' '+yen(a.sum)).join('、'):''}${nly?`。前年の空いていた${nly}日分を補完`:''}`;
+  } else {
+    const agg={};
+    recs.forEach(r=>{ const ym = r.p? r.p.key.slice(0,7) : IMP.month; const a=agg[ym]=agg[ym]||{amount:0,hours:0,hasH:false,detail:{}};
+      if(isNum(r.amount)) a.amount+=r.amount; if(isNum(r.hours)){a.hours+=r.hours;a.hasH=true;}
+      const nm=r.name||'（名前なし）'; const d=a.detail[nm]=a.detail[nm]||{amount:0,hours:0}; if(isNum(r.amount)) d.amount+=r.amount; if(isNum(r.hours)) d.hours+=r.hours; });
+    Object.entries(agg).forEach(([ym,a])=>{ const x=S.months[ym]=S.months[ym]||{};
+      const f = IMP.kind==='labor'? 'labor':'cost', fd = f+'Detail';
+      const add = IMP.mode==='add';
+      x[f] = (add&&isNum(x[f])? x[f]:0) + a.amount;
+      if(IMP.kind==='labor' && a.hasH) x.laborHours = (add&&isNum(x.laborHours)? x.laborHours:0) + a.hours;
+      const det = add&&x[fd]? Object.fromEntries(x[fd].map(d=>[d.name,{amount:d.amount,hours:d.hours||0}])) : {};
+      Object.entries(a.detail).forEach(([nm,d])=>{ det[nm]=det[nm]||{amount:0,hours:0}; det[nm].amount+=d.amount; det[nm].hours+=d.hours; });
+      x[fd]=Object.entries(det).map(([name,d])=>({name,amount:d.amount,hours:d.hours||null})).sort((a,b)=>b.amount-a.amount);
+      touched.add(ym);
+    });
+    save(); msg.className='msg ok'; msg.textContent=`取り込みました（${IMP.mode==='add'?'加算':'上書き'}）：`+[...touched].sort().map(ym=>`${ymLabel(ym)} ${yen(S.months[ym][IMP.kind==='labor'?'labor':'cost'])}`).join('、');
+  }
+  const t=[...touched].sort(); if(t.length) cur=t[t.length-1];
+  fillMonthSel(); renderCoverage();
+}
+function renderCoverage(){
+  const box=document.getElementById('covBox'); if(!box) return;
+  const yms=monthRange(); const years=[...new Set(yms.map(y=>y.slice(0,4)))];
+  let h='<table class="cov"><tr><th></th>'+Array.from({length:12},(_,i)=>`<th>${i+1}月</th>`).join('')+'</tr>';
+  years.forEach(y=>{ h+=`<tr><th>${y}</th>`; for(let m=1;m<=12;m++){ const ym=y+'-'+pad(m); const r=getM(ym);
+    h+=`<td title="${ymLabel(ym)}"><div class="c"><span class="dot ${isNum(r.budget)?'on4':''}"></span><span class="dot ${isNum(r.sales)?'on1':''}"></span><span class="dot ${isNum(r.labor)?'on2':''}"></span><span class="dot ${isNum(r.cost)?'on3':''}"></span><span class="dot ${expList(ym)?'on5':(expSource(ym)&&ym<=TODAY_YM?'on5c':'')}"></span></div></td>`; } h+='</tr>'; });
+  h+='</table><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--budget)"></i>予算</span><span><i class="sw" style="background:var(--s1)"></i>売上実績</span><span><i class="sw" style="background:var(--s3)"></i>アルバイト給与</span><span><i class="sw" style="background:var(--s2)"></i>仕入れ</span><span><i class="sw" style="background:var(--s7)"></i>経費（薄い色は前の月から引き継ぎ）</span></div>';
+  box.innerHTML=h;
+}
+function renderImp(){
+  const el=document.getElementById('v-imp');
+  const k=IMP.kind;
+  const guide = {
+    sales:'日報シートの見出し行（日付・曜日・予算・前年売上・売上・客数・客単価・仕入れ…）から月末の行まで、横一列まとめてコピーして貼り付けます。列は見出しから自動で判定し、累計・前年比・メモ・備品などの列は自動で除きます。日付が「日にち」だけのシートは、下でその月を選んでください。',
+    labor:'アルバイトの給与実績を「名前・時間・給与額」の範囲でコピーして貼り付けます。日付の列がなければ、下で選んだ月にまとめて入ります。合計行は自動で除きます。',
+    cost:'仕入れ実績を「取引先（品目）・金額」の範囲でコピーして貼り付けます。日付の列があれば月ごとに自動で分けます。'
+  }[k];
+  let h=`<div class="card"><h2>データを貼り付けて取り込む</h2>
+    <div class="seg" id="kindSeg" style="margin-bottom:10px">${[['sales','売上（予算・実績・稼働・客単価）'],['labor','アルバイト給与'],['cost','仕入れ']].map(([x,l])=>`<button data-k="${x}" class="${k===x?'on':''}">${l}</button>`).join('')}</div>
+    <p class="muted" style="margin:0 0 10px">${guide}</p>
+    <textarea id="impText" rows="7" placeholder="ここに貼り付け（表計算ソフトのセル範囲をそのままコピー）">${esc(IMP.text)}</textarea>
+    <div class="fields" style="margin-top:10px">
+      <label class="field">年の書いていない日付の年<select id="impYear">${[2024,2025,2026,2027].map(y=>`<option ${y===IMP.year?'selected':''}>${y}</option>`).join('')}</select></label>
+      <label class="field">${k==='sales'?'日付が「日にち」だけのときの月':'日付がない場合に入れる月'}<input type="month" id="impMonth" value="${IMP.month}"></label>
+      ${k!=='sales'?`
+      <label class="field">同じ月にデータがあるとき<select id="impMode"><option value="replace" ${IMP.mode==='replace'?'selected':''}>上書きする</option><option value="add" ${IMP.mode==='add'?'selected':''}>加算する（分けて貼るとき）</option></select></label>`:''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="primary" id="impRead">読み取る</button>${IMP.rows?'<button id="impT">行と列を入れ替える</button><button class="ghost" id="impClear">クリア</button>':''}</div>`;
+  if(IMP.rows){
+    const w=Math.max(...IMP.rows.map(r=>r.length));
+    const recs=buildRecords(); const okN=recs.filter(r=>r.ok).length;
+    const lbl=Object.fromEntries(COLS[k]); const used=IMP.map.map((m,i)=>m==='skip'?null:`${esc(IMP.header? String(IMP.rows[0][i]||'').trim()||('列'+(i+1)) : '列'+(i+1))} → ${lbl[m]}`).filter(Boolean);
+    h+=`<div class="banner info" style="margin:10px 0 0">読み取り結果：${used.join('　／　')||'割り当てなし'}<br><span class="muted small">違っていれば下の表の見出しのプルダウンで直せます。</span></div>`;
+    h+=`<div class="preview"><table><tr><th></th>${Array.from({length:w},(_,i)=>`<th><select data-col="${i}">${COLS[k].map(([v,l])=>`<option value="${v}" ${IMP.map[i]===v?'selected':''}>${l}</option>`).join('')}</select></th>`).join('')}</tr>`;
+    const body=IMP.header? IMP.rows.slice(1):IMP.rows;
+    if(IMP.header) h+=`<tr><td class="muted">見出し</td>${IMP.rows[0].map(c=>`<td class="muted">${esc(c)}</td>`).join('')}</tr>`;
+    body.slice(0,60).forEach((r,i)=>{ const rc=recs[i]; h+=`<tr class="${rc&&rc.ok?'':'skip'}"><td class="muted small">${rc&&rc.ok? (rc.p? (rc.p.kind==='day'? rc.p.key.slice(2).replace(/-/g,'/') : ymLabel(rc.p.key,true)) : ymLabel(IMP.month,true)) : esc(rc?rc.reason:'')}</td>${Array.from({length:w},(_,j)=>`<td>${esc(r[j]??'')}</td>`).join('')}</tr>`; });
+    h+=`</table></div><div style="display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <label class="small"><input type="checkbox" id="impHdr" ${IMP.header?'checked':''}> 1行目は見出し</label>
+      <span class="muted">${okN}行を取り込みます（${body.length-okN}行は除外）${body.length>60?'・先頭60行を表示':''}</span>
+      <button class="primary" id="impGo" ${okN?'':'disabled'}>取り込む</button></div>`;
+  }
+  h+=`<div id="impMsg" class="msg"></div></div>`;
+  // 手入力
+  const mm=getM(IMP.month), mraw=S.months[IMP.month]||{};
+  h+=`<div class="card"><h2>月ごとに手で入力・修正</h2>
+    <div class="fields"><label class="field">月<input type="month" id="manMonth" value="${IMP.month}"></label>
+    ${[['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['labor','アルバイト給与'],['laborHours','アルバイト時間'],['cost','仕入れ']].map(([f,l])=>`<label class="field">${l}<input type="number" data-f="${f}" value="${isNum(mraw[f])?mraw[f]:''}" placeholder="${isNum(mm[f])?Math.round(mm[f]):''}"></label>`).join('')}</div>
+    <p class="muted" style="margin:8px 0 0">${mm.daily?'この月は日別データがあるため、実績・客数は日別の合計が優先されます（予算は月の値が優先）。':'空欄は「データなし」として扱います。'}</p>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="primary" id="manSave">保存</button><button class="danger" id="manDel">この月の売上の日別データを削除</button></div><div id="manMsg" class="msg"></div></div>`;
+  // 明細
+  if(mraw.laborDetail||mraw.costDetail){
+    h+='<div class="row">';
+    [['laborDetail','アルバイト給与の内訳'],['costDetail','仕入れの内訳']].forEach(([f,l])=>{ if(!mraw[f]) return;
+      h+=`<div class="card"><h2>${l}<span class="sub">${ymLabel(IMP.month)}</span></h2><div class="tbl-wrap" style="max-height:300px"><table class="grid"><thead><tr><th>名前</th>${f==='laborDetail'?'<th>時間</th>':''}<th>金額</th></tr></thead><tbody>${mraw[f].map(d=>`<tr><td>${esc(d.name)}</td>${f==='laborDetail'?`<td>${isNum(d.hours)&&d.hours?d.hours.toFixed(1):'—'}</td>`:''}<td>${yen(d.amount)}</td></tr>`).join('')}</tbody></table></div></div>`; });
+    h+='</div>';
+  }
+  h+=expenseCard();
+  h+=`<div class="card"><h2>取り込み状況<span class="sub">足りない月がひと目でわかります</span></h2><div class="scrollx" id="covBox"></div></div>`;
+  el.innerHTML=h;
+  renderCoverage(); bindExpense();
+  el.querySelectorAll('#kindSeg button').forEach(b=>b.onclick=()=>{ IMP.kind=b.dataset.k; if(IMP.rows) IMP.map=guessMap(IMP.rows,IMP.kind); renderImp(); });
+  document.getElementById('impRead').onclick=readPaste;
+  document.getElementById('impText').oninput=e=>{IMP.text=e.target.value};
+  document.getElementById('impYear').onchange=e=>{ IMP.year=Number(e.target.value); renderImp(); };
+  const im=document.getElementById('impMonth'); if(im) im.onchange=e=>{ IMP.month=e.target.value; renderImp(); };
+  const imd=document.getElementById('impMode'); if(imd) imd.onchange=e=>{ IMP.mode=e.target.value; };
+  if(IMP.rows){
+    document.getElementById('impT').onclick=transposeRows;
+    document.getElementById('impClear').onclick=()=>{ IMP.rows=null; IMP.text=''; renderImp(); };
+    el.querySelectorAll('select[data-col]').forEach(s=>s.onchange=()=>{ IMP.map[+s.dataset.col]=s.value; renderImp(); });
+    document.getElementById('impHdr').onchange=e=>{ IMP.header=e.target.checked; renderImp(); };
+    document.getElementById('impGo').onclick=doImport;
+  }
+  document.getElementById('manMonth').onchange=e=>{ IMP.month=e.target.value; renderImp(); };
+  document.getElementById('manSave').onclick=()=>{
+    const x=S.months[IMP.month]=S.months[IMP.month]||{};
+    el.querySelectorAll('input[data-f]').forEach(i=>{ const v=i.value.trim(); if(v==='') delete x[i.dataset.f]; else x[i.dataset.f]=Number(v); });
+    save(); const m=document.getElementById('manMsg'); m.className='msg ok'; m.textContent=ymLabel(IMP.month)+'を保存しました。'; renderCoverage(); fillMonthSel();
+  };
+  document.getElementById('manDel').onclick=()=>{
+    const ds=daysOf(IMP.month); if(!ds.length){ alert('この月に日別データはありません。'); return; }
+    if(!confirm(ymLabel(IMP.month)+'の日別データ（'+ds.length+'日分）を削除します。よろしいですか？')) return;
+    ds.forEach(d=>delete S.days[d]); save(); renderImp();
+  };
+}
+
+/* ========== 経費（月ごと） ========== */
+let EXP_YM = addMonth(TODAY_YM,-1);
+const EXP_T=[['emp','社員人件費'],['fix','固定費'],['skip','使わない']];
+function expenseCard(){
+  const ym=EXP_YM, l=expList(ym), src=expSource(ym), ex=expOf(ym);
+  const prevSrc=expSource(addMonth(ym,-1));
+  let h=`<div class="card" id="expCard"><h2>経費（月ごと）<span class="sub">社員人件費は人件費率に、固定費は営業利益・損益分岐点に使います</span></h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+      <label class="field">月<input type="month" id="expMonth" value="${ym}"></label>
+      ${prevSrc?`<button class="primary" id="expCopy">${prevSrc===addMonth(ym,-1)? (l?'前月の内容で上書き':'前月をコピー') : (l?ymLabel(prevSrc)+'の内容で上書き':ymLabel(prevSrc)+'をコピー')}</button>`:''}
+      ${l?'<button id="expAdd">行を追加</button><button class="ghost danger" id="expDel">この月の経費を削除</button>':(!prevSrc?'<button id="expAdd">行を追加</button>':'')}
+    </div>`;
+  if(!l){
+    h+= src? `<div class="banner info">この月の経費は未入力です。${ymLabel(src)}の内容（社員人件費 ${yen(ex.emp)}・固定費 ${yen(ex.fix)}）を引き継いで計算しています。金額が変わった月だけ「前月をコピー」して直してください。</div>`
+      : `<p class="muted">まだ経費がありません。日報シートの経費欄を見出しごとコピーして下に貼るか、「行を追加」で入力してください。一度入れると、翌月以降は自動で引き継ぎます。</p>`;
+  } else {
+    h+=`<div class="scrollx"><table class="grid"><thead><tr><th>項目</th><th>区分</th><th>金額</th><th></th></tr></thead><tbody>
+      ${l.map((x,i)=>`<tr><td><input type="text" data-en="${i}" value="${esc(x.name)}" style="width:100%;min-width:140px"></td><td><select data-et="${i}">${EXP_T.map(([v,lb])=>`<option value="${v}" ${x.t===v?'selected':''}>${lb}</option>`).join('')}</select></td><td><input type="number" data-ev="${i}" value="${isNum(Number(x.v))?x.v:''}" style="width:130px"></td><td><button class="ghost" data-ex="${i}" aria-label="削除">×</button></td></tr>`).join('')}
+      <tr class="tot"><td>社員人件費 合計</td><td></td><td>${yen(ex.emp)}</td><td></td></tr><tr class="tot"><td>固定費 合計</td><td></td><td>${yen(ex.fix)}</td><td></td></tr></tbody></table></div>`;
+  }
+  h+=`<details style="margin-top:10px" ${l||src?'':'open'}><summary class="small" style="cursor:pointer">シートの経費欄を貼り付けて読み取る</summary>
+      <textarea id="expText" rows="3" style="margin-top:8px" placeholder="経費の見出しと金額の範囲を貼り付け（例：社員人件費・賞与引当金・法定福利費・光熱費・減価償却費…）"></textarea>
+      <div style="margin-top:6px"><button id="expRead">読み取ってこの月に入れる</button></div></details><div id="expMsg" class="msg"></div></div>`;
+  return h;
+}
+function parseExpenseText(text){
+  const rows=splitRows(text), items=[];
+  rows.forEach((r,ri)=>r.forEach((c,ci)=>{ if(/%/.test(c)) return; const v=parseNum(c); if(!isNum(v)) return;
+    for(let k=ri-1;k>=0;k--){ const lab=String(rows[k][ci]||'').trim(); if(lab && parseNum(lab)==null){ if(!/率|目標/.test(lab)) items.push({name:lab, v, t:/社員|賞与|法定福利|福利厚生/.test(lab)?'emp':(/仕入|原価/.test(lab)?'skip':'fix')}); return; } }
+  }));
+  return items;
+}
+function bindExpense(){
+  const card=document.getElementById('expCard'); if(!card) return;
+  const ym=EXP_YM; const M=()=>S.months[ym]=S.months[ym]||{};
+  const rer=()=>{ const c=document.getElementById('expCard'); if(!c) return; if(document.activeElement&&c.contains(document.activeElement)) document.activeElement.blur(); if(!c.isConnected) return; c.outerHTML=expenseCard(); bindExpense(); renderCoverage(); };
+  const msg=t=>{ const m=document.getElementById('expMsg'); m.className='msg ok'; m.textContent=t; };
+  document.getElementById('expMonth').onchange=e=>{ if(e.target.value){ EXP_YM=e.target.value; rer(); } };
+  const cp=document.getElementById('expCopy'); if(cp) cp.onclick=()=>{ const src=expSource(addMonth(ym,-1)); if(!src) return; if(expList(ym)&&!confirm(ymLabel(ym)+'の経費を'+ymLabel(src)+'の内容で上書きします。よろしいですか？')) return; M().expenses=expList(src).map(x=>({...x})); save(); rer(); msg(ymLabel(src)+'の経費をコピーしました。変わった金額だけ直してください。'); };
+  const ad=document.getElementById('expAdd'); if(ad) ad.onclick=()=>{ const m=M(); m.expenses=expList(ym)? m.expenses : []; m.expenses.push({name:'',t:'fix',v:0}); save(); rer(); };
+  const dl=document.getElementById('expDel'); if(dl) dl.onclick=()=>{ if(!confirm(ymLabel(ym)+'の経費を削除します（前の月の内容を引き継ぐ状態に戻ります）。')) return; delete M().expenses; save(); rer(); };
+  card.querySelectorAll('[data-en]').forEach(i=>i.onchange=()=>{ M().expenses[+i.dataset.en].name=i.value; save(); });
+  card.querySelectorAll('[data-et]').forEach(i=>i.onchange=()=>{ M().expenses[+i.dataset.et].t=i.value; save(); rer(); });
+  card.querySelectorAll('[data-ev]').forEach(i=>i.onchange=()=>{ M().expenses[+i.dataset.ev].v=Number(i.value)||0; save(); rer(); });
+  card.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{ M().expenses.splice(+b.dataset.ex,1); if(!M().expenses.length) delete M().expenses; save(); rer(); });
+  document.getElementById('expRead').onclick=()=>{
+    const items=parseExpenseText(document.getElementById('expText').value);
+    if(!items.length){ const m=document.getElementById('expMsg'); m.className='msg ng'; m.textContent='金額を読み取れませんでした。見出しの行も一緒にコピーしてください。'; return; }
+    if(expList(ym)&&!confirm(ymLabel(ym)+'の経費を貼り付けた内容で置き換えます。よろしいですか？')) return;
+    M().expenses=items; save(); rer(); msg(items.length+'項目を読み取りました。区分が違うものはプルダウンで直してください。');
+  };
+}
+
+/* ========== 設定・バックアップ ========== */
+function renderSet(){
+  const el=document.getElementById('v-set'); const st=S.settings;
+  el.innerHTML=`<div class="card"><h2>店舗の情報<span class="sub">すべて任意。入れると診断が細かくなります</span></h2><div class="fields">
+    <label class="field">店舗名（レポートの見出しに表示）<input type="text" id="sName" value="${esc(st.storeName||'')}"></label>
+    <label class="field">席数（回転数の計算）<input type="number" id="sSeats" value="${st.seats||''}"></label>
+    </div></div>
+  <div class="card"><h2>目標</h2><div class="fields">
+    <label class="field">目標人件費率（%）<input type="number" step="0.1" id="sLab" value="${st.laborTarget}"></label>
+    <label class="field">目標仕入率（%）<input type="number" step="0.1" id="sCost" value="${st.costTarget}"></label>
+    <label class="field">FL比率の目安（%）<input type="number" step="0.5" id="sFl" value="${st.flTarget||60}"></label>
+    <label class="field">予算の優先<select id="sBp"><option value="month" ${st.budgetPriority==='month'?'selected':''}>月の予算を優先</option><option value="day" ${st.budgetPriority==='day'?'selected':''}>日別予算の合計を優先</option></select></label>
+    </div><div id="sMsg" class="msg"></div></div>
+  <div class="card"><h2>バックアップ</h2><p class="muted" style="margin-top:0">データはこの端末のブラウザの中だけに保存され、外部には送信されません。ブラウザのデータ消去や長期間使わない場合に消えることがあるため、定期的に書き出してください（ファイルアプリに保存できます）。${S.lastBackup? '<br>前回のバックアップ：'+new Date(S.lastBackup).toLocaleString('ja-JP'):''}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" onclick="exportJSON()">バックアップを書き出す</button><label class="field" style="flex-direction:row;align-items:center"><button onclick="document.getElementById('jsonIn').click()">バックアップから復元</button><input type="file" id="jsonIn" accept=".json,application/json" style="display:none"></label><button onclick="exportCSV()">月次一覧をCSVで書き出す</button></div></div>
+  <div class="card"><h2>パスコード</h2><p class="muted" style="margin-top:0">開くときにパスコードを求めます（この端末を他の人が触る場合の目隠し用）。${st.passHash?'現在：設定済み':'現在：なし'}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" id="sPass" placeholder="新しいパスコード" inputmode="numeric"><button onclick="setPass()">設定する</button>${st.passHash?'<button class="ghost" onclick="clearPass()">解除する</button>':''}</div></div>
+  <div class="card"><h2>データの削除</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="loadSample()">サンプルデータを入れて試す</button><button class="danger" onclick="wipe()">すべてのデータを削除</button></div></div>`;
+  const upd=()=>{ st.laborTarget=Number(document.getElementById('sLab').value)||0; st.costTarget=Number(document.getElementById('sCost').value)||0; st.budgetPriority=document.getElementById('sBp').value; st.storeName=document.getElementById('sName').value.trim(); st.seats=Number(document.getElementById('sSeats').value)||0; st.flTarget=Number(document.getElementById('sFl').value)||60; save(); const m=document.getElementById('sMsg'); m.className='msg ok'; m.textContent='保存しました。'; };
+  ['sLab','sCost','sBp','sName','sSeats','sFl'].forEach(id=>document.getElementById(id).onchange=upd);
+  document.getElementById('jsonIn').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const d=JSON.parse(rd.result); if(!d.months||!d.days) throw 0; if(!confirm('今のデータをバックアップの内容で置き換えます。よろしいですか？')) return; S=Object.assign(defaultState(),d); S.settings=Object.assign(defaultState().settings,d.settings||{}); save(); alert('復元しました。'); cur=latestSalesYM()||TODAY_YM; render(); }catch(_){ alert('バックアップファイルを読み込めませんでした。'); } }; rd.readAsText(f); };
+}
+function download(name, text, type){ const b=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000); }
+function exportJSON(){ S.lastBackup=Date.now(); save(); download('suuchi-backup-'+TODAY+'.json', JSON.stringify(S), 'application/json'); renderBanner(); }
+function exportCSV(){
+  const head=['月','予算','実績','予算比','前年比','稼働','客単価','アルバイト給与','アルバイト時間','人件費率','仕入れ','仕入率'];
+  const lines=[head.join(',')];
+  allYMs().forEach(ym=>{ const r=getM(ym), ly=getM(addMonth(ym,-12)); if(!isNum(r.sales)&&!isNum(r.budget)) return;
+    const f=v=>isNum(v)?Math.round(v):''; const p=v=>isNum(v)?(v*100).toFixed(1):'';
+    lines.push([ym,f(r.budget),f(r.sales),p(ratio(r.sales,r.budget)),p(ratio(r.sales,ly.sales)),f(r.guests),f(r.unit),f(r.labor),isNum(r.laborHours)?r.laborHours:'',p(r.laborRate),f(r.cost),p(r.costRate)].join(',')); });
+  download('suuchi-monthly-'+TODAY+'.csv', '﻿'+lines.join('\n'), 'text/csv');
+}
+function hash(s){ let h1=0x811c9dc5, h2=5381; s='sm:'+s; for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); h1=Math.imul(h1^c,16777619)>>>0; h2=((h2<<5)+h2+c)>>>0; } return h1.toString(16)+h2.toString(16); }
+function setPass(){ const v=document.getElementById('sPass').value; if(v.length<4){ alert('4文字以上で入力してください。'); return; } S.settings.passHash=hash(v); save(); alert('パスコードを設定しました。'); renderSet(); }
+function clearPass(){ if(!confirm('パスコードを解除しますか？')) return; S.settings.passHash=''; save(); renderSet(); }
+function wipe(){ if(!confirm('すべてのデータを削除します。先にバックアップを書き出しましたか？')) return; if(!confirm('本当に削除しますか？元に戻せません。')) return; const st=S.settings; S=defaultState(); S.settings=st; save(); cur=TODAY_YM; render(); }
+
+/* ========== 印刷 ========== */
+function doPrint(html){
+  const pa=document.getElementById('printArea'); pa.innerHTML=html;
+  document.body.classList.add('printing');
+  const done=()=>{ document.body.classList.remove('printing'); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{ window.print(); setTimeout(done, 1500); }, 60);
+}
+function printReport(M){
+  if(!M){ alert('締まった月のデータがありません。'); return; }
+  const r=getM(M), ly=getM(addMonth(M,-12)); const st=S.settings;
+  const h=`<div class="ptitle"><div><div class="muted">${esc(st.storeName||'')}</div><h1 style="margin:0">${ymLabel(M)} 経営診断レポート</h1></div><div class="muted small">作成日 ${TODAY.replace(/-/g,'/')}</div></div>
+  <div class="kpis">
+    ${kpi('売上実績',man(r.sales)+'<small>円</small>',[isNum(r.budget)?'予算比 '+pct(ratio(r.sales,r.budget)):'', ly.complete&&isNum(ly.sales)?'前年比 '+pct(ratio(r.sales,ly.sales)):''])}
+    ${kpi('稼働（客数）',int(r.guests)+'<small>人</small>',[ly.complete&&isNum(ly.guests)?'前年比 '+pct(ratio(r.guests,ly.guests)):''])}
+    ${kpi('客単価',int(r.unit)+'<small>円</small>',[ly.complete&&isNum(ly.unit)?'前年 '+int(ly.unit)+'円':''])}
+    ${kpi('人件費率 / 仕入率',pct(r.laborRate)+' / '+pct(r.costRate),['目標 '+st.laborTarget+'% / '+st.costTarget+'%'])}
+  </div>`+diagHTML(M,true);
+  doPrint(h);
+}
+function printForecast(){
+  const x=window._fcNow; if(!x) return; const st=S.settings;
+  let tbl='<table class="grid"><thead><tr><th>日付</th><th>曜日</th><th>区分</th><th>店舗予算</th><th>稼働予測</th><th>仕入れ予測</th><th>アルバイト人件費予測</th></tr></thead><tbody>';
+  x.rows.forEach(r=>{ tbl+=`<tr><td>${Number(x.T.slice(5))}/${r.d}</td><td>${r.wd}</td><td style="text-align:left">${r.closed?'休業':r.kind}</td><td>${int(r.sales)}</td><td>${int(r.guests)}</td><td>${int(r.cost)}</td><td>${int(r.labor)}</td></tr>`; });
+  tbl+='</tbody></table>';
+  const m=x.fc.methods[x.mk];
+  doPrint(`<h1>${ymLabel(x.T)} 見込み</h1><div class="muted">作成日 ${TODAY.replace(/-/g,'/')}　見込み方：${m?esc(m.name):'—'}${x.adj?'（調整 '+x.adj+'%）':''}</div>
+   <div class="kpis" style="margin-top:8px">${kpi('売上見込み',man(x.sales)+'<small>円</small>',[isNum(getM(x.T).budget)?'予算比 '+pct(ratio(x.sales,getM(x.T).budget)):'', isNum(x.fc.LY.sales)?'前年比 '+pct(ratio(x.sales,x.fc.LY.sales)):''])}
+   ${kpi('客数・客単価',int(x.guests)+'人 / '+int(x.unit)+'円',[])}
+   ${kpi('アルバイト給与',man(x.baito)+'<small>円</small>',['人件費率 '+pct(x.laborRate)+'（目標'+st.laborTarget+'%）', isNum(x.laborCap)?'目標内 '+man(x.laborCap):''])}
+   ${kpi('仕入れ',man(x.cost)+'<small>円</small>',['目標'+st.costTarget+'%なら '+man(x.costCap)])}</div>
+   <div class="card"><h2>日別の見込み</h2>${tbl}</div>`);
+}
+
+/* ========== サンプル ========== */
+function loadSample(){
+  if((Object.keys(S.months).length||Object.keys(S.days).length) && !confirm('今のデータにサンプルを上書きで追加します。よろしいですか？（本番データがある場合はやめてください）')) return;
+  let seed=7; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+  const season=[.88,.9,1.0,1.02,1.0,.95,.98,.96,.97,1.02,1.03,1.2];
+  for(let ym='2025-01'; ym<TODAY_YM || ym===TODAY_YM; ym=addMonth(ym,1)){
+    const [y,m]=ym.split('-').map(Number); const grow = ym>='2026-07'? 1.18 : (y===2026?1.03:1);
+    let bud=0;
+    const last = ym===TODAY_YM ? Number(TODAY.slice(8))-1 : dim(ym);
+    for(let d=1; d<=dim(ym); d++){ const ds=ym+'-'+pad(d), t=dayType(ds);
+      const base = (t===5?190000: t===6||t===0||t===7? 125000 : 150000)*season[m-1]*grow;
+      const b = Math.round(base*1.02/1000)*1000; bud+=b;
+      if(d>last) continue;
+      const unit = (y===2026? 2550 : 2700)*(0.95+rnd()*0.1);
+      const sales = Math.round(base*(0.88+rnd()*0.24));
+      S.days[ds]={sales, guests:Math.round(sales/unit)};
+    }
+    const x=S.months[ym]=S.months[ym]||{}; x.budget=Math.round(bud/10000)*10000;
+    if(ym<TODAY_YM){ const s=getM(ym).sales; x.labor=Math.round(s*(0.205+rnd()*0.03)); x.laborHours=Math.round(x.labor/1250); x.cost=Math.round(s*(0.29+rnd()*0.03)); }
+  }
+  S.settings.empCost=S.settings.empCost||0;
+  save(); cur=TODAY_YM; render();
+}
+
+/* ========== ロック・起動 ========== */
+function boot(){
+  if(S.settings.passHash){
+    const lk=document.getElementById('lock'); lk.style.display='flex';
+    const go=()=>{ if(hash(document.getElementById('lockIn').value)===S.settings.passHash){ lk.style.display='none'; render(); } else { document.getElementById('lockMsg').textContent='パスコードが違います'; } };
+    document.getElementById('lockBtn').onclick=go;
+    document.getElementById('lockIn').onkeydown=e=>{ if(e.key==='Enter') go(); };
+    setTimeout(()=>document.getElementById('lockIn').focus(),50);
+  } else render();
+}
+boot();
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>

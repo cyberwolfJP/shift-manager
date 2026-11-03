@@ -3,6 +3,10 @@
 お店のシフト作成・人件費管理WEBアプリです。
 URL：https://cyberwolfjp.github.io/shift-manager/
 
+同じサイトに入っている別アプリ
+- 翌月予測マネージャー：https://cyberwolfjp.github.io/shift-manager/yosoku/
+- 数値マネージャー（売上進捗・経営診断・翌月見込み）：https://cyberwolfjp.github.io/shift-manager/suuchi/
+
 アプリの中の「マスタ → 使い方」にも同じ内容があります。
 
 ## はじめに1回だけ
