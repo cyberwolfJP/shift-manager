@@ -174,6 +174,18 @@ button.ok{background:var(--good);border-color:var(--good);color:#fff}
 .timeline .k{color:var(--ink3);font-size:12px;margin-top:4px}
 .timeline .tx{white-space:pre-wrap;font-size:13.5px}
 
+.kinds{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.kind{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:14px 16px;border-radius:12px;background:#fff}
+.kind .kl{font-size:16px}.kind .kd{font-size:12.5px;color:var(--ink3)}
+.kind.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;background:#f4f8fe}
+.confirm{border:1px solid #cfe1f7;background:#f6f9fe;border-radius:12px;padding:12px 14px;margin-top:12px}
+.confirm .ch{font-size:15px;margin-bottom:4px}
+.ym2{display:inline-block;min-width:92px}
+.big-btn{padding:11px 20px;font-size:15.5px}
+details.adv{margin-top:10px}details.adv>summary,summary.sum2{cursor:pointer;color:var(--ink2);font-size:13.5px}
+summary.sum2{font-size:15px;color:var(--ink)}
+.preview td.off{color:#c4c2bc}
+.card.done{border-color:#b9e3b9;background:#f5fbf5}
 .diag-top .dg{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
 .dsum{flex:1 1 380px}
 .lead{font-size:15.5px;line-height:1.8;margin:4px 0 8px}
@@ -1264,7 +1276,7 @@ function renderFc(){
 }
 
 /* ========== データ取込 ========== */
-const IMP = { kind:'sales', text:'', rows:null, map:[], header:false, year:Number(TODAY.slice(0,4))-1, month:addMonth(TODAY_YM,-1), mode:'replace' };
+const IMP = { kind:null, texts:{}, rows:null, map:[], header:false, result:null, undo:null, year:Number(TODAY.slice(0,4))-1, month:addMonth(TODAY_YM,-1), mode:'replace' };
 const COLS = {
   sales:[['skip','使わない'],['date','日付・年月'],['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['lySales','前年売上（空いている日だけ補完）'],['lyGuests','前年客数（空いている日だけ補完）'],['cost','仕入れ（複数列は合計）']],
   labor:[['skip','使わない'],['date','日付・年月'],['name','名前'],['hours','時間'],['amount','給与額']],
@@ -1349,15 +1361,26 @@ function guessMap(rows, kind){
   return map;
 }
 function readPaste(){
-  IMP.text=document.getElementById('impText').value;
-  const rows=splitRows(IMP.text);
-  if(!rows.length){ IMP.rows=null; renderImp(); return; }
-  IMP.rows=rows; IMP.map=guessMap(rows, IMP.kind); renderImp();
+  const ta=document.getElementById('impText'); if(ta) IMP.texts[IMP.kind]=ta.value;
+  const rows=splitRows(IMP.texts[IMP.kind]||'');
+  IMP.rows = rows.length? rows : null; IMP.map = rows.length? guessMap(rows, IMP.kind) : []; IMP.result=null;
+  renderImpPreview();
 }
 function transposeRows(){
   if(!IMP.rows) return; const w=Math.max(...IMP.rows.map(r=>r.length));
   IMP.rows = Array.from({length:w},(_,i)=>IMP.rows.map(r=>r[i]??''));
-  IMP.map=guessMap(IMP.rows, IMP.kind); renderImp();
+  IMP.map=guessMap(IMP.rows, IMP.kind); renderImpPreview();
+}
+// 貼った表がどの種類に見えるか
+function detectKind(rows){
+  const t=rows.slice(0,3).map(r=>r.join(' ')).join(' ');
+  const sc={sales:0,labor:0,cost:0,exp:0};
+  if(/売上|客数|稼働|予算/.test(t)) sc.sales+=3;
+  if(/氏名|名前|スタッフ|従業員|時給|支給|給与|勤務時間|労働時間/.test(t)) sc.labor+=3;
+  if(/取引先|業者|仕入先|品目|請求|納品/.test(t)) sc.cost+=3; else if(/仕入/.test(t)&&!/売上/.test(t)) sc.cost+=2;
+  if(/社員人件費|賞与|法定福利|光熱|減価償却|家賃|通信費|リース/.test(t)) sc.exp+=3;
+  const best=Object.entries(sc).sort((a,b)=>b[1]-a[1])[0];
+  return best[1]>0? best[0] : null;
 }
 function buildRecords(){
   const rows = IMP.header? IMP.rows.slice(1) : IMP.rows;
@@ -1379,29 +1402,56 @@ function buildRecords(){
   });
   return recs;
 }
+// 取り込む内容をまとめる（まだ保存しない）
+function planImport(){
+  const recs=buildRecords().filter(r=>r.ok); const out={recs, months:{}, lines:[], nly:0};
+  if(!recs.length) return out;
+  if(IMP.kind==='sales'){
+    recs.forEach(r=>{ const ym=r.p.key.slice(0,7); const m=out.months[ym]=out.months[ym]||{days:0,sales:0,budget:0,guests:0,cost:0,hasCost:false,monthRow:false,ly:0};
+      if(r.p.kind==='day'){ if(isNum(r.sales)){ m.days++; m.sales+=r.sales; } } else { m.monthRow=true; if(isNum(r.sales)) m.sales+=r.sales; }
+      if(isNum(r.budget)) m.budget+=r.budget; if(isNum(r.guests)) m.guests+=r.guests;
+      if(r.cost!=null){ m.cost+=r.cost; m.hasCost=true; }
+      if(isNum(r.lySales)) m.ly++; });
+    Object.entries(out.months).sort().forEach(([ym,m])=>{
+      const old=getM(ym); const parts=[];
+      if(m.sales) parts.push(`売上 ${yen(m.sales)}${m.days?`（${m.days}日分）`:''}`);
+      if(m.budget) parts.push(`予算 ${yen(m.budget)}`);
+      if(m.guests) parts.push(`客数 ${int(m.guests)}人`);
+      if(m.hasCost) parts.push(`仕入れ ${yen(m.cost)}`);
+      out.lines.push({ym, text:parts.join('、')||'数字なし', note: [isNum(old.sales)?`今入っている売上 ${yen(old.sales)} を置き換えます`:'', m.hasCost&&isNum(old.cost)?`今入っている仕入れ ${yen(old.cost)} を置き換えます`:'', m.ly?`前年（${ymLabel(addMonth(ym,-12))}）の空いている日を${m.ly}日分補完`:''].filter(Boolean).join('。')});
+    });
+  } else {
+    const f = IMP.kind==='labor'? 'labor':'cost';
+    recs.forEach(r=>{ const ym = r.p? r.p.key.slice(0,7) : IMP.month; const m=out.months[ym]=out.months[ym]||{amount:0,hours:0,names:new Set()}; if(isNum(r.amount)) m.amount+=r.amount; if(isNum(r.hours)) m.hours+=r.hours; if(r.name) m.names.add(r.name); });
+    Object.entries(out.months).sort().forEach(([ym,m])=>{ const old=(S.months[ym]||{})[f];
+      out.lines.push({ym, text:`${IMP.kind==='labor'?'アルバイト給与':'仕入れ'} ${yen(m.amount)}（${m.names.size||'—'}${IMP.kind==='labor'?'人':'件'}${IMP.kind==='labor'&&m.hours?`・${m.hours.toFixed(1)}時間`:''}）`,
+        note: isNum(old)? (IMP.mode==='add'? `今の ${yen(old)} に足して ${yen(old+m.amount)} にします` : `今入っている ${yen(old)} を置き換えます`) : '' }); });
+  }
+  return out;
+}
 function doImport(){
   const recs=buildRecords().filter(r=>r.ok);
-  const msg=document.getElementById('impMsg');
-  if(!recs.length){ msg.className='msg ng'; msg.textContent='取り込める行がありません。列の割り当てを確認してください。'; return; }
+  if(!recs.length) return;
+  IMP.undo = JSON.stringify({days:S.days, months:S.months});
+  const plan=planImport();
   const touched=new Set();
   if(IMP.kind==='sales'){
-    let nd=0,nm=0,nly=0; const costAgg={};
+    const costAgg={};
     recs.forEach(r=>{
       if(r.cost!=null){ const ym=r.p.key.slice(0,7); const a=costAgg[ym]=costAgg[ym]||{sum:0,det:{}}; a.sum+=r.cost; Object.entries(r.costParts||{}).forEach(([n,v])=>a.det[n]=(a.det[n]||0)+v); }
       if(r.p.kind==='day'){ const x=S.days[r.p.key]=S.days[r.p.key]||{};
         ['budget','sales','guests'].forEach(k=>{ if(isNum(r[k])) x[k]=r[k]; });
         if(isNum(r.unit)&&isNum(r.sales)&&!isNum(r.guests)&&r.unit>0) x.guests=Math.round(r.sales/r.unit);
         if(isNum(r.lySales)||isNum(r.lyGuests)){ const [yy,mm,dd]=r.p.key.split('-'); const lk=(Number(yy)-1)+'-'+mm+'-'+dd;
-          if(validKey({kind:'day',key:lk})){ const y=S.days[lk]=S.days[lk]||{}; let u=false;
-            if(isNum(r.lySales)&&!isNum(y.sales)){ y.sales=r.lySales; u=true; } if(isNum(r.lyGuests)&&!isNum(y.guests)){ y.guests=r.lyGuests; u=true; } if(u) nly++; if(!Object.keys(y).length) delete S.days[lk]; } }
-        nd++; touched.add(r.p.key.slice(0,7));
+          if(validKey({kind:'day',key:lk})){ const y=S.days[lk]=S.days[lk]||{};
+            if(isNum(r.lySales)&&!isNum(y.sales)) y.sales=r.lySales; if(isNum(r.lyGuests)&&!isNum(y.guests)) y.guests=r.lyGuests; if(!Object.keys(y).length) delete S.days[lk]; } }
+        touched.add(r.p.key.slice(0,7));
       } else { const x=S.months[r.p.key]=S.months[r.p.key]||{};
         ['budget','sales','guests','unit'].forEach(k=>{ if(isNum(r[k])) x[k]=r[k]; });
-        nm++; touched.add(r.p.key);
+        touched.add(r.p.key);
       }
     });
     Object.entries(costAgg).forEach(([ym,a])=>{ const x=S.months[ym]=S.months[ym]||{}; x.cost=a.sum; x.costDetail=Object.entries(a.det).map(([name,amount])=>({name,amount})).sort((p,q)=>q.amount-p.amount); });
-    save(); msg.className='msg ok'; msg.textContent=`取り込みました：${nd?nd+'日分':''}${nd&&nm?'・':''}${nm?nm+'ヶ月分':''}（${[...touched].sort().map(ym=>ymLabel(ym,true)).join('、')}）${Object.keys(costAgg).length?'。仕入れ '+Object.entries(costAgg).map(([ym,a])=>ymLabel(ym,true)+' '+yen(a.sum)).join('、'):''}${nly?`。前年の空いていた${nly}日分を補完`:''}`;
   } else {
     const agg={};
     recs.forEach(r=>{ const ym = r.p? r.p.key.slice(0,7) : IMP.month; const a=agg[ym]=agg[ym]||{amount:0,hours:0,hasH:false,detail:{}};
@@ -1417,10 +1467,15 @@ function doImport(){
       x[fd]=Object.entries(det).map(([name,d])=>({name,amount:d.amount,hours:d.hours||null})).sort((a,b)=>b.amount-a.amount);
       touched.add(ym);
     });
-    save(); msg.className='msg ok'; msg.textContent=`取り込みました（${IMP.mode==='add'?'加算':'上書き'}）：`+[...touched].sort().map(ym=>`${ymLabel(ym)} ${yen(S.months[ym][IMP.kind==='labor'?'labor':'cost'])}`).join('、');
   }
+  save();
+  IMP.result={kind:IMP.kind, lines:plan.lines};
+  IMP.texts[IMP.kind]=''; IMP.rows=null; IMP.map=[];
   const t=[...touched].sort(); if(t.length) cur=t[t.length-1];
-  fillMonthSel(); renderCoverage();
+  fillMonthSel(); renderImp();
+}
+function undoImport(){
+  if(!IMP.undo) return; const u=JSON.parse(IMP.undo); S.days=u.days; S.months=u.months; save(); IMP.undo=null; IMP.result={undone:true}; fillMonthSel(); renderImp();
 }
 function renderCoverage(){
   const box=document.getElementById('covBox'); if(!box) return;
@@ -1431,72 +1486,66 @@ function renderCoverage(){
   h+='</table><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--budget)"></i>予算</span><span><i class="sw" style="background:var(--s1)"></i>売上実績</span><span><i class="sw" style="background:var(--s3)"></i>アルバイト給与</span><span><i class="sw" style="background:var(--s2)"></i>仕入れ</span><span><i class="sw" style="background:var(--s7)"></i>経費（薄い色は前の月から引き継ぎ）</span></div>';
   box.innerHTML=h;
 }
+const KINDS=[
+  ['sales','日報シート','売上・予算・客数（稼働）・仕入れの入った日ごとの表'],
+  ['labor','アルバイト給与','名前・時間・給与額の表'],
+  ['cost','仕入れ（別の表）','取引先・金額の表。日報シートに仕入れがある月は不要'],
+  ['exp','経費','社員人件費・光熱費・減価償却費など毎月の固定費']
+];
+const KNAME=Object.fromEntries(KINDS.map(k=>[k[0],k[1]]));
 function renderImp(){
   const el=document.getElementById('v-imp');
   const k=IMP.kind;
-  const guide = {
-    sales:'日報シートの見出し行（日付・曜日・予算・前年売上・売上・客数・客単価・仕入れ…）から月末の行まで、横一列まとめてコピーして貼り付けます。列は見出しから自動で判定し、累計・前年比・メモ・備品などの列は自動で除きます。日付が「日にち」だけのシートは、下でその月を選んでください。',
-    labor:'アルバイトの給与実績を「名前・時間・給与額」の範囲でコピーして貼り付けます。日付の列がなければ、下で選んだ月にまとめて入ります。合計行は自動で除きます。',
-    cost:'仕入れ実績を「取引先（品目）・金額」の範囲でコピーして貼り付けます。日付の列があれば月ごとに自動で分けます。'
-  }[k];
-  let h=`<div class="card"><h2>データを貼り付けて取り込む</h2>
-    <div class="seg" id="kindSeg" style="margin-bottom:10px">${[['sales','売上（予算・実績・稼働・客単価）'],['labor','アルバイト給与'],['cost','仕入れ']].map(([x,l])=>`<button data-k="${x}" class="${k===x?'on':''}">${l}</button>`).join('')}</div>
-    <p class="muted" style="margin:0 0 10px">${guide}</p>
-    <textarea id="impText" rows="7" placeholder="ここに貼り付け（表計算ソフトのセル範囲をそのままコピー）">${esc(IMP.text)}</textarea>
-    <div class="fields" style="margin-top:10px">
-      <label class="field">年の書いていない日付の年<select id="impYear">${[2024,2025,2026,2027].map(y=>`<option ${y===IMP.year?'selected':''}>${y}</option>`).join('')}</select></label>
-      <label class="field">${k==='sales'?'日付が「日にち」だけのときの月':'日付がない場合に入れる月'}<input type="month" id="impMonth" value="${IMP.month}"></label>
-      ${k!=='sales'?`
-      <label class="field">同じ月にデータがあるとき<select id="impMode"><option value="replace" ${IMP.mode==='replace'?'selected':''}>上書きする</option><option value="add" ${IMP.mode==='add'?'selected':''}>加算する（分けて貼るとき）</option></select></label>`:''}
-    </div>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="primary" id="impRead">読み取る</button>${IMP.rows?'<button id="impT">行と列を入れ替える</button><button class="ghost" id="impClear">クリア</button>':''}</div>`;
-  if(IMP.rows){
-    const w=Math.max(...IMP.rows.map(r=>r.length));
-    const recs=buildRecords(); const okN=recs.filter(r=>r.ok).length;
-    const lbl=Object.fromEntries(COLS[k]); const used=IMP.map.map((m,i)=>m==='skip'?null:`${esc(IMP.header? String(IMP.rows[0][i]||'').trim()||('列'+(i+1)) : '列'+(i+1))} → ${lbl[m]}`).filter(Boolean);
-    h+=`<div class="banner info" style="margin:10px 0 0">読み取り結果：${used.join('　／　')||'割り当てなし'}<br><span class="muted small">違っていれば下の表の見出しのプルダウンで直せます。</span></div>`;
-    h+=`<div class="preview"><table><tr><th></th>${Array.from({length:w},(_,i)=>`<th><select data-col="${i}">${COLS[k].map(([v,l])=>`<option value="${v}" ${IMP.map[i]===v?'selected':''}>${l}</option>`).join('')}</select></th>`).join('')}</tr>`;
-    const body=IMP.header? IMP.rows.slice(1):IMP.rows;
-    if(IMP.header) h+=`<tr><td class="muted">見出し</td>${IMP.rows[0].map(c=>`<td class="muted">${esc(c)}</td>`).join('')}</tr>`;
-    body.slice(0,60).forEach((r,i)=>{ const rc=recs[i]; h+=`<tr class="${rc&&rc.ok?'':'skip'}"><td class="muted small">${rc&&rc.ok? (rc.p? (rc.p.kind==='day'? rc.p.key.slice(2).replace(/-/g,'/') : ymLabel(rc.p.key,true)) : ymLabel(IMP.month,true)) : esc(rc?rc.reason:'')}</td>${Array.from({length:w},(_,j)=>`<td>${esc(r[j]??'')}</td>`).join('')}</tr>`; });
-    h+=`</table></div><div style="display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap">
-      <label class="small"><input type="checkbox" id="impHdr" ${IMP.header?'checked':''}> 1行目は見出し</label>
-      <span class="muted">${okN}行を取り込みます（${body.length-okN}行は除外）${body.length>60?'・先頭60行を表示':''}</span>
-      <button class="primary" id="impGo" ${okN?'':'disabled'}>取り込む</button></div>`;
+  let h='';
+  if(IMP.result){
+    if(IMP.result.undone) h+=`<div class="banner info">取り込みを取り消して、元の状態に戻しました。</div>`;
+    else h+=`<div class="card done"><h2>取り込みました<span class="sub">${KNAME[IMP.result.kind]}</span></h2><ul class="evals">${IMP.result.lines.map(l=>`<li><span class="st good"><i>✓</i></span><span>${ymLabel(l.ym)}：${esc(l.text)}</span></li>`).join('')}</ul>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button onclick="IMP.result=null;renderImp()">続けて取り込む</button><button onclick="goView('dash')">ダッシュボードを見る</button>${IMP.undo?'<button class="ghost danger" onclick="undoImport()">今の取り込みを取り消す</button>':''}</div></div>`;
   }
-  h+=`<div id="impMsg" class="msg"></div></div>`;
-  // 手入力
+  h+=`<div class="card"><h2>1. 何を取り込みますか</h2><div class="kinds">${KINDS.map(([x,l,d])=>`<button class="kind ${k===x?'on':''}" data-k="${x}"><span class="kl">${l}</span><span class="kd">${d}</span></button>`).join('')}</div></div>`;
+  if(k==='exp'){
+    h+=expenseCard();
+  } else if(k){
+    const guide={
+      sales:'日報シートの見出し行（日付・曜日・予算・売上・客数…）から月末の行まで、横一列まとめてコピーして貼り付けてください。累計・前年比・メモなど使わない列は自動で外します。',
+      labor:'給与の表を、見出し行（名前・時間・給与額など）ごとコピーして貼り付けてください。合計行は自動で外します。',
+      cost:'仕入れの表を、見出し行（取引先・金額など）ごとコピーして貼り付けてください。合計行は自動で外します。'
+    }[k];
+    h+=`<div class="card"><h2>2. ${KNAME[k]}を貼り付ける</h2>
+      <div class="fields" style="margin-bottom:10px"><label class="field">${k==='sales'?'何月のシートですか':'何月の分ですか'}<input type="month" id="impMonth" value="${IMP.month}"></label></div>
+      <p class="muted" style="margin:0 0 8px">${guide}</p>
+      <textarea id="impText" rows="6" placeholder="ここに貼り付けると、すぐに読み取ります">${esc(IMP.texts[k]||'')}</textarea>
+      <details class="adv"><summary>うまく読めないとき</summary><div class="fields" style="margin-top:8px">
+        <label class="field">年の書いていない日付の年<select id="impYear">${[2024,2025,2026,2027].map(y=>`<option ${y===IMP.year?'selected':''}>${y}</option>`).join('')}</select></label>
+        ${k!=='sales'?`<label class="field">同じ月にもう入っているとき<select id="impMode"><option value="replace" ${IMP.mode==='replace'?'selected':''}>置き換える</option><option value="add" ${IMP.mode==='add'?'selected':''}>足す（2回に分けて貼るとき）</option></select></label>`:''}
+        </div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button id="impT">行と列を入れ替える（月が横に並んだ表）</button><label class="small" style="align-self:center"><input type="checkbox" id="impHdr" ${IMP.header?'checked':''}> 1行目は見出し</label></div></details>
+      <div id="impPrev"></div></div>`;
+  }
+  // 内訳・手入力（ふだんは閉じておく）
   const mm=getM(IMP.month), mraw=S.months[IMP.month]||{};
-  h+=`<div class="card"><h2>月ごとに手で入力・修正</h2>
-    <div class="fields"><label class="field">月<input type="month" id="manMonth" value="${IMP.month}"></label>
+  h+=`<div class="card"><details><summary class="sum2">手で入力・修正する（${ymLabel(IMP.month)}）</summary>
+    <div class="fields" style="margin-top:10px"><label class="field">月<input type="month" id="manMonth" value="${IMP.month}"></label>
     ${[['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['labor','アルバイト給与'],['laborHours','アルバイト時間'],['cost','仕入れ']].map(([f,l])=>`<label class="field">${l}<input type="number" data-f="${f}" value="${isNum(mraw[f])?mraw[f]:''}" placeholder="${isNum(mm[f])?Math.round(mm[f]):''}"></label>`).join('')}</div>
     <p class="muted" style="margin:8px 0 0">${mm.daily?'この月は日別データがあるため、実績・客数は日別の合計が優先されます（予算は月の値が優先）。':'空欄は「データなし」として扱います。'}</p>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="primary" id="manSave">保存</button><button class="danger" id="manDel">この月の売上の日別データを削除</button></div><div id="manMsg" class="msg"></div></div>`;
-  // 明細
-  if(mraw.laborDetail||mraw.costDetail){
-    h+='<div class="row">';
-    [['laborDetail','アルバイト給与の内訳'],['costDetail','仕入れの内訳']].forEach(([f,l])=>{ if(!mraw[f]) return;
-      h+=`<div class="card"><h2>${l}<span class="sub">${ymLabel(IMP.month)}</span></h2><div class="tbl-wrap" style="max-height:300px"><table class="grid"><thead><tr><th>名前</th>${f==='laborDetail'?'<th>時間</th>':''}<th>金額</th></tr></thead><tbody>${mraw[f].map(d=>`<tr><td>${esc(d.name)}</td>${f==='laborDetail'?`<td>${isNum(d.hours)&&d.hours?d.hours.toFixed(1):'—'}</td>`:''}<td>${yen(d.amount)}</td></tr>`).join('')}</tbody></table></div></div>`; });
-    h+='</div>';
-  }
-  h+=expenseCard();
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="primary" id="manSave">保存</button><button class="danger" id="manDel">この月の売上の日別データを削除</button></div><div id="manMsg" class="msg"></div>
+    ${[['laborDetail','アルバイト給与の内訳'],['costDetail','仕入れの内訳']].filter(([f])=>mraw[f]).map(([f,l])=>`<h3 style="font-size:14px;margin:14px 0 4px">${l}</h3><div class="tbl-wrap" style="max-height:260px"><table class="grid"><thead><tr><th>名前</th>${f==='laborDetail'?'<th>時間</th>':''}<th>金額</th></tr></thead><tbody>${mraw[f].map(d=>`<tr><td>${esc(d.name)}</td>${f==='laborDetail'?`<td>${isNum(d.hours)&&d.hours?d.hours.toFixed(1):'—'}</td>`:''}<td>${yen(d.amount)}</td></tr>`).join('')}</tbody></table></div>`).join('')}
+    </details></div>`;
   h+=`<div class="card"><h2>取り込み状況<span class="sub">足りない月がひと目でわかります</span></h2><div class="scrollx" id="covBox"></div></div>`;
   el.innerHTML=h;
-  renderCoverage(); bindExpense();
-  el.querySelectorAll('#kindSeg button').forEach(b=>b.onclick=()=>{ IMP.kind=b.dataset.k; if(IMP.rows) IMP.map=guessMap(IMP.rows,IMP.kind); renderImp(); });
-  document.getElementById('impRead').onclick=readPaste;
-  document.getElementById('impText').oninput=e=>{IMP.text=e.target.value};
-  document.getElementById('impYear').onchange=e=>{ IMP.year=Number(e.target.value); renderImp(); };
-  const im=document.getElementById('impMonth'); if(im) im.onchange=e=>{ IMP.month=e.target.value; renderImp(); };
-  const imd=document.getElementById('impMode'); if(imd) imd.onchange=e=>{ IMP.mode=e.target.value; };
-  if(IMP.rows){
+  renderCoverage();
+  if(k==='exp') bindExpense();
+  el.querySelectorAll('.kind[data-k]').forEach(b=>b.onclick=()=>{ IMP.kind=b.dataset.k; IMP.result=null; IMP.rows=null; IMP.map=[]; renderImp(); if(IMP.kind!=='exp'&&IMP.texts[IMP.kind]) readPaste(); });
+  if(k && k!=='exp'){
+    const ta=document.getElementById('impText'); let tm=null;
+    ta.oninput=()=>{ IMP.texts[k]=ta.value; clearTimeout(tm); tm=setTimeout(readPaste,250); };
+    document.getElementById('impMonth').onchange=e=>{ if(e.target.value){ IMP.month=e.target.value; EXP_YM=IMP.month; renderImpPreview(); } };
+    document.getElementById('impYear').onchange=e=>{ IMP.year=Number(e.target.value); readPaste(); };
+    const imd=document.getElementById('impMode'); if(imd) imd.onchange=e=>{ IMP.mode=e.target.value; renderImpPreview(); };
     document.getElementById('impT').onclick=transposeRows;
-    document.getElementById('impClear').onclick=()=>{ IMP.rows=null; IMP.text=''; renderImp(); };
-    el.querySelectorAll('select[data-col]').forEach(s=>s.onchange=()=>{ IMP.map[+s.dataset.col]=s.value; renderImp(); });
-    document.getElementById('impHdr').onchange=e=>{ IMP.header=e.target.checked; renderImp(); };
-    document.getElementById('impGo').onclick=doImport;
+    document.getElementById('impHdr').onchange=e=>{ IMP.header=e.target.checked; renderImpPreview(); };
+    renderImpPreview();
   }
-  document.getElementById('manMonth').onchange=e=>{ IMP.month=e.target.value; renderImp(); };
+  document.getElementById('manMonth').onchange=e=>{ if(e.target.value){ IMP.month=e.target.value; renderImp(); el.querySelector('details summary.sum2').parentElement.open=true; } };
   document.getElementById('manSave').onclick=()=>{
     const x=S.months[IMP.month]=S.months[IMP.month]||{};
     el.querySelectorAll('input[data-f]').forEach(i=>{ const v=i.value.trim(); if(v==='') delete x[i.dataset.f]; else x[i.dataset.f]=Number(v); });
@@ -1507,6 +1556,31 @@ function renderImp(){
     if(!confirm(ymLabel(IMP.month)+'の日別データ（'+ds.length+'日分）を削除します。よろしいですか？')) return;
     ds.forEach(d=>delete S.days[d]); save(); renderImp();
   };
+}
+function renderImpPreview(){
+  const box=document.getElementById('impPrev'); if(!box) return;
+  const k=IMP.kind; const hd=document.getElementById('impHdr'); if(hd) hd.checked=IMP.header;
+  if(!IMP.rows){ box.innerHTML=''; return; }
+  let h='';
+  const dk=detectKind(IMP.rows);
+  if(dk && dk!==k) h+=`<div class="banner">この表は「${KNAME[dk]}」のように見えます。${KNAME[k]}として取り込んでよいか確認してください。<button id="impSwitch">${KNAME[dk]}に切り替える</button></div>`;
+  const plan=planImport();
+  const w=Math.max(...IMP.rows.map(r=>r.length));
+  const recs=buildRecords(); const okN=recs.filter(r=>r.ok).length;
+  const body=IMP.header? IMP.rows.slice(1):IMP.rows;
+  h+=`<div class="confirm"><div class="ch">3. 取り込む内容を確認</div>`;
+  if(!plan.lines.length) h+=`<p class="msg ng" style="margin:6px 0">取り込める行がありません。${k==='sales'?'日付の列があるか、':''}下の表の見出しのプルダウンで列の割り当てを確認してください。</p>`;
+  else h+=`<ul class="evals">${plan.lines.map(l=>`<li><span class="st"><i style="background:var(--s1)">→</i></span><span><span class="ym2">${ymLabel(l.ym)}</span>　${esc(l.text)}${l.note?`<br><span class="muted small">${esc(l.note)}</span>`:''}</span></li>`).join('')}</ul>`;
+  h+=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><button class="primary big-btn" id="impGo" ${plan.lines.length?'':'disabled'}>${KNAME[k]}として取り込む</button><span class="muted small">${okN}行を使用・${body.length-okN}行は除外（合計行・空の行など）</span></div></div>`;
+  const lbl=Object.fromEntries(COLS[k]);
+  h+=`<details class="adv" ${plan.lines.length?'':'open'}><summary>読み取った列を確認・直す</summary><div class="preview"><table><tr><th></th>${Array.from({length:w},(_,i)=>`<th><select data-col="${i}">${COLS[k].map(([v,l])=>`<option value="${v}" ${IMP.map[i]===v?'selected':''}>${l}</option>`).join('')}</select></th>`).join('')}</tr>`;
+  if(IMP.header) h+=`<tr><td class="muted">見出し</td>${IMP.rows[0].map(c=>`<td class="muted">${esc(c)}</td>`).join('')}</tr>`;
+  body.slice(0,40).forEach((r,i)=>{ const rc=recs[i]; h+=`<tr class="${rc&&rc.ok?'':'skip'}"><td class="muted small">${rc&&rc.ok? (rc.p? (rc.p.kind==='day'? rc.p.key.slice(5).replace('-','/') : ymLabel(rc.p.key,true)) : ymLabel(IMP.month,true)) : esc(rc?rc.reason:'')}</td>${Array.from({length:w},(_,j)=>`<td class="${IMP.map[j]==='skip'?'off':''}">${esc(r[j]??'')}</td>`).join('')}</tr>`; });
+  h+=`</table></div><p class="muted small" style="margin:6px 0 0">薄い列は使わない列です。${body.length>40?'先頭40行を表示。':''}</p></details>`;
+  box.innerHTML=h;
+  const sw=document.getElementById('impSwitch'); if(sw) sw.onclick=()=>{ const t=IMP.texts[k]; IMP.texts[k]=''; IMP.kind=dk; if(dk!=='exp'){ IMP.texts[dk]=t; renderImp(); readPaste(); } else { renderImp(); const et=document.getElementById('expText'); if(et){ et.value=t; et.closest('details').open=true; } } };
+  box.querySelectorAll('select[data-col]').forEach(s=>s.onchange=()=>{ IMP.map[+s.dataset.col]=s.value; renderImpPreview(); box.querySelector('details.adv').open=true; });
+  document.getElementById('impGo').onclick=doImport;
 }
 
 /* ========== 経費（月ごと） ========== */
