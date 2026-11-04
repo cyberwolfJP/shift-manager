@@ -146,6 +146,7 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .grid tfoot input{width:100%;text-align:center;font-family:var(--f-num);font-size:11px;background:var(--p-yellow);color:var(--p-text)}
 .grid tfoot td.neg{background:var(--bad-bg);color:var(--bad);font-weight:600}
 .grid tfoot td.pos{background:var(--good-bg);color:var(--good);font-weight:600}
+.cutbtn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px;font-size:11px;font-weight:700;padding:2px 6px;cursor:pointer}.cuttag{font-size:11px;font-weight:700;color:var(--bad);margin-right:2px}
 .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 6px}
 .del:hover{color:var(--bad)}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
@@ -755,7 +756,9 @@ const isEmp=s=>!!(s&&s.kind==='社員');
 // 表示順：社員が上、そのあとアルバイト（名簿の順）
 const staffRank=s=>s?((isEmp(s)?0:100000)+(s.order??999)):999999;
 // アルバイトの休み（出勤しない日）は表に載せない
-const hidePAoff=sh=>{const s=S.staff[sh.sid];return s&&!isEmp(s)&&sh.pos!==PAID&&isOff(sh.pos)};
+const hidePAoff=sh=>{const s=S.staff[sh.sid];return s&&!isEmp(s)&&sh.pos!==PAID&&isOff(sh.pos)&&!sh.cut};
+// 希望（出勤）が入っている行：消さずに「カット」（休みにして希望は残す）
+const cuttable=sh=>!!(sh.req&&!sh.req.off&&!sh.req.paid&&sh.req.start!=null&&sh.req.end!=null);
 const newTag=s=>isNew(s)?'<span class="tagnew" title="新人">新人</span>':'';
 const staffList=(all)=>Object.values(S.staff).filter(s=>all||s.active!==false).sort((a,b)=>(a.order??999)-(b.order??999));
 
@@ -1701,7 +1704,7 @@ function vShift(){
       <td class="v${c.work?' red':''}">${n1(c.work)}</td><td class="v${c.brk?' navy':''}">${n1(c.brk)}</td>
       <td class="v">${n1(c.labor)}</td><td class="v">${n1(c.night)}</td>
       ${(()=>{const df=diffOf(sh);return sh.req?`<td class="v${df?' red':''}" title="${esc(df?(sh.memo||sh.why||'理由が未入力です'):'希望どおり')}" style="font-family:var(--f-body);font-size:11px">${esc(reqText(sh.req))}${df?` <b>${df.delta>0?'+':''}${n1(df.delta)}h</b>`:''}</td>`:'<td class="v muted" style="font-size:11px">—</td>'})()}
-      <td><button class="del" data-act="delRow" data-i="${i}" aria-label="${esc(nm?.name||'')}の行を削除">×</button></td></tr>`}).join('');
+      <td style="white-space:nowrap">${sh.cut?`<span class="cuttag">カット</span><button class="btn sm ghost" data-act="uncutRow" data-i="${i}" title="希望の時間に戻します">戻す</button>`:cuttable(sh)&&c.on?`<button class="cutbtn" data-act="cutRow" data-i="${i}" title="この日は休みにします（希望は残り、カットとして数えます）" aria-label="${esc(nm?.name||'')}をカット">カット</button>`:`<button class="del" data-act="delRow" data-i="${i}" aria-label="${esc(nm?.name||'')}の行を削除">×</button>`}</td></tr>`}).join('');
   const offLine=offPA.length?`<p class="hint" style="margin:0">休み（アルバイト・表には載せません）：${offPA.map(x=>esc(S.staff[x.sh.sid].name)).join('、')} <button class="btn sm ghost" data-act="toggleOff">${S.showOff?'休みの人を隠す':'休みの人も表示'}</button></p>`:'';
   const ideal=d.ideal||Array(24).fill(0);
   const foot=`<tr><td class="lab stk">実数</td><td colspan="4"></td>${C.perHour.map(v=>`<td colspan="2">${+v.toFixed(1)}</td>`).join('')}<td>${n1(C.work)}</td><td>${n1(C.brk)}</td><td>${n1(C.labor)}</td><td>${n1(C.night)}</td><td></td><td></td></tr>
@@ -2725,7 +2728,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.77'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.78'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2756,6 +2759,7 @@ function bulkInit(sid){
   for(const dt of weekDates(S.week)){const row=(dayDoc(dt).shifts||[]).find(x=>x.sid===sid);
     if(!row||row.gen)days[dt]={st:''};
     else if(row.pos===PAID)days[dt]={st:'paid',h:row.paidAuto||!(Number(row.paidH)>0)?null:Number(row.paidH)};
+    else if(isOff(row.pos)&&cuttable(row))days[dt]={st:'on',start:row.req.start,end:row.req.end,pin:false,cut:true};
     else if(isOff(row.pos))days[dt]={st:'off'};
     else if(row.start!=null&&row.end!=null){const r=row.req&&row.req.start!=null?row.req:row;days[dt]={st:'on',start:r.start,end:r.end,pin:!!row.pin}}
     else days[dt]={st:''}}
@@ -2933,6 +2937,7 @@ function vBulk(page){
     const emp=s.kind==='社員';
     const seg=[['on',emp?'出勤（固定）':'出勤'],['off',emp?'公休希望':'休み'],['paid','有給']].map(([k,l])=>`<button class="${k==='on'?'on':k==='off'?'off':''}" data-act="bday" data-d="${dt}" data-v="${k}" aria-pressed="${v.st===k}"${k==='paid'&&v.st==='paid'?' style="background:var(--ink);color:var(--surface)"':''}>${l}</button>`).join('');
     const tm=v.st==='on'?`<select data-bf="start" data-d="${dt}" aria-label="${md(dt)}の開始">${tOptions(v.start,8,31.5)}</select><span>〜</span><select data-bf="end" data-d="${dt}" aria-label="${md(dt)}の終了">${tOptions(v.end,8.5,32)}</select>`
+      +(v.cut?'<span class="cuttag" title="希望はこの時間で残っています。シフト作成でカット（休み）にしています">シフトではカット</span>':'')
       +((dayDoc(dt).shifts||[]).find(x=>x.sid===B.sid)?.req?.any?'<span class="pill" style="font-size:11px">本人：時間おまかせ</span>':'')
       +(emp?'':`<button class="pin${v.pin?' on':''}" data-act="bpin" data-d="${dt}" style="font-size:11px;padding:2px 8px" title="この日は必ず入れる（自動調整で動かさない）">固定</button>`)
       :v.st==='paid'?`<input type="number" step="0.5" min="0" max="12" data-bf="h" data-d="${dt}" value="${Number(v.h)>0?v.h:''}" placeholder="${n1(paidEst(B.sid,dt).h)}" style="width:70px" aria-label="${md(dt)}の有給時間"> 時間${Number(v.h)>0?'':` <span class="paidtag">暫定 ${n1(paidEst(B.sid,dt).h)}h（直近4週間の平均）</span>`}`:v.st===''?`<span class="muted" style="font-size:12px">${(()=>{const g=(dayDoc(dt).shifts||[]).find(x=>x.sid===B.sid&&x.gen);return g?(isOff(g.pos)?'自動作成：休み':`自動作成：${tLabel(g.start)}–${tLabel(g.end)}`):emp?'おまかせ（自動作成で決めます）':'未入力'})()}</span>`:'';
@@ -2964,7 +2969,7 @@ function bulkSave(){
     const d=ensureDay(dt);let i=d.shifts.findIndex(x=>x.sid===B.sid),row=i>=0?d.shifts[i]:null;
     if(v.st===''){if(row&&!row.gen){d.shifts.splice(i,1);n++;saveDay(dt)}continue}
     if(!row){row={sid:B.sid,start:null,end:null,pos:'',bs:null};d.shifts.push(row)}
-    const emp=S.staff[B.sid]?.kind==='社員';delete row.gen;
+    const emp=S.staff[B.sid]?.kind==='社員';delete row.gen;delete row.cut;
     if(v.st==='on'){if(isOff(row.pos))row.pos=emp?(S.staff[B.sid].defPos||''):'';row.start=v.start;row.end=v.end;row.req={start:v.start,end:v.end};row.why='';row.bs=null;row.pin=emp?true:!!v.pin}
     else if(v.st==='off'){row.pos=offPos();row.start=null;row.end=null;row.req={off:true};row.why='';row.pin=false}
     else{row.pos=PAID;row.start=null;row.end=null;delete row.req;row.why='';if(Number(v.h)>0){row.paidH=Number(v.h);row.paidAuto=false}else setPaidAuto(row,dt)}
@@ -3704,7 +3709,7 @@ app.addEventListener('change',e=>{
         if(sh.req&&!sh.req.off&&sh.req.start===sh.start&&sh.req.end===sh.end){sh.why='';}
         else if(sh.req)sh.why=sh.why&&sh.why.startsWith('目標人件費率')?'':sh.why}
       if(!sh.req&&sh.sid&&sh.start!=null&&sh.end!=null&&sh.end>sh.start)sh.req={start:sh.start,end:sh.end};
-      if(sh.gen&&['sid','pos','start','end','paidH'].includes(f))delete sh.gen; // 手で直した行は、自動作成で作り直さない
+      if(sh.gen&&['sid','pos','start','end','paidH'].includes(f))delete sh.gen;if(sh.cut&&['sid','pos','start','end'].includes(f)&&calcShift(sh).on)delete sh.cut; // 手で直した行は、自動作成で作り直さない
       // 同じ人の重なり：この行を決めたら、その人の自動で作った行・休み（公休）の行は消す（同じ人が2行にならないように）
       if(sh.sid&&['sid','pos','start','end'].includes(f)&&(calcShift(sh).on||isOther(sh.pos)||isOff(sh.pos))){
         const dup=d.shifts.filter(x=>x!==sh&&x.sid===sh.sid&&(x.gen||(isOff(x.pos)&&x.pos!==PAID)||(!calcShift(x).on&&x.pos!==PAID&&!isOther(x.pos))));
@@ -3736,7 +3741,7 @@ function syncSummary(){const st=S.settings;const work=st.positions.filter(p=>p.k
   st.summaryOrder=st.summaryOrder.filter(n=>work.includes(n)).concat(work.filter(n=>!st.summaryOrder.includes(n)))}
 app.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
-  if(['addRow','adjDay','autoBrk','autoPos','brk','clearDay','clearDayGo','delRow','edu','pin','toReq'].includes(a)&&S.tab==='shift'&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return}
+  if(['addRow','adjDay','autoBrk','autoPos','brk','clearDay','clearDayGo','delRow','cutRow','uncutRow','edu','pin','toReq'].includes(a)&&S.tab==='shift'&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return}
   if(a==='rcAdd'){const dt=curDate(),d=newDay(dt);d.recruit=[...(d.recruit||[]),{from:+b.dataset.f,to:+b.dataset.t,pos:b.dataset.p||'',n:+b.dataset.n||1,note:''}].sort((a,b)=>a.from-b.from);saveDay(dt);toast('募集に登録しました');return render()}
   if(a==='rcDel'){const dt=curDate(),d=newDay(dt);d.recruit=(d.recruit||[]).filter((_,i)=>i!==+b.dataset.i);saveDay(dt);return render()}
   if(a==='empYm'){const [Y,M]=(S.empYm||today.slice(0,7)).split('-').map(Number),d=new Date(Y,M-1+ +b.dataset.n,1);S.empYm=d.getFullYear()+'-'+pad(d.getMonth()+1);return render()}
@@ -3780,6 +3785,8 @@ app.addEventListener('click',e=>{
   if(a==='day'){S.dayIdx=+b.dataset.i;S.confirm=null;remember();return render()}
   if(a==='addRow'){const d=ensureDay(curDate());d.shifts.push({sid:'',start:null,end:null,pos:'',bs:null});saveDay(curDate());render();
     const sels=app.querySelectorAll('select.nm');sels[sels.length-1]?.focus();return}
+  if(a==='cutRow'){const d=ensureDay(curDate()),sh=d.shifts[+b.dataset.i];if(sh){sh.start=null;sh.end=null;sh.pos=offPos();sh.cut=true;sh.pin=false;sh.bs=null;sh.why='カット';delete sh.gen;saveDay(curDate());toast(`${S.staff[sh.sid]?.name||''}さんをカットしました（希望は残っています）`)}return render()}
+  if(a==='uncutRow'){const d=ensureDay(curDate()),sh=d.shifts[+b.dataset.i];if(sh&&sh.req){sh.start=sh.req.start;sh.end=sh.req.end;sh.pos=isEmp(S.staff[sh.sid])?(S.staff[sh.sid].defPos||''):'';delete sh.cut;sh.why='';sh.bs=null;saveDay(curDate());toast('希望の時間に戻しました')}return render()}
   if(a==='delRow'){const d=ensureDay(curDate());d.shifts.splice(+b.dataset.i,1);saveDay(curDate());return render()}
   if(a==='brk'){const d=ensureDay(curDate()),sh=d.shifts[+b.dataset.i],c=calcShift(sh),t=+b.dataset.t;
     if(!c.on||!c.brk||t<sh.start||t>=sh.end)return;sh.bs=Math.min(t,sh.end-c.brk);saveDay(curDate());return render()}
@@ -4038,7 +4045,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v89';
+  const APP_SW='v90';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
