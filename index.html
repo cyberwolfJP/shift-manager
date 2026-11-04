@@ -823,13 +823,13 @@ function dayDoc(date){const d=S.days[date]||{budget:0,note:'',memo:'',ideal:Arra
   return d}
 function calcDay(date){
   const d=dayDoc(date);
-  let cost=0,pa=0,labor=0,work=0,brk=0,night=0,paid=0,helpH=0,helpCost=0,eduH=0,eduCost=0;const helpRows=[],eduRows=[];
+  let paidCost=0,cost=0,pa=0,labor=0,work=0,brk=0,night=0,paid=0,helpH=0,helpCost=0,eduH=0,eduCost=0;const helpRows=[],eduRows=[];
   const perHour=Array(24).fill(0), posCount={}, rows=[];
   for(const sh of d.shifts||[]){
     const c=calcShift(sh); rows.push(c);
     if(!S.staff[sh.sid])continue;
     if(sh.pos&&!isOff(sh.pos))posCount[sh.pos]=(posCount[sh.pos]||0)+1;
-    if(c.paid!=null){cost+=c.cost;paid+=c.paid;if(S.staff[sh.sid].kind!=='社員'||S.staff[sh.sid].paCount)pa+=c.cost}
+    if(c.paid!=null){cost+=c.cost;paidCost+=c.cost;paid+=c.paid;if(S.staff[sh.sid].kind!=='社員'||S.staff[sh.sid].paCount)pa+=c.cost}
     if(!c.on)continue;
     if(c.help){helpH+=c.labor;helpCost+=c.cost;helpRows.push({sh,c});continue} // ヘルプ（他店へ）は自店の人件費・人員に含めない（人件費調整で別に計上）
     if(c.edu){eduH+=c.labor;eduCost+=c.cost;eduRows.push({sh,c});continue} // 教育（研修）は研修費として別に管理。人件費・人員に含めない
@@ -840,7 +840,7 @@ function calcDay(date){
       if(t>=sh.start&&t<sh.end&&!(bs!=null&&t>=bs&&t<bs+c.brk))perHour[Math.floor(k/2)]+=0.5;}
   }
   const budget=Number(d.budget)||0;
-  return {d,rows,cost,pa,labor,work,brk,night,paid,helpH,helpCost,helpRows,eduH,eduCost,eduRows,perHour,posCount,budget,
+  return {d,rows,cost,paidCost,pa,labor,work,brk,night,paid,helpH,helpCost,helpRows,eduH,eduCost,eduRows,perHour,posCount,budget,
     rate:budget?cost/budget:null, paRate:budget?pa/budget:null, prod:labor?budget/labor:null};
 }
 function laborOf(date,sid){let h=0;for(const sh of dayDoc(date).shifts||[])if(sh.sid===sid)h+=calcShift(sh).labor;return h}
@@ -1778,7 +1778,7 @@ function vShift(){
   ${shoteiPanel(date)}
   <section class="panel" aria-label="${md(date)}の集計">
     <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${(()=>{if(moneyLocked())return '<span class="ratechip muted">人件費率 🔒</span>';const W=weekStats(S.week),tr=targetRateOf(date),pc=v=>v==null?'—':(v*100).toFixed(1)+'%',col=(v,t)=>v==null||t==null?'':v>t+1e-9?'bad':'good';
-  return `<span class="ratechip ${col(C.rate,tr/100)}" title="この日の人件費 ${yen(C.cost)} ÷ 売上予算 ${C.budget?yen(C.budget):'未入力'}（目標${tr}%）">この日 人件費率 <b>${pc(C.rate)}</b><small>目標${tr}%</small></span><span class="ratechip ${col(W.rate,W.target)}" title="${md(S.week)}〜${md(addDays(S.week,6))}の人件費 ${yen(W.cost)} ÷ 売上予算 ${W.bud?yen(W.bud):'未入力'}">この週 人件費率 <b>${pc(W.rate)}</b><small>${W.target!=null?'目標'+(W.target*100).toFixed(1)+'%':''}</small></span>`})()}${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
+  return `<span class="ratechip ${col(C.rate,tr/100)}" title="この日の人件費 ${yen(C.cost)} ÷ 売上予算 ${C.budget?yen(C.budget):'未入力'}（目標${tr}%）">この日 人件費率 <b>${pc(C.rate)}</b><small>目標${tr}%${C.paidCost?`・うち有給 ${yen(C.paidCost)}`:''}</small></span><span class="ratechip ${col(W.rate,W.target)}" title="${md(S.week)}〜${md(addDays(S.week,6))}の人件費 ${yen(W.cost)} ÷ 売上予算 ${W.bud?yen(W.bud):'未入力'}">この週 人件費率 <b>${pc(W.rate)}</b><small>${W.target!=null?'目標'+(W.target*100).toFixed(1)+'%':''}${W.paidC?`・うち有給 ${yen(W.paidC)}`:''}</small></span>`})()}${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
       ${ocLabel(date)}<span class="muted" style="font-size:12px">${(()=>{const I=idealCostOf(date);return `理想人件費 ${yen(I)}／比較 <b class="num ${C.cost-I>0?'cell-bad':'cell-good'}">${C.cost?yen(C.cost-I):'—'}</b>`})()}</span></div>
     ${(()=>{const tr=targetRateOf(date),cap=C.budget*tr/100,over=C.cost-cap;
       const RI=set().rateMode==='weekday'?null:weekRateInfo(date);
@@ -2048,14 +2048,14 @@ async function savePdf(){
  2枚目：評価と分析（評価の内訳、気づき、改善点、店長コメント）
  3枚目：シフト表（A4印刷と同じもの） */
 function weekStats(week){
-  const ds=weekDates(week);let cost=0,bud=0,pa=0,lab=0,cap=0,n=0,edu=0,eduH=0;const help=[],eduL=[];const days=ds.map(dt=>{const C=calcDay(dt),t=targetRateOf(dt),on=(dayDoc(dt).shifts||[]).filter(sh=>calcShift(sh).on);
+  const ds=weekDates(week);let paidC=0,paidH=0,cost=0,bud=0,pa=0,lab=0,cap=0,n=0,edu=0,eduH=0;const help=[],eduL=[];const days=ds.map(dt=>{const C=calcDay(dt),t=targetRateOf(dt),on=(dayDoc(dt).shifts||[]).filter(sh=>calcShift(sh).on);
     edu+=C.eduCost;eduH+=C.eduH;for(const r of C.eduRows)eduL.push({dt,name:S.staff[r.sh.sid]?.name||'',h:r.c.labor,cost:r.c.cost});
     for(const r of C.helpRows)help.push({dt,emp:isEmp(S.staff[r.sh.sid]),name:S.staff[r.sh.sid]?.name||'',to:r.sh.helpTo||'他店',h:r.c.labor,cost:r.c.cost});
     const emp=on.filter(sh=>isEmp(S.staff[sh.sid])).length,R=shortages(dt);
-    cost+=C.cost;bud+=C.budget;pa+=C.pa;lab+=C.labor;cap+=C.budget*t/100;if(C.cost)n++;
+    cost+=C.cost;paidC+=C.paidCost;paidH+=C.paid;bud+=C.budget;pa+=C.pa;lab+=C.labor;cap+=C.budget*t/100;if(C.cost)n++;
     return {dt,C,t,people:on.length,emp,shortH:R.ready?R.totalH:null,posH:R.ready?R.posH:null,note:dayDoc(dt).note||''}});
   const helpE=help.filter(x=>x.emp),helpEmp=helpE.reduce((a,x)=>a+x.cost,0),helpAll=help.reduce((a,x)=>a+x.cost,0);
-  return {days,cost,bud,pa,lab,cap,n,edu,eduH,eduL,help,helpE,helpEmp,helpAll,rate:bud?cost/bud:null,paRate:bud?pa/bud:null,prod:lab?bud/lab:null,target:bud?cap/bud:null};
+  return {days,cost,paidC,paidH,bud,pa,lab,cap,n,edu,eduH,eduL,help,helpE,helpEmp,helpAll,rate:bud?cost/bud:null,paRate:bud?pa/bud:null,prod:lab?bud/lab:null,target:bud?cap/bud:null};
 }
 function reportFindings(week){
   const W=weekStats(week),P=weekStats(addDays(week,-7)),out=[],st=set();
@@ -2110,7 +2110,7 @@ function drawReport(week,comment){
   if(E){const gx=W0-M-62,gy=M+62;c.fillStyle=E.score>=80?'#2f7a4a':E.score>=60?'#a46a00':'#b3261e';c.beginPath();c.arc(gx,gy+10,56,0,Math.PI*2);c.fill();
     T(c,E.grade,gx,gy+4,64,{b:1,al:'center',col:'#fff'});const EP0=evalPeriod(weekDates(addDays(week,-7)));T(c,`評価 ${E.score}点`,gx-84,gy-6,32,{b:1,al:'right'});if(EP0){const dd=E.score-EP0.score;T(c,`前週 ${EP0.score}点（${dd>0?'↑+':dd<0?'↓':'→'}${dd}）`,gx-84,gy+34,24,{b:1,al:'right',col:dd>0?'#2f7a4a':dd<0?'#b3261e':'#6b655a'})}}
   const ar=(a,b)=>a>b?'↑':a<b?'↓':'→',wr=(a,b)=>b?` ${ar(a,b)}${a>=b?'+':''}${((a/b-1)*100).toFixed(1)}%`:'',wp=(a,b)=>a!=null&&b!=null?` ${ar(a,b)}${a>=b?'+':''}${((a-b)*100).toFixed(1)}pt`:'';
-  const kp=[['売上予算（週）',W.bud?yen(W.bud):'—',P.bud?`前週比${wr(W.bud,P.bud)}（${yen(P.bud)}）`:''],['人件費（週）',yen(W.cost),P.cost?`前週比${wr(W.cost,P.cost)}（${yen(P.cost)}）`:''],
+  const kp=[['売上予算（週）',W.bud?yen(W.bud):'—',P.bud?`前週比${wr(W.bud,P.bud)}（${yen(P.bud)}）`:''],['人件費（週）',yen(W.cost),`${W.paidC?`うち有給 ${yen(W.paidC)}・`:''}${P.cost?`前週比${wr(W.cost,P.cost)}`:''}`],
     ['人件費率',pc(W.rate),`目標 ${pc(W.target)}${P.rate!=null?`／前週比${wp(W.rate,P.rate)}`:''}`],['P/A人件費率',pc(W.paRate),P.paRate!=null?`前週比${wp(W.paRate,P.paRate)}（${pc(P.paRate)}）`:''],
     ['人時生産性',W.prod?Math.round(W.prod).toLocaleString()+'円':'—',P.prod?`前週比${wr(W.prod,P.prod)}（${Math.round(P.prod).toLocaleString()}円）`:'売上予算÷労働時間'],['総労働時間',n1(W.lab)+'h',P.lab?`前週比${wr(W.lab,P.lab)}（${n1(P.lab)}h）`:''],
     ['研修費',yen(W.edu),`教育 ${n1(W.eduH)}h（人件費とは別）`],['社員ヘルプ費用',yen(W.helpEmp),'人件費調整の対象']];
@@ -2766,7 +2766,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.84'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.85'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3218,7 +3218,7 @@ function vWeek(){
   const over=tc-ti;
   return `<section class="panel"><div class="bar"><h2>週間管理</h2>${weekNav()}</div>${alert28Html(dates)}${zairyuAlertHtml()}
     <div class="kpis">
-      <div class="kpi hi"><span class="k">週の人件費</span><span class="v">${yen(tc)}</span></div>
+      <div class="kpi hi"><span class="k">週の人件費</span><span class="v">${yen(tc)}</span>${(()=>{const W=weekStats(S.week);return W.paidC?`<span class="muted" style="font-size:11px">うち有給 ${yen(W.paidC)}（${n1(W.paidH)}h）</span>`:'<span class="muted" style="font-size:11px">有給なし</span>'})()}</div>
       <div class="kpi"><span class="k">週の人件費率</span><span class="v">${tb?(tc/tb*100).toFixed(2)+'%':'—'}</span></div>
       <div class="kpi"><span class="k">理想との差</span><span class="v ${over>0?'cell-bad':'cell-good'}">${over>0?'+':''}${yen(over).replace('¥-','-¥')}</span></div>
       <div class="kpi"><span class="k">週の売上予算</span><span class="v">${yen(tb)}</span></div>
@@ -4118,7 +4118,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v96';
+  const APP_SW='v97';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
