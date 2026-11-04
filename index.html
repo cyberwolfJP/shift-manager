@@ -147,6 +147,10 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .grid tfoot td.neg{background:var(--bad-bg);color:var(--bad);font-weight:600}
 .grid tfoot td.pos{background:var(--good-bg);color:var(--good);font-weight:600}
 .grid tr.cutrow td{color:var(--muted)}.grid tr.cutrow td:not(:last-child){opacity:.5}.grid tr.cutrow select{color:var(--muted);font-weight:400;text-decoration:line-through}.grid tr.cutrow select.pos{text-decoration:none;font-weight:700}
+.setnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.setnav .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:14px;font-weight:700;cursor:pointer;color:var(--fg)}.setnav .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.srow{display:grid;grid-template-columns:minmax(180px,300px) 1fr;gap:6px 16px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.srow:first-of-type{border-top:0}.srow .sl b{display:block;font-size:14px}.srow .sl small{display:block;font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}.srow .sc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}.srow select,.srow input[type=number]{font-size:15px;padding:4px 6px}
+.wdgrid label{display:grid;gap:2px;font-size:12px;font-weight:700;text-align:center}.wdgrid select{font-size:13px}
+@media (max-width:640px){.srow{grid-template-columns:1fr}}
 .grid th.prep{background:var(--sunk);color:var(--muted)}.bandrow th{font-size:11px;padding:2px 0}.bandp{background:var(--sunk);color:var(--muted);font-size:11px;text-align:center}.bandb{background:var(--good-bg);color:var(--good);font-size:11px;text-align:center}.smx td.prep{opacity:.6}.smx th.prep{color:var(--muted)}
 .ratechip{display:inline-flex;align-items:baseline;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--sunk);white-space:nowrap}.ratechip b{font-size:17px}.ratechip small{font-size:11px;color:var(--muted)}.ratechip.good b{color:var(--good)}.ratechip.bad{background:var(--bad-bg)}.ratechip.bad b{color:var(--bad)}
 .cutbtn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px;font-size:11px;font-weight:700;padding:2px 6px;cursor:pointer}.cuttag{font-size:11px;font-weight:700;color:var(--bad);margin-right:2px}
@@ -774,9 +778,11 @@ function otRuleText(){const st=set(),m=otMode();return m==='dw'?`1日${st.otAfte
 function breakHours(work){const st=set();if(work>st.brk2Over)return st.brk2;if(work>=st.brk1At)return st.brk1;return 0}
 // 特別ルール：開始がこの時刻以降の勤務は休憩なし（設定の「休憩なしにする開始時刻」）
 const noBrkAt=()=>{const v=set().noBrkFrom;return v==null||v===''?null:Number(v)};
-function brkOf(start,work){const nb=noBrkAt();if(nb!=null&&start!=null&&Number(start)>=nb)return 0;return breakHours(work)}
+// 計算（労働時間・人件費・28時間）はいつもの休憩ルールのまま。休憩なしの勤務は、休憩の配置（シフト表の黒いマス・人数）だけ休憩なしにする
+function brkOf(start,work){return breakHours(work)}
+const noBrkRow=sh=>{const nb=noBrkAt();return nb!=null&&sh.start!=null&&Number(sh.start)>=nb};
 // 通常営業の開始（これより前は仕込みの時間）
-const bizFrom=()=>{const v=set().bizFrom;return v==null||v===''?8:Number(v)};
+const bizFrom=dt=>{const st=set(),w=dt?(st.bizFromW||{})[wd(dt)]:null;if(w!=null&&w!=='')return Number(w);const v=st.bizFrom;return v==null||v===''?8:Number(v)};
 function calcShift(sh){
   const st=set(), staff=S.staff[sh.sid];
   if(staff&&sh.pos===PAID){const h=Math.max(0,Number(sh.paidH)||0);return {work:0,brk:0,labor:0,night:0,cost:(Number(staff.wage)||0)*h,on:false,paid:h}}
@@ -789,7 +795,7 @@ function calcShift(sh){
   return {work,brk,labor,night,cost,on:true,help:isHelp(sh.pos),edu:!!sh.edu&&!isHelp(sh.pos),other:isOther(sh.pos)};
 }
 function breakStart(sh,c){
-  if(!c.brk)return null;
+  if(!c.brk||noBrkRow(sh))return null;
   let b=sh.bs!=null&&sh.bs!==''?Number(sh.bs):sh.start+1;
   if(b+c.brk>sh.end)b=Math.floor((sh.end-c.brk)*2)/2; if(b<sh.start)b=sh.start;
   return b;
@@ -958,7 +964,7 @@ function shortages(date){
   const {n,pos:pos0}=slotState(d),items=[];
   const open=k=>ideal[Math.floor(k/2)]>0,peak=k=>{const h=8+Math.floor(k/2);return h>=st.peakFrom&&h<st.peakTo};
   const pos=freeFill(d,pos0,ideal,peak);
-  const kb=Math.max(0,Math.min(48,(bizFrom()-8)*2)),bandOf=k=>k<kb?'prep':'biz';
+  const kb=Math.max(0,Math.min(48,(bizFrom(date)-8)*2)),bandOf=k=>k<kb?'prep':'biz';
   const scan=(needAt,haveAt,meta)=>{let cur=null;const flush=k=>{if(cur){cur.to=8+k/2;items.push(cur);cur=null}};
     for(let k=0;k<48;k++){if(k===kb)flush(k);const need=needAt(k),have=haveAt(k);
       if(need>have){if(cur&&cur.need===need&&cur.have===have){cur.lack+=(need-have)/2}else{flush(k);cur={...meta,band:bandOf(k),from:8+k/2,need,have,lack:(need-have)/2}}}else flush(k)}
@@ -988,7 +994,7 @@ function shortMatrix(date){
     const sw=posSum(d);rows.push({label:p,need:k=>posNeed(want,sw,ideal[Math.floor(k/2)],peak(k)),have:k=>pos[k][p]||0})}
   rows.push({label:'全体',tot:true,need:k=>Math.ceil(ideal[Math.floor(k/2)]||0),have:k=>n[k]});
   const ks=[];for(let k=k0;k<=k1;k++)ks.push(k);
-  const kb=(bizFrom()-8)*2,np=ks.filter(k=>k<kb).length,nb=ks.length-np;
+  const kb=(bizFrom(date)-8)*2,np=ks.filter(k=>k<kb).length,nb=ks.length-np;
   const band=np?`<tr><th class="pn"></th><th colspan="${np}" class="bandp">仕込み</th>${nb?`<th colspan="${nb}" class="bandb">通常営業</th>`:''}</tr>`:'';
   const head=band+`<tr><th class="pn"></th>${ks.map(k=>k%2===0?`<th colspan="2"${k<kb?' class="prep"':''}>${(8+k/2)>=24?8+k/2-24:8+k/2}時</th>`:(k===k0?'<th></th>':'')).join('')}</tr>`;
   const body=rows.map(r=>`<tr class="${r.tot?'tot':''}"><th class="pn">${r.tot?'<b>全体</b>':`<span class="legend"><span style="${posStyle(r.label)}">${esc(short(r.label))}</span></span>`}</th>${ks.map(k=>{const need=r.need(k),have=r.have(k),lack=need-have;
@@ -1000,7 +1006,7 @@ function shortMatrix(date){
 function shortHtml(date,title){
   const R=shortages(date);
   if(!R.ready)return `<p class="hint" style="margin:0">${title?title+'：':''}時間帯ごとの理想人数が入っていないため、不足は計算できません（シフト作成で入力）。</p>`;
-  const bf=tLabel(bizFrom()),prepBlk=R.prep.length?`<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">仕込みの時間（〜${bf}）の不足：ポジション ${n1(R.prepPosH)}人時・全体 ${n1(R.prepTotalH)}人時</summary><div class="scroll"><table class="t"><thead><tr><th>ポジション</th><th class="r">時間</th><th class="r">いる人数 / 必要</th><th class="r">不足</th></tr></thead><tbody>${R.prep.map(x=>`<tr><td>${x.kind==='total'?'<b>全体</b>':esc(x.pos)}</td><td class="num">${tLabel(x.from)}–${tLabel(x.to)}</td><td class="num">${x.minHave===x.maxNeed?'':`${x.minHave}人 / 必要${x.maxNeed}人`}</td><td class="num cell-warn">${n1(x.lack)}人時</td></tr>`).join('')}</tbody></table></div></details>`:'';
+  const bf=tLabel(bizFrom(date)),prepBlk=R.prep.length?`<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">仕込みの時間（〜${bf}）の不足：ポジション ${n1(R.prepPosH)}人時・全体 ${n1(R.prepTotalH)}人時</summary><div class="scroll"><table class="t"><thead><tr><th>ポジション</th><th class="r">時間</th><th class="r">いる人数 / 必要</th><th class="r">不足</th></tr></thead><tbody>${R.prep.map(x=>`<tr><td>${x.kind==='total'?'<b>全体</b>':esc(x.pos)}</td><td class="num">${tLabel(x.from)}–${tLabel(x.to)}</td><td class="num">${x.minHave===x.maxNeed?'':`${x.minHave}人 / 必要${x.maxNeed}人`}</td><td class="num cell-warn">${n1(x.lack)}人時</td></tr>`).join('')}</tbody></table></div></details>`:'';
   if(!R.items.length)return `<p style="margin:0"><span class="pill good">通常営業（${bf}〜）の不足なし</span>${title?` <span class="muted">${title}</span>`:''}</p>${prepBlk}`;
   const row=x=>`<tr><td style="white-space:nowrap">${x.kind==='total'?'<b>全体</b>':`<span class="legend"><span style="${posStyle(x.pos)}">${esc(x.pos)}</span></span>`}</td><td class="num" style="white-space:nowrap">${tLabel(x.from)}–${tLabel(x.to)}</td><td class="num">${x.minHave===x.maxNeed?'':`${x.minHave}人 / 必要${x.maxNeed}人`}</td><td class="num cell-bad">${n1(x.lack)}人時</td></tr>`;
   return `<div style="display:grid;gap:6px">${title?`<b>${title}</b>`:''}<div class="bar"><b style="font-size:13px">通常営業（${bf}〜）</b><span class="pill bad">ポジション不足 ${n1(R.posH)}人時</span><span class="pill ${R.totalH?'bad':'good'}">全体の不足 ${n1(R.totalH)}人時</span></div>
@@ -1396,14 +1402,14 @@ function alert28Html(dates){
 // 休憩：理想人数に対して人が一番余っている時間帯に入れる。同じポジションの休憩はなるべく重ねない。
 // 休憩が「○時までに終わらせる」を過ぎている人
 function brkWarnHtml(date){const eb=set().brkEndBy;if(eb==null||eb==='')return '';const E=Number(eb),L=[];
-  for(const sh of dayDoc(date).shifts||[]){const c=calcShift(sh);if(!c.on||!c.brk)continue;const b=breakStart(sh,c);if(b!=null&&b+c.brk>E+1e-9)L.push(`${esc(S.staff[sh.sid]?.name||'')}（${tLabel(b)}〜${tLabel(b+c.brk)}${sh.start+1+c.brk>E?'・出勤が遅いので無理':''}）`)}
+  for(const sh of dayDoc(date).shifts||[]){const c=calcShift(sh);if(!c.on||!c.brk||noBrkRow(sh))continue;const b=breakStart(sh,c);if(b!=null&&b+c.brk>E+1e-9)L.push(`${esc(S.staff[sh.sid]?.name||'')}（${tLabel(b)}〜${tLabel(b+c.brk)}${sh.start+1+c.brk>E?'・出勤が遅いので無理':''}）`)}
   return L.length?`<p class="hint" style="margin:0;color:var(--warn);font-weight:700">休憩が${tLabel(E)}までに終わっていない人：${L.join('、')}　「休憩を配置」で${tLabel(E)}までに入れ直せます</p>`:''}
 function autoBreaks(date){
   const d=ensureDay(date),ideal=d.ideal||Array(24).fill(0),cov=Array(48).fill(0),posBrk={};
   const rows=d.shifts.map(sh=>({sh,c:calcShift(sh)})).filter(r=>r.c.on&&!r.c.help);
   rows.forEach(({sh})=>{for(let k=0;k<48;k++){const t=8+k/2;if(t>=sh.start&&t<sh.end)cov[k]++}});
   let n=0;
-  rows.filter(r=>r.c.brk).sort((a,b)=>a.sh.start-b.sh.start).forEach(({sh,c})=>{
+  rows.filter(r=>r.c.brk&&!noBrkRow(r.sh)).sort((a,b)=>a.sh.start-b.sh.start).forEach(({sh,c})=>{
     const eb0=set().brkEndBy,ebN=eb0==null||eb0===''?null:Number(eb0);const lo=ebN!=null&&sh.start+1+c.brk>ebN?sh.start+0.5:sh.start+1,hi=sh.end-c.brk-1;let best=null,score=-Infinity;const mid=(sh.start+sh.end-c.brk)/2;
     for(let b=Math.min(lo,hi);b<=Math.max(lo,hi);b+=0.5){
       if(b<sh.start||b+c.brk>sh.end)continue;
@@ -1697,9 +1703,9 @@ function vShift(){
   const weekEmpty=dates.every(dt=>!(dayDoc(dt).shifts||[]).length);
   const staffOpts=sel=>'<option value=""></option>'+staffList().map(s=>`<option value="${s.id}"${sel===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
   const posOpts=sel=>'<option value=""></option>'+st.positions.map(p=>`<option${sel===p.name?' selected':''}>${esc(p.name)}</option>`).join('')+`<option${sel===PAID?' selected':''}>${PAID}</option>`+(sel===CUT?`<option selected>${CUT}</option>`:'');
-  const bzH=HOURS.filter(hh=>hh<bizFrom()).length;
-  let head=(bzH?`<tr class="bandrow"><th class="stk"></th><th colspan="4"></th><th colspan="${bzH*2}" class="bandp">仕込み</th><th colspan="${(24-bzH)*2}" class="bandb">通常営業（${tLabel(bizFrom())}〜）</th><th colspan="6"></th></tr>`:'')+`<tr><th class="stk">名前</th><th>開始</th><th>終了</th><th>ポジション</th><th title="そのポジションのスキルレベル">Lv</th>`+
-    HOURS.map(hh=>`<th class="hr${hh>=st.peakFrom&&hh<st.peakTo?' peak':''}${hh<bizFrom()?' prep':''}" colspan="2">${hh>=24?hh-24:hh}</th>`).join('')+
+  const bzH=HOURS.filter(hh=>hh<bizFrom(date)).length;
+  let head=(bzH?`<tr class="bandrow"><th class="stk"></th><th colspan="4"></th><th colspan="${bzH*2}" class="bandp">仕込み</th><th colspan="${(24-bzH)*2}" class="bandb">通常営業（${tLabel(bizFrom(date))}〜）</th><th colspan="6"></th></tr>`:'')+`<tr><th class="stk">名前</th><th>開始</th><th>終了</th><th>ポジション</th><th title="そのポジションのスキルレベル">Lv</th>`+
+    HOURS.map(hh=>`<th class="hr${hh>=st.peakFrom&&hh<st.peakTo?' peak':''}${hh<bizFrom(date)?' prep':''}" colspan="2">${hh>=24?hh-24:hh}</th>`).join('')+
     `<th>勤務</th><th>休憩</th><th>労働</th><th>深夜</th><th title="LINEで受けた希望の時間">希望</th><th></th></tr>`;
   const shiftsAll=(d.shifts||[]).map((sh,i)=>({sh,i}));
   const offPA=shiftsAll.filter(x=>hidePAoff(x.sh));
@@ -1722,7 +1728,7 @@ function vShift(){
       <td><select class="pos" data-f="pos" data-i="${i}" aria-label="ポジション">${posOpts(sh.pos)}</select></td>
       ${isOther(sh.pos)?`<td class="lvc" style="padding:0 2px"><input type="text" data-f="oNote" data-i="${i}" value="${esc(sh.oNote||'')}" placeholder="内容（例：店長会議）" maxlength="40" style="width:110px;font-size:11px" aria-label="内容"></td>`:isHelp(sh.pos)?`<td class="lvc" style="padding:0 2px"><input type="text" data-f="helpTo" data-i="${i}" value="${esc(sh.helpTo||'')}" placeholder="ヘルプ先" style="width:90px;font-size:11px" aria-label="ヘルプ先"></td>`:(()=>{const L=sh.sid&&posInfo(sh.pos)?.kind==='work'?levelOf(sh.sid,sh.pos):undefined;return L===undefined?'<td class="lvc"></td>':L===null?'<td class="lvc lv0" title="未設定">–</td>':`<td class="lvc lv${L}" title="${esc(lvName(L))}">${L}</td>`})()}
       ${cells}
-      <td class="v${c.work?' red':''}">${n1(c.work)}</td><td class="v${c.brk?' navy':''}">${n1(c.brk)}</td>
+      <td class="v${c.work?' red':''}">${n1(c.work)}</td><td class="v${c.brk?' navy':''}"${c.brk&&noBrkRow(sh)?' title="計算上の休憩です。この勤務は休憩を入れない設定なので、シフト表には休憩を置きません"':''}>${n1(c.brk)}${c.brk&&noBrkRow(sh)?'<div style="font-size:9px;color:var(--muted)">配置なし</div>':''}</td>
       <td class="v">${n1(c.labor)}</td><td class="v">${n1(c.night)}</td>
       ${(()=>{const df=diffOf(sh);return sh.req?`<td class="v${df?' red':''}" title="${esc(df?(sh.memo||sh.why||'理由が未入力です'):'希望どおり')}" style="font-family:var(--f-body);font-size:11px">${esc(reqText(sh.req))}${df?` <b>${df.delta>0?'+':''}${n1(df.delta)}h</b>`:''}</td>`:'<td class="v muted" style="font-size:11px">—</td>'})()}
       <td style="white-space:nowrap">${sh.cut?`<span class="cuttag">カット</span><button class="btn sm ghost" data-act="uncutRow" data-i="${i}" title="希望の時間に戻します">戻す</button>`:cuttable(sh)&&c.on?`<button class="cutbtn" data-act="cutRow" data-i="${i}" title="この日は休みにします（希望は残り、カットとして数えます）" aria-label="${esc(nm?.name||'')}をカット">カット</button>`:`<button class="del" data-act="delRow" data-i="${i}" aria-label="${esc(nm?.name||'')}の行を削除">×</button>`}</td></tr>`}).join('');
@@ -2659,7 +2665,7 @@ function evalPeriod(dates){
       tip:diff>0.5?`目標を${diff.toFixed(1)}ポイント上回っています。「シフト作成」の「目標に合わせる」で、人が多い時間帯から短くできます。`:-diff>3?`目標より${(-diff).toFixed(1)}ポイント低く、人が足りていない可能性があります。人員配置の不足も確認してください。`:''})}
   // 人員配置（時間帯ごとの理想人数）
   let I=0,short=0,sur=0;for(const dt of days){const d=dayDoc(dt),ideal=(d.ideal||[]).map(Number);if(!ideal.some(v=>v>0))continue;const H=hourCover(d).H;
-    ideal.forEach((v,h)=>{if(v>0&&HOURS[h]>=bizFrom()){I+=v;short+=Math.max(0,v-H[h]);sur+=Math.max(0,H[h]-v)}})}
+    ideal.forEach((v,h)=>{if(v>0&&HOURS[h]>=bizFrom(dt)){I+=v;short+=Math.max(0,v-H[h]);sur+=Math.max(0,H[h]-v)}})}
   if(I){const sc=Math.max(0,100-short/I*300-sur/I*100);
     items.push({k:'cover',label:'人員配置',sc,val:`不足 ${n1(short)}人時・過剰 ${n1(sur)}人時`,
       tip:short>0?'理想人数に届かない時間帯があります。「シフト作成」の過不足の行（赤）を見て、出勤時間を延ばすか人を足してください。':sur/I>0.1?'人が多い時間帯があります。人件費を下げる余地があります。':''})}
@@ -2751,7 +2757,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.81'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.82'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3647,11 +3653,10 @@ function vSettings(){
     ${lk?`${hasPin?'<input type="password" id="setPinIn" inputmode="numeric" placeholder="暗証番号" autocomplete="off" style="width:120px">':''}<button class="btn pri sm" data-act="setUnlock">鍵を開ける</button><span class="hint">ポジション・人件費率・計算ルールは、鍵を開けたときだけ変えられます</span>`
       :`<button class="btn pri sm" data-act="setLock">鍵をかける</button><span class="hint">ほかのタブに移るか、アプリを開き直すと自動で鍵がかかります</span>
       <details style="margin-left:auto"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">暗証番号${hasPin?'を変える・なくす':'をつける'}</summary><div class="bar" style="gap:6px;margin-top:6px"><input type="password" id="setPinNew" inputmode="numeric" placeholder="新しい暗証番号（4けた以上）" autocomplete="off" style="width:200px"><button class="btn sm" data-act="setPinSave">保存</button>${hasPin?'<button class="btn sm ghost" data-act="setPinClear">暗証番号をなくす</button>':''}</div></details>`}</div></section>`;
-  return lockBar+storeSec+`<fieldset class="lockfs"${lk?' disabled':''}><section class="panel"><h2>各ポジションマスタ</h2>
+  const posSec=`<section class="panel"><h2>各ポジションマスタ</h2>
     <div class="scroll"><table class="t"><thead><tr><th>ポジション</th><th>色</th><th>扱い</th><th></th></tr></thead><tbody>${pos}</tbody></table></div>
-    <div><button class="btn sm" data-act="addPos">＋ ポジションを追加</button></div></section>
-  <div class="two">
-  <section class="panel"><h2>目標人件費率・理想人件費（曜日別）</h2>
+    <div><button class="btn sm" data-act="addPos">＋ ポジションを追加</button></div></section>`;
+  const rateSec=`<section class="panel"><h2>目標人件費率・理想人件費（曜日別）</h2>
     ${(()=>{const mm=st.rateMode!=='weekday',RI=weekRateInfo(S.week||iso(new Date()));
       return `<div class="autobar" style="flex-wrap:wrap"><label class="field" style="margin:0"><span>月間の目標人件費率（%）</span><input type="number" step="0.5" min="0" max="100" id="s_monthRate" data-sset="monthRate" value="${st.monthRate??24}" style="width:90px"></label>
         <label style="font-size:13px"><input type="radio" name="rmode" data-rmode="month"${mm?' checked':''}> 月間の目標から週ごとに自動で決める</label>
@@ -3667,21 +3672,52 @@ function vSettings(){
       <td class="num"><b>${yen(idealCostW(w))}</b></td></tr>`}).join('')}</tbody></table></div>
     <p class="hint" style="margin:0">理想人件費 ＝ 在籍スタッフの平均時給 × 理想人数（時間帯ごとの理想人数の合計）＋ 人件費調整。理想人数は「シフト作成」で入れた曜日ごとの基本（なければその曜日に入力済みの日の平均）を使い、各日の比較ではその日の理想人数で計算します。人件費調整には、社員の手当や応援など平均時給では表せない分をプラス／マイナスで入れてください。理想人数が未登録の曜日は、金額を手入力できます。</p>
     <div class="bar">${num('minShift','調整後も残す最短勤務（h）',0.5)}${num('fairMaxDay','公平：1日で削る上限（h）',0.5)}${num('fairMaxRatio','公平：週で削る上限（希望の%）',5)}<label style="font-size:13px"><input type="checkbox" id="adjEmp"${st.adjustEmployees?' checked':''}> 社員も調整の対象にする</label></div>
-    <p class="hint">「シフト作成」の「目標に合わせる」は、売上予算×目標人件費率を上限に、時間帯ごとの理想人数を下回らない範囲でだけ勤務を短くします。</p></section>
-  <section class="panel"><h2>計算ルール</h2>
-    <div class="kpis">${num('border','社員ボーダー（週h）',0.5)}${num('limit28','28h管理の上限（h）',0.5)}${num('otLimit','社員の残業上限（月h）',1)}${num('otWarn','社員の残業 注意（月h以上）',1)}${num('offMonth','社員の公休 所定（月の日数・基本）',1)}${num('warn28','28h：黄色にする残り（h未満）',0.5)}${num('alert28','28h：警告にする残り（h未満）',0.5)}
-    <label style="font-size:13px;align-self:end"><input type="checkbox" id="brk28"${st.brk28===true?' checked':''}> 28時間を休憩込みで数える（ふつうは外したまま＝休憩を引いて数える）</label>
-    <label class="field"><span>立ち上げの時刻（空欄＝その日一番早い出勤）</span><input type="number" step="0.5" min="0" max="31" id="s_openAt" data-ocset="openAt" value="${st.openAt??''}" placeholder="例 11"></label>
-    <label class="field"><span>締めの時刻（空欄＝その日一番遅い退勤）</span><input type="number" step="0.5" min="0" max="31" id="s_closeAt" data-ocset="closeAt" value="${st.closeAt??''}" placeholder="例 23.5"></label>
-    ${num('brk1At','休憩1：勤務がこの時間以上',0.5)}${num('brk1','→ 休憩（h）',0.25)}${num('brk2Over','休憩2：勤務がこの時間超',0.5)}${num('brk2','→ 休憩（h）',0.25)}
-    <label class="field"><span>休憩なし：開始がこの時刻以降の勤務（空欄＝なし）</span><input type="number" step="0.5" min="8" max="31" data-ocset="noBrkFrom" value="${st.noBrkFrom??''}" placeholder="例 17"></label>
-    <label class="field"><span>休憩は原則この時刻までに終わらせる（空欄＝なし）</span><input type="number" step="0.5" min="8" max="31" data-ocset="brkEndBy" value="${st.brkEndBy??''}" placeholder="例 17"></label>
-    <label class="field"><span>通常営業の開始（これより前は仕込み）</span><input type="number" step="0.5" min="8" max="31" data-ocset="bizFrom" value="${st.bizFrom??11}" placeholder="例 11"></label>
-    <label class="field"><span>残業の数え方</span><select id="s_otMode" data-otmode="1">${Object.entries(OT_MODES).map(([k,v])=>`<option value="${k}"${otMode()===k?' selected':''}>${v}</option>`).join('')}</select></label>
-    ${num('otAfter','残業：1日の基準（この時間を超えた分）',0.5)}${num('otRate','残業の割増率',0.05)}${num('weeklyOT','残業：週の基準（この時間を超えた分）',0.5)}${num('nightRate','深夜の割増率',0.05)}
-    ${num('nightFrom','深夜の開始（時）',0.5)}${num('nightTo','深夜の終了（24+時）',0.5)}
-    ${num('peakFrom','ピーク帯表示 開始',1)}${num('peakTo','ピーク帯表示 終了',1)}</div>
-    <p class="hint">残業の数え方：${otRuleText()}。${otDaily()?`日々の人件費 ＝ 時給 ×（労働時間のうち${st.otAfter}hまで）＋ 時給 × ${st.otRate} ×（${st.otAfter}hを超えた分）。`:'日々の人件費 ＝ 時給 × 労働時間（1日ごとの割増はつけません）。'}労働 ＝ 勤務 − 休憩。社員の残業・残業代は「集計 → 社員勤務時間」で、この数え方で計算します。</p></section></fieldset></div>`;
+    <p class="hint">「シフト作成」の「目標に合わせる」は、売上予算×目標人件費率を上限に、時間帯ごとの理想人数を下回らない範囲でだけ勤務を短くします。</p></section>`;
+  // 設定は「項目ごと」に分けて1つずつ表示する
+  const tSel=(attr,f,v,nullable,from=8,to=31.5)=>`<select ${attr}="${f}" aria-label="${f}">${nullable?`<option value=""${v==null||v===''?' selected':''}>（なし）</option>`:''}${tOptions(v==null||v===''?null:Number(v),from,to).replace('<option value=""></option>','')}</select>`;
+  const rowS=(label,ctl,note)=>`<div class="srow"><div class="sl"><b>${label}</b>${note?`<small>${note}</small>`:''}</div><div class="sc">${ctl}</div></div>`;
+  const nIn=(f,step,unit)=>`<input type="number" step="${step}" id="s_${f}" data-sset="${f}" value="${st[f]??DEFAULT_SETTINGS[f]??''}" style="width:90px">${unit?` <span class="muted">${unit}</span>`:''}`;
+  const SECS=[['time','営業時間・仕込み'],['brk','休憩'],['ot','残業・深夜'],['emp','社員'],['intl','留学生（28時間）'],['rate','人件費率・調整'],['pos','ポジション'],['store','店舗・パスワード・バックアップ']];
+  const sec=SECS.some(x=>x[0]===S.setSec)?S.setSec:'time';
+  const nav=`<div class="setnav">${SECS.map(([k,l])=>`<button class="chip${sec===k?' on':''}" data-act="setSec" data-k="${k}">${l}</button>`).join('')}</div>`;
+  const bw=st.bizFromW||{};
+  const body={
+    time:`<section class="panel"><h2>営業時間・仕込み</h2>
+      ${rowS('立ち上げの時刻',tSel('data-ocset','openAt',st.openAt,true),'（なし）＝その日一番早い出勤の人の時刻')}
+      ${rowS('締めの時刻',tSel('data-ocset','closeAt',st.closeAt,true),'（なし）＝その日一番遅い退勤の人の時刻。希望の「L」「ラスト」もこの時刻')}
+      ${rowS('通常営業の開始（基本）',tSel('data-ocset','bizFrom',st.bizFrom??11,false),'これより前は「仕込み」。ポジションの不足は通常営業の時間で判定します')}
+      <div class="srow"><div class="sl"><b>曜日ごとの通常営業の開始</b><small>仕込みの時間が曜日で違うときに。（基本と同じ）なら上の時刻を使います</small></div>
+        <div class="sc wdgrid">${[1,2,3,4,5,6,0].map(w=>`<label><span class="${w===6?'w-sat':w===0?'w-sun':''}">${WD[w]}</span><select data-bizw="${w}" aria-label="${WD[w]}曜日の通常営業の開始"><option value=""${bw[w]==null?' selected':''}>基本と同じ</option>${tOptions(bw[w]==null?null:Number(bw[w]),8,31.5).replace('<option value=""></option>','')}</select></label>`).join('')}</div></div>
+      ${rowS('ピーク帯（表示用）',`${tSel('data-sset','peakFrom',st.peakFrom,false)} 〜 ${tSel('data-sset','peakTo',st.peakTo,false)}`,'シフト表の時刻の色が変わるだけです')}</section>`,
+    brk:`<section class="panel"><h2>休憩</h2>
+      ${rowS('休憩1',`勤務が ${nIn('brk1At',0.5,'時間以上')} → 休憩 ${nIn('brk1',0.25,'時間')}`,'例：6時間以上で0.75（45分）')}
+      ${rowS('休憩2',`勤務が ${nIn('brk2Over',0.5,'時間を超える')} → 休憩 ${nIn('brk2',0.25,'時間')}`,'例：8時間を超えると1（60分）')}
+      ${rowS('休憩なしにする勤務',`開始が ${tSel('data-ocset','noBrkFrom',st.noBrkFrom,true)} 以降`,'例：17:00以降に始まる勤務は、シフト表で休憩を入れません（その時間も人数に数えます）。労働時間・人件費・28時間の計算は、いつもの休憩ルールのままです')}
+      ${rowS('休憩を終わらせる時刻',tSel('data-ocset','brkEndBy',st.brkEndBy,true),'「休憩を配置」でこの時刻までに入れるようにします。過ぎている人はシフト表の下に出ます')}</section>`,
+    ot:`<section class="panel"><h2>残業・深夜</h2>
+      ${rowS('残業の数え方',`<select id="s_otMode" data-otmode="1">${Object.entries(OT_MODES).map(([k,v])=>`<option value="${k}"${otMode()===k?' selected':''}>${v}</option>`).join('')}</select>`,'')}
+      ${rowS('1日の基準',nIn('otAfter',0.5,'時間を超えた分'),'')}
+      ${rowS('週の基準',nIn('weeklyOT',0.5,'時間を超えた分'),'')}
+      ${rowS('残業の割増率',nIn('otRate',0.05,'倍'),'例：1.25')}
+      ${rowS('深夜の時間帯',`${tSel('data-sset','nightFrom',st.nightFrom,false)} 〜 ${tSel('data-sset','nightTo',st.nightTo,false)}`,'')}
+      ${rowS('深夜の割増率',nIn('nightRate',0.05,''),'例：0.25（時給の25%増し）')}
+      <p class="hint">残業の数え方：${otRuleText()}。${otDaily()?`日々の人件費 ＝ 時給 ×（労働時間のうち${st.otAfter}hまで）＋ 時給 × ${st.otRate} ×（${st.otAfter}hを超えた分）。`:'日々の人件費 ＝ 時給 × 労働時間（1日ごとの割増はつけません）。'}労働 ＝ 勤務 − 休憩。社員の残業・残業代は「集計 → 社員勤務時間」で、この数え方で計算します。</p></section>`,
+    emp:`<section class="panel"><h2>社員</h2>
+      ${rowS('社員ボーダー',nIn('border',0.5,'時間／週'),'社員勤務時間の表で使う週の目安')}
+      ${rowS('残業の上限',nIn('otLimit',1,'時間／月'),'超えそうなら赤で知らせます')}
+      ${rowS('残業の注意',nIn('otWarn',1,'時間／月 以上'),'この時間を超えそうなら黄色')}
+      ${rowS('公休の所定日数（基本）',nIn('offMonth',1,'日／月'),'社員ごとに違うときは「名簿 → 社員の勤務ルール」で')}</section>`,
+    intl:`<section class="panel"><h2>留学生（28時間）</h2>
+      ${rowS('上限',nIn('limit28',0.5,'時間／連続7日'),'')}
+      ${rowS('黄色にする残り',nIn('warn28',0.5,'時間未満'),'')}
+      ${rowS('警告（赤）にする残り',nIn('alert28',0.5,'時間未満'),'')}
+      ${rowS('休憩の扱い',`<label style="font-size:13px"><input type="checkbox" id="brk28"${st.brk28===true?' checked':''}> 休憩込みで数える</label>`,'ふつうは外したまま（休憩を引いた労働時間で数えます）')}
+      ${rowS('有給の扱い',`<label style="font-size:13px"><input type="checkbox" id="paid28"${st.paid28?' checked':''}> 有給の時間も含める</label>`,'')}</section>`,
+    rate:rateSec,
+    pos:posSec,
+    store:''};
+  const locked=sec!=='store';
+  return lockBar+nav+(sec==='store'?storeSec:`<fieldset class="lockfs"${lk&&locked?' disabled':''}>${body[sec]}</fieldset>`);
 }
 
 /* ---------- 入力イベント ---------- */
@@ -3709,6 +3745,7 @@ app.addEventListener('change',e=>{
   if(el.id==='adjEmp'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.adjustEmployees=el.checked;saveSettings();return render()}
   if(el.id==='reqPick'){if(S.bulk&&JSON.stringify(S.bulk.days)!==S.bulk.orig)bulkSave();S.bulk=bulkInit(el.value);return render()}
   if(el.id==='bS'||el.id==='bE'){S.bulkT=[Number(document.getElementById('bS').value),Number(document.getElementById('bE').value)];return}
+  if(el.dataset.bizw!=null){S.settings=S.settings||clone(DEFAULT_SETTINGS);const W={...(S.settings.bizFromW||{})};if(el.value==='')delete W[el.dataset.bizw];else W[el.dataset.bizw]=Number(el.value);S.settings.bizFromW=W;saveSettings();return render()}
   if(el.dataset.zsid!=null){const r=(S.zImp||[])[+el.dataset.zsid];if(r)r.sid=el.value;return render()}
   if(el.dataset.bf){const v=S.bulk.days[el.dataset.d];v[el.dataset.bf]=el.value===''?null:Number(el.value);return render()}
   if(el.id==='brk28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.brk28=el.checked;saveSettings();return render()}
@@ -3776,6 +3813,7 @@ app.addEventListener('click',e=>{
   if(a==='ocrReset'){if(!confirm('読み込んだスクショと下書きを全部消しますか？（登録済みのシフト希望はそのままです）'))return;S.rc.forEach(y=>{try{URL.revokeObjectURL(y.url)}catch(_){}});S.rc=[];S.rcP=[];S.rcN=0;return render()}
   if(a==='zRead'){const t=document.getElementById('zText')?.value||'';S.zText=t;const r=zParse(t);if(!r.length)return toast('「名前　2026/12/24」の形の行が見つかりません');S.zImp=r;toast(`${r.length}行を読み取りました（${r.filter(x=>x.sid).length}人を名簿に結びつけました）`);return render()}
   if(a==='zApply'){let n=0;for(const r of S.zImp||[]){if(!r.sid)continue;const st=S.staff[r.sid];if(!st||!st.limit28)continue;st.zairyu=r.date;if(!st.fullName)st.fullName=r.name.replace(/\s+/g,' ');saveStaff(st.id);n++}S.zImp=null;S.zText='';toast(`${n}人の在留カード期限を入れました`);return render()}
+  if(a==='setSec'){S.setSec=b.dataset.k;return render()}
   if(a==='setUnlock'){const st=set();if(st.setPin){const v=(document.getElementById('setPinIn')?.value||'').trim();if(sha256hex('setpin:'+v)!==st.setPin){toast('暗証番号が違います');return}}S.setOpen=true;toast('鍵を開けました');return render()}
   if(a==='setLock'){S.setOpen=false;toast('鍵をかけました');return render()}
   if(a==='setPinSave'){const v=(document.getElementById('setPinNew')?.value||'').trim();if(v.length<4)return toast('暗証番号は4けた以上にしてください');S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.setPin=sha256hex('setpin:'+v);saveSettings();toast('暗証番号を保存しました。次に鍵を開けるときに使います');return render()}
@@ -4071,7 +4109,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v93';
+  const APP_SW='v94';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
