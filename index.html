@@ -260,6 +260,7 @@ table.wk tr.me td{background:var(--warn-bg)}
 .ccell .cn{font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ccell .ce{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ccell .ce i{font-style:normal;color:var(--muted)}
 .ccell .ct{border-radius:3px;padding:0 3px;overflow:hidden;text-overflow:ellipsis;background:var(--warn-bg,#fff3cd);white-space:nowrap}.ccell .ct.ok{background:var(--good-bg);color:var(--good)}.ccell .ct.late{background:var(--bad);color:var(--surface)}
+.ccell .cz{border-radius:3px;padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;background:var(--warn-bg);color:var(--warn)}.ccell .cz.exp,.ccell .cz.d30{background:var(--bad-bg);color:var(--bad)}
 .ccell .cp{border-radius:3px;padding:0 3px;background:var(--p-violet);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ccell .cb{margin-top:auto;color:var(--muted);font-size:10px;text-align:right}
 .crate{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:6px;font-size:11px}.crate b{font-size:15px}.crate b.good{color:var(--good)}.crate b.bad{color:var(--bad)}.crate .k{color:var(--muted);font-size:10px}
@@ -2724,7 +2725,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.76'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.77'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -2988,10 +2989,12 @@ function taskDue(t,dt){if(t.from&&dt<t.from)return false;if(t.until&&dt>t.until)
 const tasksOn=dt=>(set().tasks||[]).filter(t=>taskDue(t,dt));
 const taskDone=(dt,id)=>!!S.days[dt]?.done?.[id];
 const entriesOf=dt=>S.days[dt]?.cal||[];
+// 在留カード：期限の日と、3か月前・30日前の声かけの日をカレンダーに出す（留学生だけ）
+const zOn=dt=>staffList().filter(s=>s.limit28&&s.zairyu).flatMap(s=>s.zairyu===dt?[{s,k:'exp',t:'在留期限'}]:addDays(s.zairyu,-90)===dt?[{s,k:'d90',t:'在留更新 3か月前'}]:addDays(s.zairyu,-30)===dt?[{s,k:'d30',t:'在留期限まで30日'}]:[]);
 const paidOn=dt=>(dayDoc(dt).shifts||[]).map((sh,i)=>({sh,i})).filter(x=>x.sh.pos===PAID&&S.staff[x.sh.sid]);
 // 期限を過ぎて終わっていないタスク（直近14日）
 function overdue(){const out=[];for(let i=14;i>=1;i--){const dt=addDays(today,-i);for(const t of tasksOn(dt))if(!taskDone(dt,t.id))out.push({dt,t})}return out}
-const calBadge=()=>{let n=overdue().length;for(const t of tasksOn(today))if(!taskDone(today,t.id))n++;return n};
+const calBadge=()=>{let n=overdue().length+zOn(today).length;for(const t of tasksOn(today))if(!taskDone(today,t.id))n++;return n};
 // 週ごとのシフト回収率：その週に希望（シフト提出・希望入力）が入った人の割合
 function collectRate(week){const dates=weekDates(week),list=staffList();
   const has=s=>!!S.requests[s.id+'_'+week]||dates.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===s.id&&!x.gen));
@@ -3015,6 +3018,7 @@ function vCal(){
       ${note?`<span class="cn">${esc(note)}</span>`:''}
       ${es.slice(0,2).map(e=>`<span class="ce">${e.time?`<i>${esc(e.time)}</i> `:''}${esc(e.text)}</span>`).join('')}${es.length>2?`<span class="ce muted">ほか${es.length-2}件</span>`:''}
       ${ts.slice(0,3).map(t=>{const ok=taskDone(dt,t.id);return `<span class="ct ${ok?'ok':late?'late':''}"${ok?' style="text-decoration:line-through"':''}>${ok?'✓':'□'} ${esc(t.title)}</span>`}).join('')}${ts.length>3?`<span class="ct ${dn===ts.length?'ok':late?'late':''}">ほか${ts.length-3}件（${dn}/${ts.length}済）</span>`:''}
+      ${zOn(dt).map(z=>`<span class="cz ${z.k}">${z.k==='exp'?'⚠':'🔔'} ${esc(z.s.name)} ${z.t}</span>`).join('')}
       ${pd.map(x=>`<span class="cp">有給 ${esc(S.staff[x.sh.sid].name)}</span>`).join('')}
       ${b&&!lk&&inM?`<span class="cb">${Math.round(b/1000).toLocaleString()}千</span>`:''}</button>`};
   const grid=weeks.map(wk=>{const R=collectRate(wk);
@@ -3035,6 +3039,7 @@ function vCal(){
       ${rep==='weekly'?`<span class="bar" style="gap:2px">${[1,2,3,4,5,6,0].map(x=>`<label class="wdchk"><input type="checkbox" data-ctwd="${x}"${x===w?' checked':''}>${WD[x]}</label>`).join('')}</span>`:''}
       ${rep==='monthly'?`<select id="ctDom" aria-label="毎月の日">${Array.from({length:31},(_,i)=>`<option value="${i+1}"${i+1===+sel.slice(8)?' selected':''}>${i+1}日</option>`).join('')}<option value="last">月末</option></select>`:''}
       <button class="btn sm pri" type="submit">タスクを追加</button></form>
+    ${zOn(sel).length?`<h3 class="ch">在留カード</h3><ul class="clist">${zOn(sel).map(z=>`<li><b>${esc(z.s.name)}</b><span style="flex:1">${z.k==='exp'?'今日が在留カードの期限です。更新できたか確認してください':z.k==='d90'?`期限（${z.s.zairyu.replace(/-/g,'/')}）の3か月前です。更新の申請ができます。本人に声をかけてください`:`期限（${z.s.zairyu.replace(/-/g,'/')}）まで30日です。申請がまだなら急いでもらってください`}</span><button class="btn sm ghost" data-act="zGoRoster">名簿で直す</button></li>`).join('')}</ul>`:''}
     <h3 class="ch">有給の予定</h3>
     ${pd.length?`<ul class="clist">${pd.map(x=>`<li><b>${esc(S.staff[x.sh.sid].name)}</b><span class="num">${n1(Number(x.sh.paidH)||0)}h</span><button class="btn sm ghost" data-act="cPaidDel" data-sid="${x.sh.sid}" aria-label="消す">×</button></li>`).join('')}</ul>`:'<p class="hint" style="margin:0">この日の有給予定はありません。</p>'}
     <form id="calPaidForm" class="bar" style="gap:6px;align-items:flex-end;flex-wrap:wrap"><label class="field" style="margin:0"><span>スタッフ</span><select id="cpSid">${staffOpts}</select></label>
@@ -3049,7 +3054,7 @@ function vCal(){
   const rrows=weeks.map(wk=>{const R=collectRate(wk);return `<tr><td><button class="btn sm ghost" data-act="cReq" data-w="${wk}">${md(wk)}〜${md(addDays(wk,6))}</button></td><td class="num ${R.rate==null?'':R.rate>=1?'cell-good':R.rate<0.7?'cell-bad':''}">${R.rate==null?'—':Math.round(R.rate*100)+'%'}</td><td class="num">${R.paGot}/${R.pa}</td><td class="num">${R.empGot}/${R.emp}</td><td style="font-size:12px">${R.todo.length?esc(R.todo.map(s=>s.name).join('、')):`<span class="muted">${R.rate==null?'まだ提出はありません':'全員提出済み'}</span>`}</td></tr>`}).join('');
   const rsec=`<section class="panel"><h2>週ごとのシフト回収率</h2><div class="scroll"><table class="t"><thead><tr><th>週</th><th class="r">回収率</th><th class="r">アルバイト</th><th class="r">社員</th><th>未提出（アルバイト）</th></tr></thead><tbody>${rrows}</tbody></table></div>
     <p class="hint">「シフト提出」で出した人と、「希望入力」で希望が入っている人を提出済みとして数えます。週をタップすると、その週の希望入力を開きます。</p></section>`;
-  return `<section class="panel"><div class="bar"><h2>カレンダー</h2>${nav}<span class="hint">日をタップすると、記入・タスク・有給の予定を入れられます</span></div>${cal}</section>
+  return `<section class="panel"><div class="bar"><h2>カレンダー</h2>${nav}<span class="hint">日をタップすると、記入・タスク・有給の予定を入れられます。留学生の在留カードの期限と、その3か月前・30日前の声かけの日も出ます</span></div>${cal}</section>
     <div class="ccols">${detail}<div>${tlist}${rsec}</div></div>`}
 // 有給の予定をシフトに入れる
 function addPaid(sid,from,to,h){const s=S.staff[sid];if(!s)throw 'スタッフを選んでください';const hh=h>0?h:null;let n=0,skip=[];const put=(r,dt)=>{if(hh){r.paidH=hh;r.paidAuto=false}else setPaidAuto(r,dt)};
@@ -3839,6 +3844,7 @@ app.addEventListener('click',e=>{
   if(a==='cymNow'){S.cym=ymOf(today);S.cday=today;return render()}
   if(a==='cpick'){S.cday=b.dataset.d;S.cym=ymOf(b.dataset.d);render();if(window.innerWidth<900)document.querySelector('.cdetail')?.scrollIntoView({behavior:'smooth'});return}
   if(a==='cpickGo'){S.cday=b.dataset.d;S.cym=ymOf(b.dataset.d);return goTab('cal')}
+  if(a==='zGoRoster'){return goTab('roster')}
   if(a==='cOpenShift'){const d=b.dataset.d;S.week=monday(d);S.dayIdx=(wd(d)+6)%7;return goTab('shift')}
   if(a==='cReq'){S.week=b.dataset.w;return goTab('req')}
   if(a==='cEntDel'){const d=newDay(S.cday);d.cal=(d.cal||[]).filter((_,i)=>i!==+b.dataset.i);saveDay(S.cday);return render()}
@@ -4032,7 +4038,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v88';
+  const APP_SW='v89';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
