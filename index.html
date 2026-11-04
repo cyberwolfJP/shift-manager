@@ -147,6 +147,7 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .grid tfoot td.neg{background:var(--bad-bg);color:var(--bad);font-weight:600}
 .grid tfoot td.pos{background:var(--good-bg);color:var(--good);font-weight:600}
 .grid tr.cutrow td{color:var(--muted)}.grid tr.cutrow td:not(:last-child){opacity:.5}.grid tr.cutrow select{color:var(--muted);font-weight:400;text-decoration:line-through}.grid tr.cutrow select.pos{text-decoration:none;font-weight:700}
+.ratechip{display:inline-flex;align-items:baseline;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--sunk);white-space:nowrap}.ratechip b{font-size:17px}.ratechip small{font-size:11px;color:var(--muted)}.ratechip.good b{color:var(--good)}.ratechip.bad{background:var(--bad-bg)}.ratechip.bad b{color:var(--bad)}
 .cutbtn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px;font-size:11px;font-weight:700;padding:2px 6px;cursor:pointer}.cuttag{font-size:11px;font-weight:700;color:var(--bad);margin-right:2px}
 .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 6px}
 .del:hover{color:var(--bad)}
@@ -1748,7 +1749,8 @@ function vShift(){
   ${(()=>{const {y,m}=monthOf(date);return empRiskHtml(y,m,true)})()}
   ${shoteiPanel(date)}
   <section class="panel" aria-label="${md(date)}の集計">
-    <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
+    <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${(()=>{if(moneyLocked())return '<span class="ratechip muted">人件費率 🔒</span>';const W=weekStats(S.week),tr=targetRateOf(date),pc=v=>v==null?'—':(v*100).toFixed(1)+'%',col=(v,t)=>v==null||t==null?'':v>t+1e-9?'bad':'good';
+  return `<span class="ratechip ${col(C.rate,tr/100)}" title="この日の人件費 ${yen(C.cost)} ÷ 売上予算 ${C.budget?yen(C.budget):'未入力'}（目標${tr}%）">この日 人件費率 <b>${pc(C.rate)}</b><small>目標${tr}%</small></span><span class="ratechip ${col(W.rate,W.target)}" title="${md(S.week)}〜${md(addDays(S.week,6))}の人件費 ${yen(W.cost)} ÷ 売上予算 ${W.bud?yen(W.bud):'未入力'}">この週 人件費率 <b>${pc(W.rate)}</b><small>${W.target!=null?'目標'+(W.target*100).toFixed(1)+'%':''}</small></span>`})()}${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
       ${ocLabel(date)}<span class="muted" style="font-size:12px">${(()=>{const I=idealCostOf(date);return `理想人件費 ${yen(I)}／比較 <b class="num ${C.cost-I>0?'cell-bad':'cell-good'}">${C.cost?yen(C.cost-I):'—'}</b>`})()}</span></div>
     ${(()=>{const tr=targetRateOf(date),cap=C.budget*tr/100,over=C.cost-cap;
       const RI=set().rateMode==='weekday'?null:weekRateInfo(date);
@@ -2730,7 +2732,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.79'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.80'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -4047,7 +4049,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v91';
+  const APP_SW='v92';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
