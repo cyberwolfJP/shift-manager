@@ -232,7 +232,8 @@ table.wk tr.me td{background:var(--warn-bg)}
 .h28big .v{font-size:30px;font-weight:800;font-family:var(--mono,inherit)}.h28big small{font-size:13px;margin-left:2px}.h28c.good .h28big .v{color:var(--good)}.h28c.warn .h28big .v{color:var(--warn)}.h28c.bad .h28big .v{color:var(--bad)}
 .h28bar{position:relative;height:10px;background:var(--sunk);border-radius:5px}.h28bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}.h28c.warn .h28bar i{background:var(--warn)}.h28c.bad .h28bar i{background:var(--bad)}
 .h28days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.h28days span{display:grid;text-align:center;font-size:12px;font-weight:700;background:var(--sunk);border-radius:4px;padding:2px 0;color:var(--muted)}
-.h28days span.on{color:var(--fg)}.lockfs{border:0;padding:0;margin:0;min-width:0;display:contents}.lockfs:disabled section{opacity:.62}.lockbar.on{border-left:5px solid var(--warn)}.lockbar.off{border-left:5px solid var(--good)}
+.h28days span.on{color:var(--fg)}.zgrid{display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}.zc{display:grid;gap:4px;border:1px solid var(--line);border-left:5px solid var(--good);border-radius:8px;padding:6px 10px;background:var(--surface)}.zc.warn{border-left-color:var(--warn)}.zc.bad{border-left-color:var(--bad);background:var(--bad-bg)}.zc input{font-size:13px}
+.lockfs{border:0;padding:0;margin:0;min-width:0;display:contents}.lockfs:disabled section{opacity:.62}.lockbar.on{border-left:5px solid var(--warn)}.lockbar.off{border-left:5px solid var(--good)}
 .riskgrid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.riskc{border:1px solid var(--line);border-left:5px solid var(--good);border-radius:10px;padding:8px 12px;background:var(--surface);font-size:13px}.riskc.warn{border-left-color:var(--warn)}.riskc.bad{border-left-color:var(--bad);background:var(--bad-bg,var(--surface))}.risktips{margin:6px 0 0;padding-left:18px;font-size:12px}.risktips li{margin:2px 0}
 .paidtag{font-size:12px;font-weight:700;color:#7a4fb5;background:var(--p-violet);border-radius:4px;padding:1px 6px}
 .paid28{display:block;font-style:normal;font-size:9px;font-weight:700;color:#7a4fb5;line-height:1.1}td .paid28{margin:1px 0 0}
@@ -1734,7 +1735,7 @@ function vShift(){
       <button class="btn sm" data-act="adj28" title="最後に留学生の週28時間を確認し、超える人だけ短くします"><i>3</i>28時間の修正</button>
       <button class="btn sm" data-act="finishWeek" title="ポジションが空欄の人を割り振り、休憩を入れます"><i>4</i>ポジション・休憩</button>
       <button class="btn sm pri" data-act="autoWeek">1〜4をまとめて実行</button></div>
-    ${alert28Html(dates)}
+    ${alert28Html(dates)}${zairyuAlertHtml()}
     ${subStatus()}</section>
   ${empWeekPanel(date)}
   ${intlWeekPanel(date)}
@@ -2723,7 +2724,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.75'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.76'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3167,7 +3168,7 @@ function vWeek(){
   const mrows=[1,2,3,4,5,6,0].map(w=>{const dt=dates[(w+6)%7],c=calcDay(dt),v=c.cost*counts[w],b=c.budget*counts[w];mt+=v;mb+=b;
     return `<tr><td>${WD[w]}</td><td class="num">${yen(v)}</td><td class="num">${counts[w]}</td></tr>`}).join('');
   const over=tc-ti;
-  return `<section class="panel"><div class="bar"><h2>週間管理</h2>${weekNav()}</div>${alert28Html(dates)}
+  return `<section class="panel"><div class="bar"><h2>週間管理</h2>${weekNav()}</div>${alert28Html(dates)}${zairyuAlertHtml()}
     <div class="kpis">
       <div class="kpi hi"><span class="k">週の人件費</span><span class="v">${yen(tc)}</span></div>
       <div class="kpi"><span class="k">週の人件費率</span><span class="v">${tb?(tc/tb*100).toFixed(2)+'%':'—'}</span></div>
@@ -3242,6 +3243,35 @@ function empRules(){
       <td><select data-sf="defStart" data-id="${e.id}" aria-label="基本の開始">${tOptions(Number(e.defStart??12),8,31.5)}</select></td><td><select data-sf="defEnd" data-id="${e.id}" aria-label="基本の終了">${tOptions(Number(e.defEnd??23.5),8.5,32)}</select></td><td>${posSel(e.id,e.defPos||'')}</td><td class="r"><input type="number" min="0" step="0.5" data-sf="shotei" data-id="${e.id}" value="${e.shotei??173}" style="width:80px" aria-label="月の所定労働時間"> h</td><td class="r"><input type="number" min="0" max="31" data-sf="offDays" data-id="${e.id}" value="${e.offDays??''}" placeholder="${st.offMonth??9}" style="width:60px" aria-label="月の公休日数"> 日</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">「シフト作成」の「社員シフトを自動作成」で使います。決め打ち（固定）と休み希望は動かさず、残りの日をこの出勤日数・時間で埋めます。月の所定労働時間（初期値173時間＝週40時間×52週÷12か月）は、シフト作成と希望入力で「今月あと何時間か」を出すのに使います。</p></section>`;
 }
+/* ---------- 在留カードの期限 ----------
+ 赤＝切れている・30日以内、黄＝90日以内（更新の申請は期限の3か月前からできます） */
+const zDays=s=>s&&s.zairyu?Math.round((parse(s.zairyu)-parse(today))/864e5):null;
+const zLv=d=>d==null?'':d<0||d<=30?'bad':d<=90?'warn':'good';
+const zTxt=d=>d==null?'未入力':d<0?`${-d}日前に切れています`:d===0?'今日まで':`あと${d}日`;
+function zairyuAlertHtml(){if(S.role!=='manager')return '';const L=staffList().filter(s=>s.limit28).map(s=>({s,d:zDays(s)})).filter(x=>x.d!=null&&x.d<=90).sort((a,b)=>a.d-b.d);if(!L.length)return '';
+  const bad=L.filter(x=>zLv(x.d)==='bad'),warn=L.filter(x=>zLv(x.d)==='warn'),line=x=>`${esc(x.s.name)} <b class="num">${x.s.zairyu.replace(/-/g,'/')}</b>（${zTxt(x.d)}）`;
+  return (bad.length?`<div class="alert28" role="alert"><b>在留カードの期限：${bad.length}人</b><span>${bad.map(line).join('　')}</span><span style="font-size:12px">期限が切れている・30日以内です。更新できたか確認し、新しい期限を「マスタ → 名簿」に入れてください。</span></div>`:'')+
+    (warn.length?`<div class="alert28 near"><b>在留カードの期限が近い：${warn.length}人</b><span>${warn.map(line).join('　')}</span><span style="font-size:12px">90日以内です。更新の手続きを進めるよう声をかけてください。</span></div>`:'')}
+// 貼り付けた「名前　2026/12/24」の一覧を、名簿の人に結びつける（名前の一部が名簿の名前・LINEの名前と同じ人）
+function zParse(text){const out=[];const re=/([^\d\n]+?)\s*(\d{4})\s*[\/.\-年]\s*(\d{1,2})\s*[\/.\-月]\s*(\d{1,2})\s*日?/g;let m;
+  while((m=re.exec(String(text)))){const name=m[1].replace(/[\t\u3000]+/g,' ').trim();if(!name)continue;out.push({name,date:`${m[2]}-${pad(+m[3])}-${pad(+m[4])}`})}
+  const list=staffList(true).filter(s=>s.limit28),toks=n=>z2h(n).split(/\s+/).map(nameKey).filter(t=>t.length>=2);
+  out.forEach(r=>{const tk=toks(r.name),all=nameKey(r.name);r.cand=list.filter(s=>[s.name,...String(s.lineName||'').split(/[,、]/),s.fullName||''].map(nameKey).filter(k=>k.length>=2).some(k=>k===all||tk.includes(k)||(k.length>=3&&all.includes(k)))).map(s=>s.id)});
+  // 1人にしか当てはまらない行から決めていき、決まった人は他の行の候補から外す
+  const used=new Set();let ch=true;while(ch){ch=false;for(const r of out){if(r.sid)continue;const c=r.cand.filter(id=>!used.has(id));if(c.length===1){r.sid=c[0];used.add(c[0]);ch=true}}}
+  out.forEach(r=>{if(!r.sid)r.sid=''});return out}
+function zairyuPanel(){const L=staffList().filter(s=>s.limit28).map(s=>({s,d:zDays(s)})).sort((a,b)=>(a.d??1e9)-(b.d??1e9));
+  const imp=S.zImp;
+  return `<section class="panel"><div class="bar"><h2>在留カードの期限</h2><span class="hint">留学生（名簿で「留学生」にチェックした人）だけ入れられます。期限の近い順に並べています。90日以内は黄、30日以内・切れているときは赤で、シフト作成と28時間管理にも知らせが出ます</span></div>
+    ${zairyuAlertHtml()}
+    <div class="zgrid">${L.map(x=>`<div class="zc ${zLv(x.d)}"><div><b>${esc(x.s.name)}</b>${x.s.fullName?` <span class="muted" style="font-size:11px">${esc(x.s.fullName)}</span>`:''}</div>
+      <div class="bar" style="gap:6px"><input type="date" data-sf="zairyu" data-id="${x.s.id}" value="${esc(x.s.zairyu||'')}" aria-label="${esc(x.s.name)}の在留カード期限"><span class="pill ${zLv(x.d)||'warn'}">${zTxt(x.d)}</span></div></div>`).join('')||'<div class="empty">留学生がいません。名簿の右の「留学生」にチェックすると、ここで期限を入れられます。</div>'}</div>
+    <details${imp?' open':''} id="zImpDet" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;font-size:13px">一覧を貼り付けてまとめて入れる</summary>
+      <p class="hint" style="margin:6px 0">「名前　2026/12/24」の形で1行ずつ貼り付けます。名前の一部が名簿の名前と同じ留学生に自動で結びつけます。違う人や見つからない人は選び直してください。</p>
+      <textarea id="zText" rows="6" style="width:100%;font-size:13px" placeholder="ポカレル ビベク　2026/12/24">${esc(S.zText||'')}</textarea><button class="btn sm" data-act="zRead">読み取る</button>
+      ${imp?`<div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>貼り付けた名前</th><th>期限</th><th>名簿の人</th></tr></thead><tbody>${imp.map((r,i)=>`<tr><td>${esc(r.name)}</td><td class="num">${r.date.replace(/-/g,'/')}</td>
+        <td><select data-zsid="${i}"><option value="">（入れない）</option>${staffList(true).filter(x=>x.limit28).map(x=>`<option value="${x.id}"${x.id===r.sid?' selected':''}>${esc(x.name)}</option>`).join('')}</select>${r.sid?'':'<span class="pill bad" style="margin-left:4px">選んでください</span>'}</td></tr>`).join('')}</tbody></table></div>
+        <div class="bar" style="gap:6px"><button class="btn pri" data-act="zApply">${imp.filter(r=>r.sid).length}人に期限を入れる</button><span class="hint">貼り付けた名前も「在留カードの名前」として覚えます</span></div>`:''}</details></section>`}
 function vRoster(){
   const dates=weekDates(S.week), list=staffList(true);
   const rows=list.map((s,idx)=>{
@@ -3272,7 +3302,7 @@ function vRoster(){
   ${list.length?`<div class="scroll"><table class="t"><thead><tr><th>#</th><th>スタッフ名</th><th>区分</th><th>時給</th><th>交通費（往復）</th>${dates.map(dt=>`<th class="r">${WD[wd(dt)]}</th>`).join('')}<th class="r">合計h</th><th class="r">金額</th><th class="r">交通費</th><th>スキル</th><th>対象</th><th></th></tr></thead>
   <tbody>${rows}</tbody><tfoot><tr><td colspan="5">日別人件費</td>${tot.map(v=>`<td class="num">${v?Math.round(v/1000)+'k':'0'}</td>`).join('')}<td></td><td class="num">${yen(tot.reduce((a,b)=>a+b,0))}</td><td colspan="4"></td></tr></tfoot></table></div>
   <p class="hint">スキルは「マスタ → スキル」で設定します。「留学生」にチェックした人は、どの連続7日間でも労働時間が28時間を超えないかチェックされます。有給の時間は「集計 → 有給」で管理します。</p>`:
-  `<div class="empty">スタッフが登録されていません。「＋ スタッフを追加」から名前・時給・交通費を入れてください。</div>`}</section>${empRules()}`;
+  `<div class="empty">スタッフが登録されていません。「＋ スタッフを追加」から名前・時給・交通費を入れてください。</div>`}</section>${zairyuPanel()}${empRules()}`;
 }
 
 /* --- 理想人数の入力（大きいボタン） --- */
@@ -3527,7 +3557,7 @@ function v28(){
     <div class="scroll" style="margin-top:6px"><table class="t ewk"><thead><tr><th>名前</th>${all.map((dt,i)=>`<th style="${i===7?'border-left:2px solid var(--muted)':''}">${WD[wd(dt)]}<br>${md(dt)}</th>`).join('')}<th class="r">この週</th><th class="r">次の週</th><th class="r">残り</th></tr></thead><tbody>
     ${D.map(x=>`<tr><td style="white-space:nowrap"><b>${esc(x.s.name)}</b></td>${x.h.map((v,i)=>`<td class="num${x.win.has(all[i])?' w28':''}" style="${i===7?'border-left:2px solid var(--muted)':''}"${x.cut[i]?` title="調整で${n1(x.cut[i])}hカット済み"`:''}>${v?n1(v):'<span class="muted">—</span>'}${x.cut[i]?`<em class="cut28">カット−${n1(x.cut[i])}</em>`:''}${pm28(all[i],x.s.id)}</td>`).join('')}<td class="num"><b>${n1(x.wkH)}</b></td><td class="num">${n1(x.nxH)}</td><td class="num" style="font-weight:700;color:var(--${lvl(x)})">${x.left<0?'−'+n1(-x.left):n1(x.left)}h</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">色のついたマスは、その人の「一番多い7日間」です。マスに指を乗せると、その日にあと何時間入れられるかが出ます。</p></details>`;
-  return `<section class="panel">${head}${sum}<div class="h28grid">${D.map(card).join('')}</div>${tbl}
+  return `<section class="panel">${head}${zairyuAlertHtml()}${sum}<div class="h28grid">${D.map(card).join('')}</div>${tbl}
     <p class="hint">残り＝${lim}時間 −（この週を含む、一番多い連続7日間の合計）。緑＝余裕あり、黄＝残り${n1(W28)}時間未満、赤＝残り${n1(A28)}時間未満または超えています。「カット」は調整で短くした日で、カット後の時間で数えています。超えている人は「シフト作成 → 3 28時間の修正」で自動で短くできます。</p></section>`;
 }
 
@@ -3643,6 +3673,7 @@ app.addEventListener('change',e=>{
   if(el.id==='adjEmp'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.adjustEmployees=el.checked;saveSettings();return render()}
   if(el.id==='reqPick'){if(S.bulk&&JSON.stringify(S.bulk.days)!==S.bulk.orig)bulkSave();S.bulk=bulkInit(el.value);return render()}
   if(el.id==='bS'||el.id==='bE'){S.bulkT=[Number(document.getElementById('bS').value),Number(document.getElementById('bE').value)];return}
+  if(el.dataset.zsid!=null){const r=(S.zImp||[])[+el.dataset.zsid];if(r)r.sid=el.value;return render()}
   if(el.dataset.bf){const v=S.bulk.days[el.dataset.d];v[el.dataset.bf]=el.value===''?null:Number(el.value);return render()}
   if(el.id==='brk28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.brk28=el.checked;saveSettings();return render()}
   if(el.id==='paid28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.paid28=el.checked;saveSettings();return render()}
@@ -3707,6 +3738,8 @@ app.addEventListener('click',e=>{
   if(a==='empYmNow'){S.empYm=null;return render()}
   if(a==='ocrDelImg'){const x=S.rc.find(y=>y.id===b.dataset.q);if(x){try{if(x.url)URL.revokeObjectURL(x.url)}catch(_){}S.rc=S.rc.filter(y=>y!==x);if(!S.rc.length){S.rcP=[];S.rcN=0}else rcRebuild()}return render()}
   if(a==='ocrReset'){if(!confirm('読み込んだスクショと下書きを全部消しますか？（登録済みのシフト希望はそのままです）'))return;S.rc.forEach(y=>{try{URL.revokeObjectURL(y.url)}catch(_){}});S.rc=[];S.rcP=[];S.rcN=0;return render()}
+  if(a==='zRead'){const t=document.getElementById('zText')?.value||'';S.zText=t;const r=zParse(t);if(!r.length)return toast('「名前　2026/12/24」の形の行が見つかりません');S.zImp=r;toast(`${r.length}行を読み取りました（${r.filter(x=>x.sid).length}人を名簿に結びつけました）`);return render()}
+  if(a==='zApply'){let n=0;for(const r of S.zImp||[]){if(!r.sid)continue;const st=S.staff[r.sid];if(!st||!st.limit28)continue;st.zairyu=r.date;if(!st.fullName)st.fullName=r.name.replace(/\s+/g,' ');saveStaff(st.id);n++}S.zImp=null;S.zText='';toast(`${n}人の在留カード期限を入れました`);return render()}
   if(a==='setUnlock'){const st=set();if(st.setPin){const v=(document.getElementById('setPinIn')?.value||'').trim();if(sha256hex('setpin:'+v)!==st.setPin){toast('暗証番号が違います');return}}S.setOpen=true;toast('鍵を開けました');return render()}
   if(a==='setLock'){S.setOpen=false;toast('鍵をかけました');return render()}
   if(a==='setPinSave'){const v=(document.getElementById('setPinNew')?.value||'').trim();if(v.length<4)return toast('暗証番号は4けた以上にしてください');S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.setPin=sha256hex('setpin:'+v);saveSettings();toast('暗証番号を保存しました。次に鍵を開けるときに使います');return render()}
@@ -3999,7 +4032,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v87';
+  const APP_SW='v88';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
