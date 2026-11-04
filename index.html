@@ -151,6 +151,7 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .srow{display:grid;grid-template-columns:minmax(180px,300px) 1fr;gap:6px 16px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.srow:first-of-type{border-top:0}.srow .sl b{display:block;font-size:14px}.srow .sl small{display:block;font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}.srow .sc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}.srow select,.srow input[type=number]{font-size:15px;padding:4px 6px}
 .wdgrid label{display:grid;gap:2px;font-size:12px;font-weight:700;text-align:center}.wdgrid select{font-size:13px}
 @media (max-width:640px){.srow{grid-template-columns:1fr}}
+.grid td.c.bz{border-top:1px solid #9a9383;border-bottom:1px solid #9a9383}.grid td.c.bz.h{border-left:1px solid #9a9383}.grid td.c.bz0,.grid th.bz0{border-left:3px solid var(--fg)!important}.grid td.c:not(.bz):not(.on):not(.brk){background:var(--sunk);opacity:.7}.grid th.bzh{font-weight:800;color:var(--fg)}
 .grid th.prep{background:var(--sunk);color:var(--muted)}.bandrow th{font-size:11px;padding:2px 0}.bandp{background:var(--sunk);color:var(--muted);font-size:11px;text-align:center}.bandb{background:var(--good-bg);color:var(--good);font-size:11px;text-align:center}.smx td.prep{opacity:.6}.smx th.prep{color:var(--muted)}
 .ratechip{display:inline-flex;align-items:baseline;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--sunk);white-space:nowrap}.ratechip b{font-size:17px}.ratechip small{font-size:11px;color:var(--muted)}.ratechip.good b{color:var(--good)}.ratechip.bad{background:var(--bad-bg)}.ratechip.bad b{color:var(--bad)}
 .cutbtn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px;font-size:11px;font-weight:700;padding:2px 6px;cursor:pointer}.cuttag{font-size:11px;font-weight:700;color:var(--bad);margin-right:2px}
@@ -782,6 +783,8 @@ const noBrkAt=()=>{const v=set().noBrkFrom;return v==null||v===''?null:Number(v)
 function brkOf(start,work){return breakHours(work)}
 const noBrkRow=sh=>{const nb=noBrkAt();return nb!=null&&sh.start!=null&&Number(sh.start)>=nb};
 // 通常営業の開始（これより前は仕込みの時間）
+// 通常営業の終わり＝締めの時刻（未設定ならその日一番遅い退勤、なければ24時）
+const bizEnd=dt=>{const v=set().closeAt;if(v!=null&&v!=='')return Number(v);let m=0;for(const sh of dayDoc(dt).shifts||[]){const c=calcShift(sh);if(c.on&&!c.help)m=Math.max(m,sh.end)}return m||24};
 const bizFrom=dt=>{const st=set(),w=dt?(st.bizFromW||{})[wd(dt)]:null;if(w!=null&&w!=='')return Number(w);const v=st.bizFrom;return v==null||v===''?8:Number(v)};
 function calcShift(sh){
   const st=set(), staff=S.staff[sh.sid];
@@ -1703,14 +1706,15 @@ function vShift(){
   const weekEmpty=dates.every(dt=>!(dayDoc(dt).shifts||[]).length);
   const staffOpts=sel=>'<option value=""></option>'+staffList().map(s=>`<option value="${s.id}"${sel===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
   const posOpts=sel=>'<option value=""></option>'+st.positions.map(p=>`<option${sel===p.name?' selected':''}>${esc(p.name)}</option>`).join('')+`<option${sel===PAID?' selected':''}>${PAID}</option>`+(sel===CUT?`<option selected>${CUT}</option>`:'');
-  const bzH=HOURS.filter(hh=>hh<bizFrom(date)).length;
-  let head=(bzH?`<tr class="bandrow"><th class="stk"></th><th colspan="4"></th><th colspan="${bzH*2}" class="bandp">仕込み</th><th colspan="${(24-bzH)*2}" class="bandb">通常営業（${tLabel(bizFrom(date))}〜）</th><th colspan="6"></th></tr>`:'')+`<tr><th class="stk">名前</th><th>開始</th><th>終了</th><th>ポジション</th><th title="そのポジションのスキルレベル">Lv</th>`+
-    HOURS.map(hh=>`<th class="hr${hh>=st.peakFrom&&hh<st.peakTo?' peak':''}${hh<bizFrom(date)?' prep':''}" colspan="2">${hh>=24?hh-24:hh}</th>`).join('')+
+  const bzH=HOURS.filter(hh=>hh<bizFrom(date)).length,bzE0=bizEnd(date),bzN=Math.max(0,Math.min(48-bzH*2,Math.round((bzE0-Math.max(8,bizFrom(date)))*2))),aft=48-bzH*2-bzN;
+  let head=`<tr class="bandrow"><th class="stk"></th><th colspan="4"></th>${bzH?`<th colspan="${bzH*2}" class="bandp">仕込み</th>`:''}${bzN?`<th colspan="${bzN}" class="bandb">通常営業（${tLabel(bizFrom(date))}〜${tLabel(bzE0)}）</th>`:''}${aft>0?`<th colspan="${aft}" class="bandp">営業後</th>`:''}<th colspan="6"></th></tr>`+`<tr><th class="stk">名前</th><th>開始</th><th>終了</th><th>ポジション</th><th title="そのポジションのスキルレベル">Lv</th>`+
+    HOURS.map(hh=>`<th class="hr${hh>=st.peakFrom&&hh<st.peakTo?' peak':''}${hh<bizFrom(date)||hh>=bizEnd(date)?' prep':' bzh'}${hh===Math.ceil(bizFrom(date))?' bz0':''}" colspan="2">${hh>=24?hh-24:hh}</th>`).join('')+
     `<th>勤務</th><th>休憩</th><th>労働</th><th>深夜</th><th title="LINEで受けた希望の時間">希望</th><th></th></tr>`;
   const shiftsAll=(d.shifts||[]).map((sh,i)=>({sh,i}));
   const offPA=shiftsAll.filter(x=>hidePAoff(x.sh));
   const visible=shiftsAll.filter(x=>S.showOff||!hidePAoff(x.sh)).sort((a,b)=>staffRank(S.staff[a.sh.sid])-staffRank(S.staff[b.sh.sid])||a.i-b.i);
   let lastGrp=null;
+  const bzF=bizFrom(date),bzE=bizEnd(date);
   const rows=visible.map(({sh,i})=>{
     const grp=!S.staff[sh.sid]?'未選択':isEmp(S.staff[sh.sid])?'社員':'アルバイト';
     const sepRow=grp!==lastGrp?`<tr class="sep"><td class="stk">${grp}</td><td colspan="58"></td></tr>`:'';lastGrp=grp;
@@ -1718,7 +1722,7 @@ function vShift(){
     let cells='';
     for(let k=0;k<48;k++){const t=8+k/2;
       const on=c.on&&t>=sh.start&&t<sh.end, br=on&&bs!=null&&t>=bs&&t<bs+c.brk;
-      cells+=`<td class="c${k%2===0?' h':''}${on?(br?' brk':' on'):''}" data-act="brk" data-i="${i}" data-t="${t}" title="${tLabel(t)}${on?(br?' 休憩':' — タップで休憩をここへ'):''}"></td>`}
+      cells+=`<td class="c${k%2===0?' h':''}${t>=bzF&&t<bzE?' bz':''}${t===bzF||t===bzE?' bz0':''}${on?(br?' brk':' on'):''}" data-act="brk" data-i="${i}" data-t="${t}" title="${tLabel(t)}${on?(br?' 休憩':' — タップで休憩をここへ'):''}"></td>`}
     const nm=S.staff[sh.sid];
     return sepRow+`<tr style="${posStyle(sh.pos)}" class="${isEmp(nm)?'emp':''}${sh.pos===CUT?' cutrow':''}">
       <td class="stk"><select class="nm" data-f="sid" data-i="${i}" aria-label="名前">${staffOpts(sh.sid)}</select>${newTag(S.staff[sh.sid])}${sh.sid&&c.on?`<button class="pin${sh.pin?' on':''}" data-act="pin" data-i="${i}" title="${sh.pin?'決め打ち中：自動作成・調整で動かしません（押すと解除）':'押すと決め打ち（自動作成・調整で動かさない）'}">${sh.pin?'固定':'固定する'}</button><button class="pin edu${sh.edu?' on':''}" data-act="edu" data-i="${i}" title="${sh.edu?'教育（研修）中：研修費として別に計上し、人件費・人数に含めません（押すと解除）':'押すと教育（研修）にする：研修費として別に計上'}">教育</button>`:''}${sh.gen&&!sh.pin?'<span class="subtag" style="background:var(--ink)" title="社員シフトの自動作成で入れた行">自動</span>':''}${sh.sub?'<span class="subtag" title="アルバイトさんが提出した希望">提出</span>':''}${(()=>{const s=S.staff[sh.sid];if(!s?.limit28||!c.on)return '';let mx=0;for(let k=0;k<7;k++)mx=Math.max(mx,roll7(s.id,addDays(date,k)));const lim=set().limit28;return mx>lim?`<span class="tag28" title="この日を含む7日間で${n1(mx)}時間">28h超</span>`:mx>lim-3?`<span class="tag28 near" title="この日を含む7日間で${n1(mx)}時間">残${n1(lim-mx)}h</span>`:''})()}</td>
@@ -2053,6 +2057,11 @@ function weekStats(week){
   const helpE=help.filter(x=>x.emp),helpEmp=helpE.reduce((a,x)=>a+x.cost,0),helpAll=help.reduce((a,x)=>a+x.cost,0);
   return {days,cost,bud,pa,lab,cap,n,edu,eduH,eduL,help,helpE,helpEmp,helpAll,rate:bud?cost/bud:null,paRate:bud?pa/bud:null,prod:lab?bud/lab:null,target:bud?cap/bud:null};
 }
+/* 今月のざっくりした着地：シフトが入っている日はその人件費、まだの日は 売上予算 ×（ここまでの人件費率。なければ月間目標） */
+function monthLanding(ym){const MR=Number(set().monthRate??24)/100;let bud=0,cost=0,dBud=0,dCost=0,nD=0,rBud=0,nR=0;
+  for(const dt of monthDays(ym)){const C=calcDay(dt);bud+=C.budget;if((dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on||sh.pos===PAID)){cost+=C.cost;dBud+=C.budget;dCost+=C.cost;nD++}else{rBud+=C.budget;nR++}}
+  const pace=dBud?dCost/dBud:MR,est=rBud*pace,tot=cost+est;
+  return {ym,bud,cost:tot,rate:bud?tot/bud:null,target:MR,cap:bud*MR,diff:tot-bud*MR,doneDays:nD,doneCost:dCost,restDays:nR,restCost:est,pace,usedPace:!!dBud}}
 function reportFindings(week){
   const W=weekStats(week),P=weekStats(addDays(week,-7)),out=[],st=set();
   const pc=v=>(v*100).toFixed(1)+'%',pt=v=>(v>0?'+':'')+(v*100).toFixed(1)+'pt';
@@ -2105,17 +2114,24 @@ function drawReport(week,comment){
   let c=mk();head(c,'週次シフト報告',1);
   if(E){const gx=W0-M-62,gy=M+62;c.fillStyle=E.score>=80?'#2f7a4a':E.score>=60?'#a46a00':'#b3261e';c.beginPath();c.arc(gx,gy+10,56,0,Math.PI*2);c.fill();
     T(c,E.grade,gx,gy+4,64,{b:1,al:'center',col:'#fff'});T(c,`評価 ${E.score}点`,gx-84,gy+10,32,{b:1,al:'right'})}
-  const kp=[['売上予算（週）',W.bud?yen(W.bud):'—',P.bud?`前週 ${yen(P.bud)}`:''],['人件費（週）',yen(W.cost),P.cost?`前週 ${yen(P.cost)}`:''],
-    ['人件費率',pc(W.rate),`目標 ${pc(W.target)}`],['P/A人件費率',pc(W.paRate),P.paRate!=null?`前週 ${pc(P.paRate)}`:''],
-    ['人時生産性',W.prod?Math.round(W.prod).toLocaleString()+'円':'—','売上予算÷労働時間'],['総労働時間',n1(W.lab)+'h',P.lab?`前週 ${n1(P.lab)}h`:''],
+  const wr=(a,b)=>b?` ${a>=b?'+':''}${((a/b-1)*100).toFixed(1)}%`:'',wp=(a,b)=>a!=null&&b!=null?` ${a>=b?'+':''}${((a-b)*100).toFixed(1)}pt`:'';
+  const kp=[['売上予算（週）',W.bud?yen(W.bud):'—',P.bud?`前週比${wr(W.bud,P.bud)}（${yen(P.bud)}）`:''],['人件費（週）',yen(W.cost),P.cost?`前週比${wr(W.cost,P.cost)}（${yen(P.cost)}）`:''],
+    ['人件費率',pc(W.rate),`目標 ${pc(W.target)}${P.rate!=null?`／前週比${wp(W.rate,P.rate)}`:''}`],['P/A人件費率',pc(W.paRate),P.paRate!=null?`前週比${wp(W.paRate,P.paRate)}（${pc(P.paRate)}）`:''],
+    ['人時生産性',W.prod?Math.round(W.prod).toLocaleString()+'円':'—',P.prod?`前週比${wr(W.prod,P.prod)}（${Math.round(P.prod).toLocaleString()}円）`:'売上予算÷労働時間'],['総労働時間',n1(W.lab)+'h',P.lab?`前週比${wr(W.lab,P.lab)}（${n1(P.lab)}h）`:''],
     ['研修費',yen(W.edu),`教育 ${n1(W.eduH)}h（人件費とは別）`],['社員ヘルプ費用',yen(W.helpEmp),'人件費調整の対象']];
   const kw=(W0-2*M-7*20)/8,ky=M+190,kh=210;
   kp.forEach(([k,v,s],i)=>{const x=M+i*(kw+20);const bad=k==='人件費率'&&W.rate!=null&&W.target!=null&&W.rate>W.target+0.0005;
     c.fillStyle=bad?'#f8dcd8':'#f1eee8';c.fillRect(x,ky,kw,kh);T(c,k,x+24,ky+44,26,{col:'#6b655a',b:1,max:kw-48});T(c,v,x+24,ky+112,56,{b:1,max:kw-48,col:bad?'#b3261e':'#1d1b16'});if(s)T(c,s,x+24,ky+176,24,{col:'#6b655a',max:kw-48})});
+  // 今月の着地（ざっくり）
+  {const L=monthLanding(week.slice(0,7)>=addDays(week,6).slice(0,7)?week.slice(0,7):addDays(week,6).slice(0,7)),by=ky+kh+30,bh=120,over=L.diff>0;
+    c.fillStyle=over?'#fbedcc':'#e4f1e8';c.fillRect(M,by,W0-2*M,bh);
+    T(c,`${+L.ym.slice(5)}月の着地見込み（ざっくり）`,M+24,by+38,28,{b:1,col:'#3d3a33'});
+    T(c,`売上予算 ${yen(L.bud)}　人件費 ${yen(Math.round(L.cost))}　人件費率 ${pc(L.rate)}（月間目標 ${pc(L.target)}・枠より ${L.diff>0?yen(Math.round(L.diff))+' 多い':yen(Math.round(-L.diff))+' 少ない'}）`,M+24,by+86,36,{b:1,col:over?'#a46a00':'#2f7a4a',max:W0-2*M-48-900});
+    T(c,`シフト済み ${L.doneDays}日 ${yen(Math.round(L.doneCost))}＋まだの ${L.restDays}日 ${yen(Math.round(L.restCost))}（${L.usedPace?'ここまでの人件費率':'月間目標'} ${pc(L.pace)}で見込み）`,W0-M-24,by+86,24,{al:'right',col:'#6b655a',max:880})}
   // 日別の表
   const cols=[['日付',190,'l'],['備考',260,'l'],['売上予算',230,'r'],['人件費',230,'r'],['人件費率',170,'r'],['目標',120,'r'],['差（上限比）',220,'r'],['P/A人件費',220,'r'],['労働h',140,'r'],['人時生産性',190,'r'],['出勤',120,'r'],['うち社員',140,'r'],['不足人時',160,'r']];
   const tw=cols.reduce((a,x)=>a+x[1],0),sc=(W0-2*M)/tw;cols.forEach(x=>x[1]*=sc);
-  let ty=ky+kh+50;const rh=78;
+  let ty=ky+kh+50+150;const rh=74;
   c.fillStyle='#ebe7de';c.fillRect(M,ty,W0-2*M,rh);let x=M;cols.forEach(([h,w,a])=>{T(c,h,a==='r'?x+w-16:x+16,ty+rh/2,26,{b:1,al:a==='r'?'right':'left'});x+=w});ty+=rh;
   const rows=W.days.map(d=>{const cap=d.C.budget*d.t/100,diff=d.C.cost-cap;return [`${md(d.dt)}（${WD[wd(d.dt)]}）`,d.note,d.C.budget?yen(d.C.budget):'—',d.C.cost?yen(d.C.cost):'—',pc(d.C.rate),d.t+'%',d.C.budget&&d.C.cost?(diff>0?'+':'')+yen(diff).replace('¥-','-¥'):'—',d.C.pa?yen(d.C.pa):'—',d.C.labor?n1(d.C.labor):'—',d.C.prod?Math.round(d.C.prod).toLocaleString():'—',d.people?d.people+'人':'—',d.people?d.emp+'人':'—',d.shortH==null?'—':n1(d.shortH),diff>0&&d.C.budget,d.dt]});
   const totDiff=W.cost-W.cap;
@@ -2757,7 +2773,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.82'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.83'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -4109,7 +4125,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v94';
+  const APP_SW='v95';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
