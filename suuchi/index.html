@@ -423,7 +423,7 @@ function expOf(ym){
 function getM(ym){
   const m = S.months[ym]||{};
   const r = {ym, budget:m.budget??null, sales:m.sales??null, guests:m.guests??null, unit:m.unit??null,
-    labor:m.labor??null, laborHours:m.laborHours??null, cost:m.cost??null, daily:false, lastDay:null, elapsed:0, estGuests:false};
+    labor:m.labor??null, laborHours:null, cost:m.cost??null, daily:false, lastDay:null, elapsed:0, estGuests:false};
   const ds = daysOf(ym);
   if(ds.length){
     let b=0,s=0,g=0,hb=0,hs=0,hg=0,last=null;
@@ -1359,7 +1359,7 @@ function renderFc(){
 const IMP = { kind:null, texts:{}, rows:null, map:[], header:false, result:null, undo:null, year:Number(TODAY.slice(0,4))-1, month:addMonth(TODAY_YM,-1), mode:'replace' };
 const COLS = {
   sales:[['skip','使わない'],['date','日付・年月'],['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['lySales','前年売上（空いている日だけ補完）'],['lyGuests','前年客数（空いている日だけ補完）'],['cost','仕入れ（複数列は合計）']],
-  labor:[['skip','使わない'],['date','日付・年月'],['name','名前'],['hours','時間'],['amount','給与額']],
+  labor:[['skip','使わない'],['date','日付・年月'],['name','名前'],['amount','給与額']],
   cost:[['skip','使わない'],['date','日付・年月'],['name','取引先・品目'],['amount','仕入れ額']]
 };
 function parseNum(s){
@@ -1435,7 +1435,7 @@ function guessMap(rows, kind){
         else if(/店舗予算/.test(c)) k=map.includes('budget')?'skip':'budget';
         else if(/予算|目標/.test(c)) k='budget';
         else if(/客単価|単価/.test(c)) k='unit'; else if(/稼働|客数|人数|来客|組/.test(c)) k='guests'; else if(/実績|売上|売り上げ|純売/.test(c)) k='sales'; else if(/日付|年月|^月$|^日$|date/i.test(c)) k='date'; }
-      else { if(/日付|年月|^月$|date/i.test(c)) k='date'; else if(/名前|氏名|スタッフ|従業員|取引先|業者|仕入先|品目|商品|^名/.test(c)) k='name'; else if(/時間|h$/i.test(c)) k=kind==='labor'?'hours':'skip'; else if(/給与|支給|金額|総額|額|仕入|合計|計$/.test(c)) k='amount'; }
+      else { if(/日付|年月|^月$|date/i.test(c)) k='date'; else if(/名前|氏名|スタッフ|従業員|取引先|業者|仕入先|品目|商品|^名/.test(c)) k='name'; else if(/時間|時給|日数|h$/i.test(c)) k='skip'; else if(/給与|支給|金額|総額|額|仕入|合計|計$/.test(c)) k='amount'; }
       if(k!=='skip' && k!=='date' && k!=='cost' && map.includes(k) && kind==='sales') k='skip';
       map[i]=k;
     });
@@ -1444,7 +1444,7 @@ function guessMap(rows, kind){
     const body=rows.slice(0,5);
     const dateCol = [...Array(w).keys()].find(i=>body.some(r=>validKey(parseDateCell(r[i],{year:IMP.year,lastM:0}))));
     if(dateCol!=null) map[dateCol]='date';
-    const order = kind==='sales'? ['budget','sales','guests','unit'] : kind==='labor'? ['name','hours','amount'] : ['name','amount'];
+    const order = kind==='sales'? ['budget','sales','guests','unit'] : kind==='labor'? ['name','amount'] : ['name','amount'];
     let k=0;
     for(let i=0;i<w && k<order.length;i++){ if(i===dateCol) continue;
       const numeric = body.some(r=>parseNum(r[i])!=null);
@@ -1619,10 +1619,10 @@ function renderImp(){
   const mm=getM(IMP.month), mraw=S.months[IMP.month]||{};
   h+=`<div class="card"><details><summary class="sum2">手で入力・修正する（${ymLabel(IMP.month)}）</summary>
     <div class="fields" style="margin-top:10px"><label class="field">月<input type="month" id="manMonth" value="${IMP.month}"></label>
-    ${[['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['labor','アルバイト給与'],['laborHours','アルバイト時間'],['cost','仕入れ']].map(([f,l])=>`<label class="field">${l}<input type="number" data-f="${f}" value="${isNum(mraw[f])?mraw[f]:''}" placeholder="${isNum(mm[f])?Math.round(mm[f]):''}"></label>`).join('')}</div>
+    ${[['budget','予算'],['sales','実績（売上）'],['guests','稼働（客数）'],['unit','客単価'],['labor','アルバイト給与'],['cost','仕入れ']].map(([f,l])=>`<label class="field">${l}<input type="number" data-f="${f}" value="${isNum(mraw[f])?mraw[f]:''}" placeholder="${isNum(mm[f])?Math.round(mm[f]):''}"></label>`).join('')}</div>
     <p class="muted" style="margin:8px 0 0">${mm.daily?'この月は日別データがあるため、実績・客数は日別の合計が優先されます（予算は月の値が優先）。':'空欄は「データなし」として扱います。'}</p>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="primary" id="manSave">保存</button><button class="danger" id="manDel">この月の売上の日別データを削除</button></div><div id="manMsg" class="msg"></div>
-    ${[['laborDetail','アルバイト給与の内訳'],['costDetail','仕入れの内訳']].filter(([f])=>mraw[f]).map(([f,l])=>`<h3 style="font-size:14px;margin:14px 0 4px">${l}</h3><div class="tbl-wrap" style="max-height:260px"><table class="grid"><thead><tr><th>名前</th>${f==='laborDetail'?'<th>時間</th>':''}<th>金額</th></tr></thead><tbody>${mraw[f].map(d=>`<tr><td>${esc(d.name)}</td>${f==='laborDetail'?`<td>${isNum(d.hours)&&d.hours?d.hours.toFixed(1):'—'}</td>`:''}<td>${yen(d.amount)}</td></tr>`).join('')}</tbody></table></div>`).join('')}
+    ${[['laborDetail','アルバイト給与の内訳'],['costDetail','仕入れの内訳']].filter(([f])=>mraw[f]).map(([f,l])=>`<h3 style="font-size:14px;margin:14px 0 4px">${l}</h3><div class="tbl-wrap" style="max-height:260px"><table class="grid"><thead><tr><th>名前</th><th>金額</th></tr></thead><tbody>${mraw[f].map(d=>`<tr><td>${esc(d.name)}</td><td>${yen(d.amount)}</td></tr>`).join('')}</tbody></table></div>`).join('')}
     </details></div>`;
   h+=`<div class="card"><h2>取り込み状況<span class="sub">足りない月がひと目でわかります</span></h2><div class="scrollx" id="covBox"></div></div>`;
   el.innerHTML=h;
@@ -1755,11 +1755,11 @@ function renderSet(){
 function download(name, text, type){ const b=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000); }
 function exportJSON(){ S.lastBackup=Date.now(); save(); download('suuchi-backup-'+TODAY+'.json', JSON.stringify(S), 'application/json'); renderBanner(); }
 function exportCSV(){
-  const head=['月','予算','実績','予算比','前年比','稼働','客単価','アルバイト給与','アルバイト時間','人件費率','仕入れ','仕入率'];
+  const head=['月','予算','実績','予算比','前年比','稼働','客単価','アルバイト給与','人件費率','仕入れ','仕入率'];
   const lines=[head.join(',')];
   allYMs().forEach(ym=>{ const r=getM(ym), ly=getM(addMonth(ym,-12)); if(!isNum(r.sales)&&!isNum(r.budget)) return;
     const f=v=>isNum(v)?Math.round(v):''; const p=v=>isNum(v)?(v*100).toFixed(1):'';
-    lines.push([ym,f(r.budget),f(r.sales),p(ratio(r.sales,r.budget)),p(ratio(r.sales,ly.sales)),f(r.guests),f(r.unit),f(r.labor),isNum(r.laborHours)?r.laborHours:'',p(r.laborRate),f(r.cost),p(r.costRate)].join(',')); });
+    lines.push([ym,f(r.budget),f(r.sales),p(ratio(r.sales,r.budget)),p(ratio(r.sales,ly.sales)),f(r.guests),f(r.unit),f(r.labor),p(r.laborRate),f(r.cost),p(r.costRate)].join(',')); });
   download('suuchi-monthly-'+TODAY+'.csv', '﻿'+lines.join('\n'), 'text/csv');
 }
 function hash(s){ let h1=0x811c9dc5, h2=5381; s='sm:'+s; for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); h1=Math.imul(h1^c,16777619)>>>0; h2=((h2<<5)+h2+c)>>>0; } return h1.toString(16)+h2.toString(16); }
