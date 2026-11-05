@@ -2075,8 +2075,8 @@ function slEvalHTML(W){
   <div class="card"><h2>日ごと・時刻ごとの達成率</h2>${slHeatHTML(W)}</div>
   <div class="card"><h2>時間帯ごとの差<span class="sub">どの時間帯で取りこぼしたか</span></h2>${slBandHTML(W)}</div>
   <div class="card"><h2>日ごとの評価と改善</h2>${slRecsHTML(W)}</div>
-  <div class="card"><h2>店長コメント<span class="sub">報告用画面に載ります</span></h2>
-    <textarea id="wkCm" rows="3" placeholder="今週の振り返り、上席への報告など">${esc(wk.comment||'')}</textarea>
+  <div class="card"><h2>備考<span class="sub">報告用画面に載ります</span></h2>
+    <textarea id="wkCm" rows="3" placeholder="天気・イベント・団体・人員・特記事項など">${esc(wk.comment||'')}</textarea>
     <h2 style="margin-top:12px">来週の取り組み<span class="sub">空欄なら「来週の重点」を使います。来週の中間集計表の「前回事項」に印刷されます</span></h2>
     <textarea id="wkNx" rows="2" placeholder="${esc(W.focus.map(f=>f.short).join(' / '))}">${esc(wk.next||'')}</textarea><div id="wkMsg" class="msg"></div></div>`;
 }
@@ -2231,8 +2231,8 @@ function slReportHTML(W){
    <h3>未達の日と改善策</h3>
    ${W.recs.length? W.recs.map(r=>{ const d=r.d, w=d.worst, c=causeOf(d.ge,d.ue); const parts=[]; if(w&&w.gap<0) parts.push(`崩れ ${w.label} ${signMan(w.gap)}`); if(c) parts.push(`原因 ${c==='unit'?'客単価 '+signInt(d.unitA-d.U,'円'):'客数 '+signInt(d.G-d.Gt,'人')}`); if(isNum(d.unitA)&&d.unitA>0) parts.push(`あと${Math.ceil(-d.gap/d.unitA)}人 か 1人+${int(Math.ceil(-d.gap/d.G/10)*10)}円で達成`); return `<div class="rr"><b>${r.title}</b>　${parts.join('／')}<br>→ ${esc(r.acts[0])}</div>`; }).join('') : '<div class="muted">未達の日はありません。</div>'}
    <h3>来週の重点</h3>${slFocusHTML(W)}
-   ${wk.next?`<div class="fc-item"><div class="ft">店長の取り組み</div>${esc(wk.next)}</div>`:''}
-   <h3>店長コメント</h3><div class="cm">${esc(wk.comment||'')}</div>`;
+   ${wk.next?`<div class="fc-item"><div class="ft">来週の取り組み</div>${esc(wk.next)}</div>`:''}
+   ${wk.comment?`<h3>備考</h3><div class="cm">${esc(wk.comment)}</div>`:''}`;
 }
 function openReport(){
   const W=slWeek(slWk), r=document.getElementById('rep');
