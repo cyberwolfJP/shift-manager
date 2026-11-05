@@ -1,5 +1,5 @@
 // 翌月予測マネージャー：オフライン用（同じサイト内のファイルだけを保存。外部には一切アクセスしない）
-const CACHE = 'yosoku-v3';
+const CACHE = 'yosoku-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', e => {
@@ -10,7 +10,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(ks => Promise.all(ks.filter(k => k.startsWith('yosoku-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

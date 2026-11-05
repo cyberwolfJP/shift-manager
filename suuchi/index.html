@@ -213,10 +213,70 @@ summary.sum2{font-size:15px;color:var(--ink)}
 #lock .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;width:min(340px,90vw);text-align:center}
 #lock input{width:100%;margin:14px 0;text-align:center;font-size:20px;letter-spacing:.3em}
 
+/* 時間帯ノルマ */
+.slbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.slbar .sp{flex:1 1 auto}
+.wknav{display:flex;gap:4px;align-items:center}
+.wknav button{padding:6px 11px}
+.slmini{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;align-items:baseline}
+.slmini b{font-weight:500;font-size:18px;font-variant-numeric:tabular-nums}
+.sdays{display:grid;grid-template-columns:repeat(auto-fill,minmax(500px,1fr));gap:14px}
+.sday{margin-bottom:0}
+.sdh{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.sdh .dt{font-size:17px}
+.sdh .dt.sat{color:#2a78d6}.sdh .dt.sun{color:var(--crit)}
+.sdh input{width:110px;text-align:right}
+.lvls{font-size:12px;color:var(--ink2)}
+table.sin td,table.sin th{padding:4px 5px}
+table.sin input{width:100%;min-width:62px;text-align:right;padding:6px 7px}
+table.sin td.w1{width:24%}table.sin td.w2{width:14%}
+.hc{display:inline-block;min-width:48px;text-align:center;padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+.hc.g{background:#dcf3dc;color:#0a640a}.hc.w{background:#fff0c7;color:#6e4e00}.hc.b{background:#fbe0dc;color:#a3271c}.hc.n{color:var(--ink3)}
+table.heat td,table.heat th{text-align:center}
+table.heat td:first-child,table.heat th:first-child{text-align:left}
+.fc-item{border-left:3px solid var(--accent);background:#f6f9fe;border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:8px;font-size:14px;line-height:1.7}
+.fc-item .ft{font-size:15px}
+.ctbl input{width:62px;text-align:right;padding:5px 6px}
+#rep{position:fixed;inset:0;z-index:90;background:#fff;overflow:auto;display:none}
+#rep .rbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));background:#f4f3f0;border-bottom:1px solid var(--line)}
+#rep .rbar .sp{flex:1}
+#rep .paper{max-width:820px;margin:0 auto;padding:14px 18px 20px}
+#rep .kpi{padding:8px 12px}#rep .kpis{margin-bottom:8px}
+#rep .rh1{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:12px}
+#rep .rh1 h1{font-size:21px}
+#rep .kpis{grid-template-columns:repeat(4,1fr)}
+#rep .kpi .v{font-size:21px}
+#rep table.heat{font-size:13px}
+#rep table.heat td,#rep table.heat th{padding:3px 4px}
+#rep h3{font-size:15px;margin:10px 0 5px;border-left:4px solid var(--accent);padding-left:8px}
+#rep .rr{font-size:13px;line-height:1.6;margin-bottom:6px}#rep .rr b{font-weight:500}
+#rep .fc-item{font-size:13px;line-height:1.6;padding:6px 10px;margin-bottom:6px}#rep .fc-item .ft{font-size:14px}
+#rep .cm{white-space:pre-wrap;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px;min-height:40px}
+.score{display:flex;align-items:baseline;gap:6px}
+.score .pt{font-size:30px;font-variant-numeric:tabular-nums}
+.score .gr{font-size:15px;border-radius:999px;padding:1px 10px;color:#fff;background:var(--accent)}
+/* 中間集計表（印刷） */
+.ssheet{height:264mm;display:flex;flex-direction:column;break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:11px}
+.ssheet:last-child{break-after:auto;page-break-after:auto}
+.ss-h{display:flex;justify-content:space-between;align-items:center;background:#2f3e5c;color:#fff;padding:5px 10px;font-size:14px}
+.ss-memo{display:flex;gap:8px;border:1px solid #9a9a9a;border-top:none;min-height:13mm;padding:3px 8px;font-size:10px;line-height:1.5}
+.ss-memo .k{color:#666;flex:0 0 auto}
+.ss-cols{flex:1;display:grid;border:1px solid #888;margin-top:2mm}
+.ss-col{display:flex;flex-direction:column;border-left:1px solid #888;min-width:0}
+.ss-col:first-child{border-left:none}
+.ss-top{text-align:center;padding:4px 3px;border-bottom:1px solid #888}
+.ss-top .d{font-size:13px}
+.ss-lv{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:3px}
+.ss-lv div{border:1px solid #bbb;border-radius:3px;background:#fff;font-size:9px;line-height:1.3;padding:1px}
+.ss-cell{flex:1;display:flex;flex-direction:column;border-top:1px solid #aaa}
+.ss-cell:first-of-type{border-top:none}
+.ss-cell .ct{text-align:center;padding:2px;font-size:11px}
+.ss-cell .pl{flex:1;display:flex;align-items:center;justify-content:center;color:#d0d0d0;font-size:10px}
+.ss-f{font-size:9px;color:#777;text-align:right;margin-top:1mm}
 #printArea{display:none}
 @media print{
   @page{size:A4;margin:12mm}
-  body{background:#fff;font-size:11.5px}
+  html,body{background:#fff!important;font-size:11.5px}
   body.printing>*:not(#printArea){display:none!important}
   body.printing #printArea{display:block}
   #printArea .rec,#printArea .kpi{break-inside:avoid}
@@ -247,6 +307,7 @@ summary.sum2{font-size:15px;color:var(--ink)}
   <nav class="tabs" id="tabs">
     <button data-v="dash" class="on">ダッシュボード</button>
     <button data-v="diag">経営診断</button>
+    <button data-v="slot">時間帯ノルマ</button>
     <button data-v="list">月次一覧</button>
     <button data-v="fc">翌月見込み</button>
     <button data-v="imp">データ取込</button>
@@ -260,10 +321,12 @@ summary.sum2{font-size:15px;color:var(--ink)}
   <section class="view" id="v-list"></section>
   <section class="view" id="v-fc"></section>
   <section class="view" id="v-diag"></section>
+  <section class="view" id="v-slot"></section>
   <section class="view" id="v-imp"></section>
   <section class="view" id="v-set"></section>
 </main>
 <div id="tip"></div>
+<div id="rep"></div>
 <div id="printArea"></div>
 
 <script>
@@ -601,7 +664,8 @@ function render(){
   for(const k in charts) delete charts[k];
   fillMonthSel();
   renderBanner();
-  const f = {dash:renderDash, list:renderList, fc:renderFc, diag:renderDiag, imp:renderImp, set:renderSet}[view];
+  document.querySelector('.monthnav').style.visibility = view==='slot' ? 'hidden' : '';
+  const f = {dash:renderDash, list:renderList, fc:renderFc, diag:renderDiag, slot:renderSlot, imp:renderImp, set:renderSet}[view];
   f();
 }
 function renderBanner(){
@@ -1672,6 +1736,417 @@ function hash(s){ let h1=0x811c9dc5, h2=5381; s='sm:'+s; for(let i=0;i<s.length;
 function setPass(){ const v=document.getElementById('sPass').value; if(v.length<4){ alert('4文字以上で入力してください。'); return; } S.settings.passHash=hash(v); save(); alert('パスコードを設定しました。'); renderSet(); }
 function clearPass(){ if(!confirm('パスコードを解除しますか？')) return; S.settings.passHash=''; save(); renderSet(); }
 function wipe(){ if(!confirm('すべてのデータを削除します。先にバックアップを書き出しましたか？')) return; if(!confirm('本当に削除しますか？元に戻せません。')) return; const st=S.settings; S=defaultState(); S.settings=st; save(); cur=TODAY_YM; render(); }
+
+/* ========== 時間帯ノルマ（週次） ========== */
+// 目安＝日別予算×その時刻までの累計の割合。初期値は東銀座店の中間集計表（2026/10/19週）から
+const SL_CURVES0 = (()=>{
+  const wd={18:.08,19:.18,20:.41,21:.64,22:.80}, fri={18:.08,19:.18,20:.40,21:.68,22:.87},
+        sat={18:.20,19:.35,20:.55,21:.78,22:.93}, sun={18:.25,19:.42,20:.62,21:.82,22:1};
+  return {0:sun,1:wd,2:wd,3:wd,4:wd,5:fri,6:sat,7:sun};
+})();
+function SL(){
+  const d=S.slot=S.slot||{}; const c=d.cfg=d.cfg||{};
+  if(!Array.isArray(c.hours)||!c.hours.length) c.hours=[18,19,20,21,22];
+  if(!c.curves) c.curves=JSON.parse(JSON.stringify(SL_CURVES0));
+  if(!c.tax) c.tax='net';
+  d.days=d.days||{}; d.weeks=d.weeks||{};
+  return d;
+}
+const WDJ=['日','月','火','水','木','金','土'];
+const TYPEN=['日曜','月曜','火曜','水曜','木曜','金曜','土曜','祝日'];
+function monOf(ds){ const d=dateObj(ds); d.setDate(d.getDate()-(d.getDay()+6)%7); return dstr(d); }
+function weekDays(mon){ const a=[]; for(let i=0;i<7;i++) a.push(shiftDate(mon,i)); return a; }
+function dLabel(ds){ const d=dateObj(ds); return (d.getMonth()+1)+'/'+d.getDate()+'('+WDJ[d.getDay()]+(HOL.has(ds)?'・祝':'')+')'; }
+function wkLabel(mon){ return dLabel(mon)+'〜'+dLabel(shiftDate(mon,6)); }
+function curveType(ds){ return HOL.has(ds)? 7 : (preWeekday(ds)? 5 : dateObj(ds).getDay()); }
+function curveNote(ds){ return HOL.has(ds)? '祝日の配分' : (preWeekday(ds)? '祝前日（金曜の配分）' : ''); }
+function signMan(v){ return isNum(v)? (v>=0?'+':'−')+man(Math.abs(v))+(Math.abs(v)<1e4?'円':'') : '—'; }
+// 目安の表示（中間集計表と同じく 6.24万・45万）
+function tg(v){ return isNum(v)? (+(v/1e4).toFixed(2))+'万' : '—'; }
+function signInt(v,u=''){ return isNum(v)? (v>=0?'+':'−')+Math.abs(Math.round(v)).toLocaleString('ja-JP')+u : '—'; }
+const n0 = v => isNum(v)? v : null;
+function sumOf(arr, f){ let s=0, n=0; arr.forEach(x=>{ const v=f(x); if(isNum(v)){ s+=v; n++; } }); return n? s : null; }
+function salesLabel(){ return SL().cfg.tax==='gross' ? '税込純売上' : '純売上'; }
+
+function slBudget(ds){ const sd=SL().days[ds]; if(sd&&isNum(sd.budget)) return sd.budget; const d=S.days[ds]; return d&&isNum(d.budget)? d.budget : null; }
+function slFin(ds){ const f=(SL().days[ds]||{}).fin||{}, d=S.days[ds]||{}; return {s:isNum(f.s)?f.s:n0(d.sales), g:n0(f.g), c:isNum(f.c)?f.c:n0(d.guests)}; }
+// 目標客単価：設定 → 直近の締まった月の客単価
+function slUnit(mon){
+  const c=SL().cfg; if(isNum(c.unit)&&c.unit>0) return {v:c.unit, src:'設定の目標客単価'};
+  const a=[]; let m=lastComplete(mon.slice(0,7));
+  for(let i=0;i<3&&m;i++){ const u=getM(m).unit; if(isNum(u)) a.push(u); m=lastComplete(addMonth(m,-1)); }
+  return a.length? {v:Math.round(avg(a)), src:'直近'+a.length+'か月の客単価'} : null;
+}
+function segLabel(from,to){ return from==null? to+'時まで' : (to==='close'? from+'時以降' : from+'時台'); }
+function bandOf(to){ return to==='close'||to>=22? 'late' : (to<=19? 'early' : 'peak'); }
+const BANDN={early:'早い時間（開店〜19時）', peak:'ピーク（19〜21時）', late:'遅い時間（21時〜閉店）'};
+
+// 改善アクション（時間帯 × 原因）
+const SL_ACT = {
+  early:{
+    guest:['開店前に店頭の看板・POPを通りから見える向きに出し、ハイボールの値段と「すぐ座れます」を見せる',
+           '最初のお客様は入口や窓ぎわの席から案内して、外から「にぎわっている店」に見せる',
+           '早い時間のお得（0次会・ちょい飲み）をPOPで打ち出し、予約の受付状況も開店前に確認する'],
+    unit:['1杯目の注文のときに「たこ焼きすぐ出せます」とフードを一緒に提案する',
+          '着席したら卓上POPのおすすめ（点心・小籠包）を指して、最初の注文で2品目まで取る']
+  },
+  peak:{
+    guest:['入口で待たせない。空席を見る担当を1人決めて、来店から着席まで1分以内にする',
+           '帰った卓の片付けと次の案内を最優先にして、席の回転を止めない',
+           '満席のときは待ち時間を伝えて名前を控え、他の店に流さない',
+           '2名客はカウンター・小さい卓へ案内し、4名卓を空けておく'],
+    unit:['グラスが3分の1になった卓に2杯目の声かけ（巡回の順番を決めておく）',
+          '料理が途切れた卓に、すぐ出せる一品（点心・小籠包など）を提案する',
+          '卓上POPのおすすめを1つに絞って、迷わず頼めるようにする']
+  },
+  late:{
+    guest:['21時以降は店頭POPを二軒目・一人飲み向け（「ハイボール1杯から」）に替える',
+           '歌舞伎座の終演時間に合わせて店頭に立ち、帰り道のお客様に声をかける',
+           '店頭の照明と入口の見通しを保ち、遅い時間も入りやすい店に見せる'],
+    unit:['ラストオーダー前に全卓へ締めの提案（たこ焼き追加・バニラアイス）をする',
+          '空いたグラスを置いたままにせず、次の1杯をこちらから提案する']
+  }
+};
+function actsFor(band, cause, k=2){ return (SL_ACT[band]||SL_ACT.peak)[cause==='unit'?'unit':'guest'].slice(0,k); }
+
+function slDay(ds, U){
+  const L=SL(), H=L.cfg.hours, cv=L.cfg.curves[curveType(ds)]||{}, sd=L.days[ds]||{}, hh=sd.h||{};
+  const B=slBudget(ds);
+  const pts=H.map(h=>{ const a=hh[h]||{}, r=cv[h]; return {h, r, t:isNum(B)&&isNum(r)? Math.round(B*r/100)*100 : null, s:n0(a.s), g:n0(a.g), c:n0(a.c)}; });
+  const mk=(from,to,t,a,ga)=>({from,to,t,a,ga,label:segLabel(from,to),band:bandOf(to)});
+  const segs=[]; let pT=0, pS=0, pC=0, from=null;
+  pts.forEach(p=>{ segs.push(mk(from,p.h, isNum(p.t)&&isNum(pT)?p.t-pT:null, isNum(p.s)&&isNum(pS)?p.s-pS:null, isNum(p.c)&&isNum(pC)?p.c-pC:null)); pT=p.t; pS=p.s; pC=p.c; from=p.h; });
+  const fin=slFin(ds);
+  segs.push(mk(from,'close', isNum(B)&&isNum(pT)?B-pT:null, isNum(fin.s)&&isNum(pS)?fin.s-pS:null, isNum(fin.c)&&isNum(pC)?fin.c-pC:null));
+  segs.forEach(s=>{ s.gap=isNum(s.t)&&isNum(s.a)? s.a-s.t : null; if(isNum(U)&&isNum(s.gap)&&isNum(s.ga)){ s.ge=(s.ga-s.t/U)*U; s.ue=s.a-s.ga*U; } });
+  const lastP=[...pts].reverse().find(p=>isNum(p.s));
+  const closed=isNum(fin.s);
+  const d={ds, B, pts, segs, fin, closed, has:!!lastP||closed, U, memo:sd.memo||''};
+  d.F = closed? fin.s : (lastP? lastP.s : null);
+  d.G = closed? fin.c : (lastP? lastP.c : null);
+  d.Gr = closed? fin.g : (lastP? lastP.g : null);
+  d.ach = closed? ratio(d.F,B) : null;
+  d.gap = closed&&isNum(B)? d.F-B : null;
+  d.unitA = ratio(d.F,d.G);
+  if(closed&&isNum(B)&&isNum(U)&&isNum(d.G)&&d.G>0){ d.Gt=B/U; d.ge=(d.G-d.Gt)*U; d.ue=d.F-d.G*U; }
+  d.hits = pts.filter(p=>isNum(p.s)&&isNum(p.t)&&p.t>0).map(p=>p.s>=p.t);
+  const sg=segs.filter(s=>isNum(s.gap));
+  d.worst = sg.reduce((m,s)=>!m||s.gap<m.gap? s:m, null);
+  d.best  = sg.reduce((m,s)=>!m||s.gap>m.gap? s:m, null);
+  return d;
+}
+function causeOf(ge, ue){ if(!isNum(ge)||!isNum(ue)) return null; return ue<ge? 'unit' : 'guest'; }
+
+function slWeek(mon){
+  const u=slUnit(mon); let U=u?u.v:null, usrc=u?u.src:'';
+  let days=weekDays(mon).map(ds=>slDay(ds,U));
+  if(!isNum(U)){ const F=sumOf(days.filter(d=>d.closed&&isNum(d.G)),d=>d.F), G=sumOf(days.filter(d=>d.closed),d=>d.G);
+    if(isNum(F)&&G>0){ U=Math.round(F/G); usrc='今週の客単価（目標客単価が未設定のため）'; days=weekDays(mon).map(ds=>slDay(ds,U)); } }
+  const W={mon, days, U, usrc};
+  const cl=days.filter(d=>d.closed&&isNum(d.B));
+  W.cl=cl; W.B=sumOf(cl,d=>d.B); W.F=sumOf(cl,d=>d.F); W.Ball=sumOf(days,d=>d.B); W.ach=ratio(W.F,W.B);
+  const cg=cl.filter(d=>isNum(d.G)); W.G=sumOf(cg,d=>d.G); W.unit=ratio(sumOf(cg,d=>d.F),W.G);
+  W.Gr=sumOf(cl,d=>d.Gr); W.won=cl.filter(d=>d.F>=d.B).length;
+  const hits=days.flatMap(d=>d.hits); W.hitN=hits.filter(Boolean).length; W.hitT=hits.length;
+  W.ge=sumOf(cl,d=>d.ge); W.ue=sumOf(cl,d=>d.ue);
+  // 時間帯ごとの週合計
+  const H=SL().cfg.hours, order=[segLabel(null,H[0])]; for(let i=1;i<H.length;i++) order.push(segLabel(H[i-1],H[i])); order.push(segLabel(H[H.length-1],'close'));
+  const bm={}; order.forEach(k=>bm[k]={label:k,t:0,a:0,n:0,ge:0,ue:0,gn:0,band:null,to:null});
+  days.forEach(d=>d.segs.forEach(s=>{ const b=bm[s.label]; if(!b||!isNum(s.gap)) return; b.band=s.band; b.to=s.to; b.t+=s.t; b.a+=s.a; b.n++; if(isNum(s.ge)){ b.ge+=s.ge; b.ue+=s.ue; b.gn++; } }));
+  W.bands=order.map(k=>bm[k]); W.bands.forEach(b=>{ b.gap=b.n? b.a-b.t : null; });
+  // 点数（100点）
+  if(cl.length){
+    const pA = W.ach>=1? 60 : Math.max(0, 60-(1-W.ach)*400);
+    const pH = W.hitT? 25*W.hitN/W.hitT : 25*W.won/cl.length;
+    const pD = 15*W.won/cl.length;
+    W.score=Math.round(pA+pH+pD);
+    W.grade = W.score>=90?'S':W.score>=80?'A':W.score>=65?'B':W.score>=50?'C':'D';
+  }
+  // 日ごとのコメント
+  W.recs=[]; W.goods=[];
+  days.forEach(d=>{
+    if(!d.closed||!isNum(d.B)) return;
+    if(d.F>=d.B){
+      const b=d.best&&d.best.gap>0? `いちばん伸びたのは${d.best.label}（目安より${signMan(d.best.gap)}）。何が良かったかをメモに残して、他の曜日でも同じ動きをする。` : '';
+      W.goods.push({d, text:`${dLabel(d.ds)} 予算達成 ${pct(d.ach)}（${signMan(d.gap)}）。${b}`});
+      return;
+    }
+    const w=d.worst, lines=[];
+    if(w&&w.gap<0) lines.push(`崩れた時間帯は<b>${w.label}</b>：目安${signMan(w.t)}に対して実績${signMan(w.a)}（${signMan(w.gap)}）。`);
+    let cause=null;
+    if(isNum(d.ge)){
+      cause=causeOf(d.ge,d.ue);
+      lines.push(`客数 ${int(d.G)}人（予算に必要な目安 ${int(d.Gt)}人、${signInt(d.G-d.Gt,'人')}）、客単価 ${int(d.unitA)}円（目標 ${int(d.U)}円、${signInt(d.unitA-d.U,'円')}）。主な原因は<b>${cause==='unit'?'客単価':'客数'}</b>（客数で${signMan(d.ge)}、客単価で${signMan(d.ue)}）。`);
+    }
+    const how=[];
+    if(isNum(d.unitA)&&d.unitA>0) how.push(`あと<b>${Math.ceil(-d.gap/d.unitA)}人</b>来店（今の客単価のまま）`);
+    if(isNum(d.G)&&d.G>0) how.push(`1人あたり<b>+${int(Math.ceil(-d.gap/d.G/10)*10)}円</b>（今の客数のまま）`);
+    if(how.length) lines.push(`${how.join('、または')}で予算に届いていた。`);
+    const acts = actsFor(w? w.band : 'peak', cause || (w&&isNum(w.ge)? causeOf(w.ge,w.ue) : 'guest'), 2);
+    W.recs.push({d, title:`${dLabel(d.ds)} 予算${man(d.B)} → ${man(d.F)}（${signMan(d.gap)}・${pct(d.ach)}）`, lines, acts, lv:d.ach>=.8?'中':'高'});
+  });
+  // 来週の重点（最大3つ）
+  W.focus=[];
+  const weak=W.bands.filter(b=>b.n&&b.gap<0).sort((a,b)=>a.gap-b.gap)[0];
+  if(weak){
+    const c=b=>b.gn? causeOf(b.ge,b.ue) : null; const cs=c(weak)||'guest';
+    let goal='';
+    if(cs==='guest'&&isNum(W.U)) goal=`1日あたり客数を<b>+${Math.max(1,Math.ceil(-weak.ge/W.U/Math.max(weak.gn,1)))}人</b>`;
+    else if(cs==='unit'&&weak.gn){ const gaSum=W.days.reduce((s,d)=>{ const x=d.segs.find(z=>z.label===weak.label); return s+(x&&isNum(x.ga)&&isNum(x.ge)?x.ga:0); },0); if(gaSum>0) goal=`この時間帯の客単価を<b>+${int(Math.ceil(-weak.ue/gaSum/10)*10)}円</b>`; }
+    W.focus.push({title:`${weak.label}を取り戻す`, short:`${weak.label}：${cs==='unit'?'客単価':'客数'}`, text:`今週は目安より合計${signMan(weak.gap)}（${weak.n}日分）。原因は主に${cs==='unit'?'客単価':'客数'}。${goal?goal+'を目標に、':''}${actsFor(weak.band||bandOf(weak.to),cs,1)[0]}。`});
+  }
+  const worstDay=W.recs.slice().sort((a,b)=>a.d.gap-b.d.gap)[0];
+  if(worstDay){
+    const nd=shiftDate(worstDay.d.ds,7), nb=slBudget(nd), w=worstDay.d.worst;
+    W.focus.push({title:`${WDJ[dateObj(nd).getDay()]}曜日の立て直し`, short:`${WDJ[dateObj(nd).getDay()]}曜：${w?w.label:'全体'}`, text:`今週いちばん足りなかった日（${signMan(worstDay.d.gap)}）。来週の${dLabel(nd)}${isNum(nb)?'（予算'+man(nb)+'）':''}は${w?w.label+'の目安を'+(w.from==null?'開店前':w.from+'時')+'の時点で全員に共有し、':''}${worstDay.acts[0]}。`});
+  }
+  if(isNum(W.ge)&&isNum(W.ue)&&(W.ge<0||W.ue<0)){
+    if(W.ue<W.ge && isNum(W.G)&&W.G>0) W.focus.push({title:'客単価を上げる', short:`客単価 +${int(Math.ceil(-W.ue/W.G/10)*10)}円`, text:`今週は客単価で${signMan(W.ue)}。1人あたり<b>+${int(Math.ceil(-W.ue/W.G/10)*10)}円</b>で取り戻せる。${SL_ACT.peak.unit[0]}。`});
+    else if(W.ge<0 && isNum(W.U)) W.focus.push({title:'客数を増やす', short:`客数 +${Math.ceil(-W.ge/W.U)}人/週`, text:`今週は客数で${signMan(W.ge)}（約${Math.ceil(-W.ge/W.U)}人分）。${SL_ACT.early.guest[0]}。`});
+  }
+  if(!W.focus.length && cl.length){
+    const best=W.bands.filter(b=>b.n&&b.gap>0).sort((a,b)=>b.gap-a.gap)[0];
+    W.focus.push({title:'今の動きを続けて上積み', short:'好調の継続', text: best? `${best.label}が目安より${signMan(best.gap)}。この時間帯にやったこと（POP・声かけ・案内）をスタッフ全員で共有し、他の時間帯にも広げる。` : '全日で予算達成。今週うまくいった動きをスタッフ全員で共有する。'});
+  }
+  W.focus=W.focus.slice(0,3);
+  return W;
+}
+function weekLead(W){
+  if(!W.cl.length) return '日計（閉店時の売上）が入った日がまだありません。入力すると評価と改善コメントが出ます。';
+  let s=`予算${man(W.B)}に対して${man(W.F)}（${pct(W.ach)}・${signMan(W.F-W.B)}）。${W.cl.length}日中${W.won}日で予算達成`;
+  if(W.hitT) s+=`、時間帯の目安は${W.hitT}回中${W.hitN}回クリア`;
+  s+='。';
+  const weak=W.bands.filter(b=>b.n&&b.gap<0).sort((a,b)=>a.gap-b.gap)[0];
+  if(weak) s+=`いちばん差がついたのは${weak.label}（週合計${signMan(weak.gap)}）。`;
+  if(isNum(W.ge)&&isNum(W.ue)) s+=`予算との差の内訳は、客数で${signMan(W.ge)}、客単価で${signMan(W.ue)}。`;
+  return s;
+}
+function hcell(r, d=0){ if(!isNum(r)) return '<span class="hc n">—</span>'; const c=r>=1?'g':(r>=.9?'w':'b'); return `<span class="hc ${c}">${pct(r,d)}</span>`; }
+function lvMark(r){ return !isNum(r)? '—' : r>=1? '100%' : r>=.8? '80%' : r>=.6? '60%' : '60%未満'; }
+
+let slWk=null, slMode='in';
+function slDefaultWeek(){
+  const ks=Object.keys(SL().days).filter(ds=>{ const x=SL().days[ds]; return x&&(x.h&&Object.keys(x.h).length || x.fin); }).sort();
+  return ks.length? monOf(ks[ks.length-1]) : monOf(TODAY);
+}
+function slWeekOptions(){
+  const now=monOf(TODAY); const ks=Object.keys(SL().days).sort();
+  let lo=shiftDate(now,-7*12); if(ks.length&&monOf(ks[0])<lo) lo=monOf(ks[0]);
+  let hi=shiftDate(now,14); if(slWk>hi) hi=slWk; if(slWk<lo) lo=slWk;
+  const out=[]; for(let m=hi; m>=lo; m=shiftDate(m,-7)) out.push(m); return out;
+}
+function renderSlot(){
+  SL(); if(!slWk) slWk=slDefaultWeek();
+  const el=document.getElementById('v-slot');
+  const W=slWeek(slWk);
+  const head=`<div class="card"><div class="slbar">
+    <div class="seg">${[['in','実績の入力'],['ev','週の評価'],['cfg','配分・設定']].map(([k,l])=>`<button data-sm="${k}" class="${slMode===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="wknav"><button data-wk="-7" aria-label="前の週">◀</button><select id="wSel" aria-label="週">${slWeekOptions().map(m=>`<option value="${m}" ${m===slWk?'selected':''}>${wkLabel(m)}${m===monOf(TODAY)?'（今週）':''}</option>`).join('')}</select><button data-wk="7" aria-label="次の週">▶</button></div>
+    <span class="sp"></span>
+    <button class="primary" data-act="rep">報告用画面</button>
+    <button data-act="sheet">中間集計表を印刷</button>
+  </div></div>`;
+  let body='';
+  if(slMode==='in') body=slInputHTML(W);
+  else if(slMode==='ev') body=slEvalHTML(W);
+  else body=slCfgHTML();
+  el.innerHTML=head+body;
+  if(slMode==='ev') bindSlEval();
+  if(slMode==='cfg') bindSlCfg();
+}
+document.getElementById('v-slot').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.sm){ slMode=b.dataset.sm; renderSlot(); }
+  else if(b.dataset.wk){ slWk=shiftDate(slWk, Number(b.dataset.wk)); renderSlot(); }
+  else if(b.dataset.act==='rep') openReport();
+  else if(b.dataset.act==='sheet') printSheet();
+});
+document.getElementById('v-slot').addEventListener('change', e=>{
+  const t=e.target;
+  if(t.id==='wSel'){ slWk=t.value; renderSlot(); return; }
+  if(t.classList.contains('si')){
+    const ds=t.dataset.ds, h=t.dataset.h, f=t.dataset.f;
+    const v = f==='memo'? t.value.trim() : parseNum(t.value);
+    if(f!=='memo' && t.value.trim() && v==null){ t.style.borderColor='var(--crit)'; return; }
+    t.style.borderColor='';
+    slSet(ds,h,f,v); slRefresh(ds);
+  }
+});
+document.getElementById('v-slot').addEventListener('keydown', e=>{
+  const t=e.target; if(e.key!=='Enter'||!t.classList.contains('si')||t.dataset.f==='memo') return;
+  e.preventDefault(); const all=[...document.querySelectorAll('#v-slot input.si:not([data-f="memo"])')]; const i=all.indexOf(t); if(all[i+1]) all[i+1].focus(); else t.blur();
+});
+function slSet(ds,h,f,v){
+  const L=SL(); const sd=L.days[ds]=L.days[ds]||{};
+  const put=(o,k)=>{ if(v==null||v==='') delete o[k]; else o[k]=v; };
+  if(f==='budget') put(sd,'budget');
+  else if(f==='memo') put(sd,'memo');
+  else if(h==='fin'){ sd.fin=sd.fin||{}; put(sd.fin,f); if(!Object.keys(sd.fin).length) delete sd.fin; }
+  else { sd.h=sd.h||{}; sd.h[h]=sd.h[h]||{}; put(sd.h[h],f); if(!Object.keys(sd.h[h]).length) delete sd.h[h]; if(!Object.keys(sd.h).length) delete sd.h; }
+  if(!Object.keys(sd).length) delete L.days[ds];
+  save();
+}
+function inpS(ds,h,f,v,ph){ return `<input class="si" data-ds="${ds}" data-h="${h}" data-f="${f}" inputmode="numeric" autocomplete="off" value="${isNum(v)?v:''}" placeholder="${ph!=null?esc(ph):''}">`; }
+function slRes(s,t){ return isNum(s)&&isNum(t)&&t>0? `${hcell(s/t)} <span class="small muted">${signMan(s-t)}</span>` : ''; }
+function slDayHead(d){
+  const B=d.B; const lv=isNum(B)? `<span class="lvls">60% ${man(B*.6)}／80% ${man(B*.8)}／100% ${man(B)}</span>` : '<span class="lvls" style="color:var(--crit)">日別予算を入れてください</span>';
+  const st = d.closed&&isNum(B)? `${hcell(d.ach)} <span class="small">${lvMark(d.ach)}ライン ${signMan(d.gap)}</span>` : (d.has? '<span class="small muted">日計の入力待ち</span>' : '');
+  return `${lv} <span id="st-${d.ds}">${st}</span>`;
+}
+function slDayCard(d){
+  const ds=d.ds, sd=SL().days[ds]||{}, hh=sd.h||{}, f=sd.fin||{}, dw=dateObj(ds).getDay();
+  const bPh = S.days[ds]&&isNum(S.days[ds].budget)? int(S.days[ds].budget)+'（取込済み）' : '';
+  const daySales = S.days[ds]&&isNum(S.days[ds].sales)? S.days[ds].sales : null;
+  let rows='';
+  d.pts.forEach(p=>{ const a=hh[p.h]||{};
+    rows+=`<tr><td>${p.h}:00</td><td id="t-${ds}-${p.h}">${tg(p.t)}</td><td class="w1">${inpS(ds,p.h,'s',a.s)}</td><td class="w2">${inpS(ds,p.h,'g',a.g)}</td><td class="w2">${inpS(ds,p.h,'c',a.c)}</td><td id="r-${ds}-${p.h}">${slRes(p.s,p.t)}</td></tr>`; });
+  rows+=`<tr class="tot"><td>日計</td><td id="t-${ds}-fin">${isNum(d.B)?man(d.B):'—'}</td><td class="w1">${inpS(ds,'fin','s',f.s, daySales!=null?int(daySales)+'（取込）':'閉店時')}</td><td class="w2">${inpS(ds,'fin','g',f.g)}</td><td class="w2">${inpS(ds,'fin','c',f.c, S.days[ds]&&isNum(S.days[ds].guests)?S.days[ds].guests:'')}</td><td id="r-${ds}-fin">${d.closed?slRes(d.F,d.B):''}</td></tr>`;
+  return `<div class="card sday" id="sd-${ds}"><div class="sdh"><span class="dt ${dw===6?'sat':(dw===0||HOL.has(ds)?'sun':'')}">${dLabel(ds)}</span>${curveNote(ds)?`<span class="cat">${curveNote(ds)}</span>`:''}
+    <label class="small muted" style="display:flex;align-items:center;gap:6px">日別予算 ${inpS(ds,'budget','budget',sd.budget,bPh)}</label></div>
+    <div class="sdh" id="sh-${ds}">${slDayHead(d)}</div>
+    <table class="grid sin"><thead><tr><th>時刻</th><th>目安</th><th>${salesLabel()}</th><th>組数</th><th>来客数</th><th>目安比</th></tr></thead><tbody>${rows}</tbody></table>
+    <div style="margin-top:8px"><input class="si" data-ds="${ds}" data-h="memo" data-f="memo" style="width:100%" placeholder="メモ（天気・団体・イベント・人員など）" value="${esc(sd.memo||'')}"></div></div>`;
+}
+function slMiniHTML(W){
+  return `<div class="slmini"><span>週の予算 <b>${man(W.Ball)}</b></span><span>実績（日計あり${W.cl.length}日） <b>${man(W.F)}</b> ${W.cl.length?hcell(W.ach):''}</span><span>目安クリア <b>${W.hitN}/${W.hitT}</b></span>${isNum(W.score)?`<span>今週の点数 <b>${W.score}</b>点</span>`:''}<span class="muted small">目標客単価 ${isNum(W.U)?int(W.U)+'円':'—'}（${esc(W.usrc||'未設定')}）</span></div>`;
+}
+function slInputHTML(W){
+  return `<div class="card"><div id="slMini">${slMiniHTML(W)}</div>
+    <p class="muted small" style="margin:8px 0 0">レシート（売上速報）の「${salesLabel()}・組数・来客数」をその時刻の欄に入れます。数字はその時点の日計（累計）のままでOK。閉店後に「日計」の行を入れると、その日の評価と改善コメントが出ます。Enterで次の欄へ進みます。</p></div>
+    <div class="sdays">${W.days.map(slDayCard).join('')}</div>`;
+}
+function slRefresh(ds){
+  const W=slWeek(slWk), d=W.days.find(x=>x.ds===ds); if(!d) return;
+  d.pts.forEach(p=>{ const t=document.getElementById(`t-${ds}-${p.h}`), r=document.getElementById(`r-${ds}-${p.h}`); if(t) t.innerHTML=tg(p.t); if(r) r.innerHTML=slRes(p.s,p.t); });
+  const tf=document.getElementById(`t-${ds}-fin`), rf=document.getElementById(`r-${ds}-fin`); if(tf) tf.innerHTML=isNum(d.B)?man(d.B):'—'; if(rf) rf.innerHTML=d.closed?slRes(d.F,d.B):'';
+  const sh=document.getElementById('sh-'+ds); if(sh) sh.innerHTML=slDayHead(d);
+  const mi=document.getElementById('slMini'); if(mi) mi.innerHTML=slMiniHTML(W);
+}
+
+function slHeatHTML(W){
+  const H=SL().cfg.hours;
+  let h=`<div class="scrollx"><table class="grid heat"><thead><tr><th>日付</th><th>予算</th>${H.map(x=>`<th>${x}時</th>`).join('')}<th>日計</th><th>達成</th><th>客数</th><th>客単価</th></tr></thead><tbody>`;
+  W.days.forEach(d=>{
+    h+=`<tr><td>${dLabel(d.ds)}</td><td>${man(d.B)}</td>${d.pts.map(p=>`<td>${isNum(p.s)&&isNum(p.t)&&p.t>0?hcell(p.s/p.t,0):'<span class="hc n">—</span>'}</td>`).join('')}<td>${d.closed?man(d.F):'—'}</td><td>${d.closed?hcell(d.ach):'<span class="hc n">—</span>'}</td><td>${int(d.G)}</td><td>${int(d.unitA)}</td></tr>`;
+  });
+  h+=`<tr class="tot"><td>週計</td><td>${man(W.B)}</td>${H.map(()=>'<td></td>').join('')}<td>${man(W.F)}</td><td>${W.cl.length?hcell(W.ach):'—'}</td><td>${int(W.G)}</td><td>${int(W.unit)}</td></tr></tbody></table></div>
+  <div class="muted small" style="margin-top:6px">時刻の列は、その時刻の目安（累計）に対する達成率。緑＝目安クリア、黄＝90%以上、赤＝90%未満。予算・日計の週計は日計が入った日だけ。</div>`;
+  return h;
+}
+function slBandHTML(W){
+  const bs=W.bands.filter(b=>b.n);
+  if(!bs.length) return '<div class="muted">時刻ごとの実績が入ると表示されます。</div>';
+  const c=chart({labels:bs.map(b=>b.label), series:[{name:'目安（週合計）',type:'bar',values:bs.map(b=>b.t),color:'#c9c7c1'},{name:'実績（週合計）',type:'bar',values:bs.map(b=>b.a),color:'var(--s1)'}], height:210, fmtVal:yen, title:'時間帯ごとの売上（週合計）'});
+  let t=`<div class="scrollx" style="margin-top:8px"><table class="grid"><thead><tr><th>時間帯</th><th>目安</th><th>実績</th><th>差</th><th>うち客数</th><th>うち客単価</th><th>日数</th></tr></thead><tbody>`;
+  bs.forEach(b=>{ t+=`<tr><td>${b.label}</td><td>${man(b.t)}</td><td>${man(b.a)}</td><td style="color:${b.gap<0?'var(--crit)':'#0a7a0a'}">${signMan(b.gap)}</td><td>${b.gn?signMan(b.ge):'—'}</td><td>${b.gn?signMan(b.ue):'—'}</td><td>${b.n}</td></tr>`; });
+  return c+t+'</tbody></table></div>';
+}
+function slRecsHTML(W){
+  let h='';
+  W.recs.forEach(r=>{ h+=`<div class="rec"><div class="rh"><span class="pri p${r.lv}">未達</span><span class="rt">${r.title}</span></div><div class="why">${r.lines.join('<br>')}</div><div class="acts"><div class="small muted">次に同じ曜日でやること</div><ul>${r.acts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>${r.d.memo?`<div class="small muted">メモ：${esc(r.d.memo)}</div>`:''}</div>`; });
+  if(W.goods.length) h+=`<div class="rec"><div class="rh"><span class="pri" style="background:var(--good)">達成</span><span class="rt">良かった日</span></div><ul class="dl" style="margin-top:6px">${W.goods.map(g=>`<li>${esc(g.text)}${g.d.memo?`<span class="muted small">（メモ：${esc(g.d.memo)}）</span>`:''}</li>`).join('')}</ul></div>`;
+  const open=W.days.filter(d=>d.has&&!d.closed);
+  if(open.length) h+=`<div class="muted small">日計が未入力の日：${open.map(d=>dLabel(d.ds)).join('、')}（入力すると評価に入ります）</div>`;
+  return h || '<div class="muted">日計が入ると、日ごとの評価と改善コメントが出ます。</div>';
+}
+function slFocusHTML(W){ return W.focus.length? W.focus.map((f,i)=>`<div class="fc-item"><div class="ft">${i+1}. ${esc(f.title)}</div>${f.text}</div>`).join('') : '<div class="muted">データが入ると表示されます。</div>'; }
+function slEvalHTML(W){
+  const wk=SL().weeks[W.mon]||{};
+  return `<div class="kpis">
+    ${kpi('週の売上',man(W.F)+'<small>円</small>',['予算 '+man(W.B)+'（日計ありの日）', W.cl.length?'達成率 '+pct(W.ach):''])}
+    ${kpi('予算達成した日',W.won+'<small>/'+W.cl.length+'日</small>',[W.cl.length?'未達 '+(W.cl.length-W.won)+'日':''])}
+    ${kpi('時間帯の目安クリア',W.hitN+'<small>/'+W.hitT+'回</small>',[W.hitT?'クリア率 '+pct(W.hitN/W.hitT,0):''])}
+    ${kpi('客数・客単価',int(W.G)+'<small>人</small> / '+int(W.unit)+'<small>円</small>',['目標客単価 '+(isNum(W.U)?int(W.U)+'円':'—'), isNum(W.Gr)&&W.Gr>0&&isNum(W.G)?'1組 '+(W.G/W.Gr).toFixed(1)+'人':''])}
+    ${kpi('今週の点数',isNum(W.score)?W.score+'<small>点 '+W.grade+'</small>':'—',['予算60・目安25・達成日15'])}
+  </div>
+  <div class="card"><h2>総評</h2><p class="lead">${weekLead(W)}</p></div>
+  <div class="card"><h2>来週の重点<span class="sub">数字の根拠つき</span></h2>${slFocusHTML(W)}</div>
+  <div class="card"><h2>日ごと・時刻ごとの達成率</h2>${slHeatHTML(W)}</div>
+  <div class="card"><h2>時間帯ごとの差<span class="sub">どの時間帯で取りこぼしたか</span></h2>${slBandHTML(W)}</div>
+  <div class="card"><h2>日ごとの評価と改善</h2>${slRecsHTML(W)}</div>
+  <div class="card"><h2>店長コメント<span class="sub">報告用画面に載ります</span></h2>
+    <textarea id="wkCm" rows="3" placeholder="今週の振り返り、上席への報告など">${esc(wk.comment||'')}</textarea>
+    <h2 style="margin-top:12px">来週の取り組み<span class="sub">空欄なら「来週の重点」を使います。来週の中間集計表の「前回事項」に印刷されます</span></h2>
+    <textarea id="wkNx" rows="2" placeholder="${esc(W.focus.map(f=>f.short).join(' / '))}">${esc(wk.next||'')}</textarea><div id="wkMsg" class="msg"></div></div>`;
+}
+function bindSlEval(){
+  const sv=()=>{ const L=SL(); const w=L.weeks[slWk]=L.weeks[slWk]||{}; w.comment=document.getElementById('wkCm').value.trim(); w.next=document.getElementById('wkNx').value.trim(); if(!w.comment&&!w.next) delete L.weeks[slWk]; save(); const m=document.getElementById('wkMsg'); m.className='msg ok'; m.textContent='保存しました。'; };
+  document.getElementById('wkCm').onchange=sv; document.getElementById('wkNx').onchange=sv;
+}
+
+/* 配分・設定 */
+function slCfgHTML(){
+  const c=SL().cfg, H=c.hours, order=[1,2,3,4,5,6,0,7];
+  let t=`<div class="scrollx"><table class="grid ctbl"><thead><tr><th>曜日</th>${H.map(h=>`<th>${h}:00まで</th>`).join('')}</tr></thead><tbody>`;
+  order.forEach(k=>{ const cv=c.curves[k]||{}; t+=`<tr><td>${TYPEN[k]}</td>${H.map(h=>`<td><input class="cv" data-k="${k}" data-h="${h}" inputmode="decimal" value="${isNum(cv[h])?+(cv[h]*100).toFixed(1):''}">%</td>`).join('')}</tr>`; });
+  t+='</tbody></table></div>';
+  return `<div class="card"><h2>時刻ごとの目安の割合<span class="sub">日別予算のうち、その時刻までに売れていてほしい割合（累計）</span></h2>${t}
+    <p class="muted small">祝前日（平日・日曜）は金曜、祝日は「祝日」の行を使います。初期値は中間集計表（10/19週）の目安から逆算した値です。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="cfLearn">実績の売れ方に合わせる（直近8週）</button><button id="cfReset">最初の値に戻す</button></div><div id="cfMsg" class="msg"></div></div>
+  <div class="card"><h2>入力と評価の設定</h2><div class="fields">
+    <label class="field">チェックする時刻（カンマ区切り）<input type="text" id="cfH" value="${H.join(',')}"></label>
+    <label class="field">入力する売上<select id="cfTax"><option value="net" ${c.tax==='net'?'selected':''}>純売上（税抜）</option><option value="gross" ${c.tax==='gross'?'selected':''}>税込純売上</option></select></label>
+    <label class="field">目標客単価（円・空欄なら直近の月から）<input type="number" id="cfU" value="${isNum(c.unit)?c.unit:''}"></label>
+  </div><p class="muted small">日別予算と同じ基準（税抜か税込か）の売上を入れてください。日別予算は「データ取込」で日報から取り込んだ値を自動で使い、入力画面で上書きもできます。</p></div>`;
+}
+function bindSlCfg(){
+  const c=SL().cfg, msg=t=>{ const m=document.getElementById('cfMsg'); m.className='msg ok'; m.textContent=t; };
+  document.querySelectorAll('#v-slot input.cv').forEach(i=>i.onchange=()=>{ const v=parseNum(i.value); const k=i.dataset.k, h=i.dataset.h; c.curves[k]=c.curves[k]||{}; if(v==null) delete c.curves[k][h]; else c.curves[k][h]=Math.min(v,200)/100; save(); msg('保存しました。'); });
+  document.getElementById('cfH').onchange=e=>{ const a=[...new Set(e.target.value.split(/[,、\s]+/).map(Number).filter(n=>Number.isInteger(n)&&n>=0&&n<=29))].sort((a,b)=>a-b); if(!a.length){ alert('時刻を入れてください（例：18,19,20,21,22）'); return; } c.hours=a; save(); renderSlot(); };
+  document.getElementById('cfTax').onchange=e=>{ c.tax=e.target.value; save(); };
+  document.getElementById('cfU').onchange=e=>{ const v=parseNum(e.target.value); if(v>0) c.unit=v; else delete c.unit; save(); };
+  document.getElementById('cfReset').onclick=()=>{ if(!confirm('割合を最初の値に戻しますか？')) return; c.curves=JSON.parse(JSON.stringify(SL_CURVES0)); save(); renderSlot(); };
+  document.getElementById('cfLearn').onclick=()=>{
+    const from=shiftDate(monOf(TODAY),-56), acc={};
+    Object.keys(SL().days).forEach(ds=>{ if(ds<from) return; const d=slDay(ds,null); if(!d.closed||!(d.F>0)) return; const k=curveType(ds); d.pts.forEach(p=>{ if(!isNum(p.s)) return; acc[k]=acc[k]||{}; (acc[k][p.h]=acc[k][p.h]||[]).push(p.s/d.F); }); });
+    const done=[];
+    Object.keys(acc).forEach(k=>{ let ok=false; Object.keys(acc[k]).forEach(h=>{ const a=acc[k][h]; if(a.length>=2){ c.curves[k]=c.curves[k]||{}; c.curves[k][h]=Math.round(avg(a)*1000)/1000; ok=true; } }); if(ok) done.push(TYPEN[k]); });
+    if(!done.length){ alert('同じ曜日で日計まで入った日が2日以上ないため、まだ合わせられません。'); return; }
+    save(); renderSlot(); msg(done.join('・')+'の割合を実績に合わせました。');
+  };
+}
+
+/* 報告用画面（写真・スクリーンショット用） */
+function slReportHTML(W){
+  const st=S.settings, wk=SL().weeks[W.mon]||{};
+  return `<div class="rh1"><div><div class="muted">${esc(st.storeName||'')}</div><h1>週次 時間帯ノルマ報告</h1></div><div style="text-align:right"><div>${wkLabel(W.mon)}</div><div class="muted small">作成 ${TODAY.replace(/-/g,'/')}</div></div></div>
+   <div class="kpis">
+    ${kpi('週の売上',man(W.F)+'<small>円</small>',['予算 '+man(W.B), W.cl.length?'達成率 '+pct(W.ach):''])}
+    ${kpi('予算達成日',W.won+'<small>/'+W.cl.length+'日</small>',[])}
+    ${kpi('目安クリア',W.hitN+'<small>/'+W.hitT+'回</small>',[W.hitT?pct(W.hitN/W.hitT,0):''])}
+    ${kpi('点数',isNum(W.score)?W.score+'<small>点 '+W.grade+'</small>':'—',['客数 '+int(W.G)+'人・客単価 '+int(W.unit)+'円'])}
+   </div>
+   <p style="font-size:13.5px;line-height:1.65;margin:2px 0 8px">${weekLead(W)}</p>
+   ${slHeatHTML(W).replace(/<div class="muted small"[\s\S]*$/,'')}
+   <h3>未達の日と改善策</h3>
+   ${W.recs.length? W.recs.map(r=>{ const d=r.d, w=d.worst, c=causeOf(d.ge,d.ue); const parts=[]; if(w&&w.gap<0) parts.push(`崩れ ${w.label} ${signMan(w.gap)}`); if(c) parts.push(`原因 ${c==='unit'?'客単価 '+signInt(d.unitA-d.U,'円'):'客数 '+signInt(d.G-d.Gt,'人')}`); if(isNum(d.unitA)&&d.unitA>0) parts.push(`あと${Math.ceil(-d.gap/d.unitA)}人 か 1人+${int(Math.ceil(-d.gap/d.G/10)*10)}円で達成`); return `<div class="rr"><b>${r.title}</b>　${parts.join('／')}<br>→ ${esc(r.acts[0])}</div>`; }).join('') : '<div class="muted">未達の日はありません。</div>'}
+   <h3>来週の重点</h3>${slFocusHTML(W)}
+   ${wk.next?`<div class="fc-item"><div class="ft">店長の取り組み</div>${esc(wk.next)}</div>`:''}
+   <h3>店長コメント</h3><div class="cm">${esc(wk.comment||'')}</div>`;
+}
+function openReport(){
+  const W=slWeek(slWk), r=document.getElementById('rep');
+  r.innerHTML=`<div class="rbar"><button data-r="close">閉じる</button><span class="sp"></span><span class="muted small">この画面をスクリーンショット／撮影して報告</span><button data-r="print">印刷・PDF</button></div><div class="paper">${slReportHTML(W)}</div>`;
+  r.style.display='block'; r.scrollTop=0;
+  r.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.r==='close') r.style.display='none'; else if(b.dataset.r==='print'){ r.style.display='none'; doPrint(slReportHTML(W)); } };
+}
+
+/* 中間集計表（A4・レシートを貼る用紙） */
+function printSheet(){
+  const mon=slWk, W=slWeek(mon), H=SL().cfg.hours.slice().reverse(), st=S.settings;
+  const pm=shiftDate(mon,-7), pw=SL().weeks[pm]||{};
+  let memo=pw.next||'';
+  if(!memo){ const P=slWeek(pm); memo=P.focus.map(f=>f.short).join('　／　'); }
+  const tint=ds=>{ const w=dateObj(ds).getDay(); return HOL.has(ds)||w===0? '#f8e1dc' : w===6? '#dff0e4' : w===5? '#fbe6d6' : '#e3ebf5'; };
+  const col=d=>{ const B=d.B, bg=tint(d.ds);
+    return `<div class="ss-col"><div class="ss-top" style="background:${bg}"><div class="d">${dLabel(d.ds)}</div><div>日別予算：${isNum(B)?tg(B):'＿＿＿'}</div>
+      <div class="ss-lv">${[.6,.8,1].map(r=>`<div>${r*100}%<br>${isNum(B)?tg(Math.round(B*r/100)*100):''}<br>□</div>`).join('')}</div></div>
+      ${H.map(h=>{ const p=d.pts.find(x=>x.h===h); return `<div class="ss-cell"><div class="ct" style="background:${bg}">${h}:00　目安 ${p&&isNum(p.t)?tg(p.t):'＿＿'}</div><div class="pl">レシート貼付</div></div>`; }).join('')}</div>`; };
+  const page=(ds,i,n)=>`<div class="ssheet"><div class="ss-h"><span>売上中間集計表：${esc(st.storeName||'')}</span><span style="font-size:12px">${wkLabel(mon)}</span></div>
+    <div class="ss-memo"><span class="k">前回事項<br>（メモ）</span><span>${esc(memo)}</span></div>
+    <div class="ss-cols" style="grid-template-columns:repeat(${ds.length},1fr)">${ds.map(col).join('')}</div><div class="ss-f">${i}/${n}　数値マネージャー</div></div>`;
+  doPrint(page(W.days.slice(0,4),1,2)+page(W.days.slice(4),2,2));
+}
 
 /* ========== 印刷 ========== */
 function doPrint(html){

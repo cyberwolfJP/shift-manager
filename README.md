@@ -5,7 +5,8 @@ URL：https://cyberwolfjp.github.io/shift-manager/
 
 同じサイトに入っている別アプリ
 - 翌月予測マネージャー：https://cyberwolfjp.github.io/shift-manager/yosoku/
-- 数値マネージャー（売上進捗・経営診断・翌月見込み）：https://cyberwolfjp.github.io/shift-manager/suuchi/
+- 数値マネージャー（売上進捗・経営診断・翌月見込み・時間帯ノルマ）：https://cyberwolfjp.github.io/shift-manager/suuchi/
+  - 時間帯ノルマ：中間集計表（A4・レシート貼付用）の印刷、時刻ごとの実績入力、週の評価と改善コメント、写真で送れる報告用画面
 
 アプリの中の「マスタ → 使い方」にも同じ内容があります。
 
