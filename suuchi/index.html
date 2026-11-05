@@ -56,7 +56,6 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 80px}
 .row{display:flex;gap:14px;flex-wrap:wrap}
 .row>.card{flex:1 1 340px}
 .muted{color:var(--ink3);font-size:13px}
-.small{font-size:12.5px}
 .banner{background:#fff6e0;border:1px solid #f1d9a0;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .banner.info{background:#eef5fd;border-color:#cfe1f7}
 
@@ -290,6 +289,19 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
   .kpi .v{font-size:20px}
   .factor{grid-template-columns:80px 1fr 96px}
 }
+
+/* 商品分析 */
+.fdbar{display:flex;height:32px;border-radius:8px;overflow:hidden;font-size:13px;font-weight:600}
+.fdbar .f{background:#f6c3ab;color:#7a2f10;display:flex;align-items:center;padding-left:10px;white-space:nowrap}
+.fdbar .d{background:#b7d3f6;color:#0e3f78;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;white-space:nowrap}
+.stack{display:flex;height:28px;border-radius:8px;overflow:hidden;margin:4px 0 10px;font-size:12px;font-weight:600}
+.stack span{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#2b2a27}
+.hb{height:10px;background:var(--grid);border-radius:5px;overflow:hidden;min-width:60px}.hb span{display:block;height:100%;border-radius:5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media (max-width:760px){.two{grid-template-columns:1fr}}
+.two h3{font-size:14px;margin:0 0 4px}
+.up{color:#0a7a0a}.dn{color:var(--crit)}
+.rk{display:inline-block;font-size:11px;padding:1px 8px;border-radius:9px}.rk-A{background:#dff3e6;color:#0a6a2a}.rk-B{background:#e3eefb;color:#1d5aa6}.rk-C{background:#efeee9;color:var(--ink2)}
+.small{font-size:12.5px}
 </style>
 </head>
 <body>
@@ -307,6 +319,7 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
   <nav class="tabs" id="tabs">
     <button data-v="dash" class="on">ダッシュボード</button>
     <button data-v="diag">経営診断</button>
+    <button data-v="prod">商品分析</button>
     <button data-v="slot">時間帯ノルマ</button>
     <button data-v="list">月次一覧</button>
     <button data-v="fc">翌月見込み</button>
@@ -321,6 +334,7 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
   <section class="view" id="v-list"></section>
   <section class="view" id="v-fc"></section>
   <section class="view" id="v-diag"></section>
+  <section class="view" id="v-prod"></section>
   <section class="view" id="v-slot"></section>
   <section class="view" id="v-imp"></section>
   <section class="view" id="v-set"></section>
@@ -665,7 +679,7 @@ function render(){
   fillMonthSel();
   renderBanner();
   document.querySelector('.monthnav').style.visibility = view==='slot' ? 'hidden' : '';
-  const f = {dash:renderDash, list:renderList, fc:renderFc, diag:renderDiag, slot:renderSlot, imp:renderImp, set:renderSet}[view];
+  const f = {dash:renderDash, list:renderList, fc:renderFc, diag:renderDiag, prod:renderProd, slot:renderSlot, imp:renderImp, set:renderSet}[view];
   f();
 }
 function renderBanner(){
@@ -1187,6 +1201,7 @@ function diagHTML(M, print){
     let f=null; if(k===1&&A.fcT.recommended) f=A.fcT.methods[A.fcT.recommended].sales; else if(isNum(L.sales)&&isNum(yk)) f=L.sales*yk;
     out.push({T, ly:L.sales, si: isNum(L.sales)&&isNum(lyAvg)? L.sales/lyAvg:null, f, b:B.budget}); }
   h+=`<div class="card"><h2>この先3ヶ月の見通し</h2><table class="grid"><thead><tr><th>月</th><th>前年実績</th><th>季節の強さ</th><th>見込み</th><th>予算</th><th>予算との差</th></tr></thead><tbody>${out.map(o=>`<tr><td>${ymLabel(o.T)}</td><td>${man(o.ly)}</td><td>${isNum(o.si)? (o.si>=1.08?'<span class="st good"><i>↑</i>繁忙 ':o.si<=0.93?'<span class="st ser"><i>↓</i>閑散 ':'<span class="st">')+pct(o.si,0)+'</span>':'—'}</td><td>${man(o.f)}</td><td>${man(o.b)}</td><td>${isNum(o.f)&&isNum(o.b)? signYen(o.f-o.b):'—'}</td></tr>`).join('')}</tbody></table><p class="muted small" style="margin:6px 0 0">季節の強さ＝前年のその月の売上 ÷ 前年の月平均。2ヶ月目以降の見込みは前年実績 × 直近の前年比${isNum(yk)?'（'+pct(yk)+'）':''}。</p></div>`;
+  h+=prodDiagHTML(M, print);
   h+=`<p class="muted small">この診断は取り込んだ数値だけから自動で作成しています。金額の影響は概算です。</p>`;
   return h;
 }
@@ -2291,6 +2306,325 @@ function printForecast(){
    ${kpi('仕入れ',man(x.cost)+'<small>円</small>',['目標'+st.costTarget+'%なら '+man(x.costCap)])}</div>
    <div class="card"><h2>日別の見込み</h2>${tbl}</div>`);
 }
+
+/* ========== 商品分析（月の出数） ========== */
+const PROD=(function(){
+const CATS=['ドリンク','フード','その他'], PCATS=CATS;
+/* ---------- 読み取り ---------- */
+function z2h(s){return s.replace(/[０-９．，％：Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/　/g,' ').replace(/[￥]/g,'¥');}
+function guessCat(t){
+  if(/ドリンク|飲み物|飲|酒|ビール|ハイボール|サワー|ソーダ|ジュース|茶|コーラ|ワイン|焼酎|日本酒|カクテル|ウイスキー|ウーロン|ノンアル|梅酒|ワンカップ|ジョッキ|ホッピー|ハイ$|ジン/.test(t))return 'ドリンク';
+  if(/フード|料理|食|つまみ|たこ焼|焼き|揚|唐揚|ポテト|餃子|点心|小籠包|焼売|アイス|デザート|サラダ|丼|麺|ご飯|枝豆/.test(t))return 'フード';
+  return null;
+}
+const HEAD={name:/商品|品名|メニュー|名前|名称/,price:/売価|価格|値段|単価|売値/,cost:/原価(?!率)/,rate:/原価率/,time:/時間|作成|提供/,count:/出数|販売数|数量|個数|注文数|件数|点数/,amount:/金額|売上/,cat:/カテゴリ|分類|部門|種別/,genre:/ジャンル/};
+function numToken(tok){
+  const m=tok.match(/^(?:原価率|原価|売価)?[:：]?¥?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(円|分|秒|%|点|個|品|杯)?$/);
+  if(!m)return null;
+  const v=parseFloat(m[1].replace(/,/g,'')+(m[2]||''));
+  let u=m[3]||'';if(/^¥/.test(tok))u='円';
+  let kind=null;if(/^原価(?!率)/.test(tok))kind='cost';if(/^売価/.test(tok))kind='price';
+  return {v,u,kind};
+}
+function splitLine(line){
+  if(line.includes('\t'))return line.split('\t').map(s=>s.trim());
+  if(!/\s/.test(line.trim())&&(line.match(/,/g)||[]).length>=1&&!/\d,\d{3}/.test(line))return line.split(',').map(s=>s.trim().replace(/^"|"$/g,''));
+  if(/","/.test(line))return line.split(/","/).map(s=>s.replace(/^"|"$/g,'').trim());
+  return line.replace(/[・…\.]{2,}|[:：]/g,' ').split(/\s+|、/).map(s=>s.trim()).filter(Boolean);
+}
+function findHeader(cells){const hits={};cells.forEach((c,idx)=>{for(const k in HEAD){if(hits[k]===undefined&&HEAD[k].test(c)){if(k==='cost'&&HEAD.rate.test(c))continue;if(k==='price'&&HEAD.amount.test(c)&&!/単価/.test(c))continue;hits[k]=idx;break;}}});return hits;}
+
+function parseMenu(text){
+  const lines=z2h(text).split(/\r?\n/).filter(l=>l.trim());
+  const out=[];let map=null;let curCat=null;let curGenre=null;
+  lines.forEach((line,i)=>{
+    const cells=splitLine(line);
+    if(!map){const h=findHeader(cells);if(h.name!==undefined&&Object.keys(h).length>=2){map=h;return;}}
+    if(map){
+      const g=k=>map[k]!==undefined?cells[map[k]]:undefined;
+      const nv=k=>{const t=g(k);if(t===undefined||t==='')return undefined;return numToken(t.replace(/\s/g,''))||undefined;};
+      const name=(g('name')||'').trim();if(!name)return;
+      const it={name};
+      const p=nv('price');if(p)it.price=p.v;
+      const c=nv('cost');if(c)it.cost=c.v;
+      const r=nv('rate');if(r&&it.cost===undefined&&it.price)it.cost=Math.round(it.price*r.v/100);
+      const t=nv('time');if(t)it.time=t.u==='秒'?+(t.v/60).toFixed(2):t.v;
+      const n=nv('count');if(n)it.count=n.v;
+      const ct=g('cat');if(ct)it.cat=CATS.includes(ct)?ct:(guessCat(ct)||'その他');
+      const gn=g('genre');if(gn)it.genre=gn.trim();
+      out.push(it);return;
+    }
+    const nameParts=[];const nums=[];
+    cells.forEach(c=>{const n=numToken(c);if(n&&!/^(個|杯|点|品)$/.test(n.u))nums.push(n);else nameParts.push(c);});
+    if(!nums.length){
+      const h=line.replace(/[【】\[\]■●◆★☆<>＜＞《》「」]/g,'').trim();
+      if(h.length<=14){if(/^(ドリンク|フード|その他|飲み物|料理)$/.test(h)){curCat=guessCat(h)||'その他';curGenre=null;}else{curGenre=h;curCat=guessCat(h)||curCat;}}
+      return;
+    }
+    const name=nameParts.join(' ').trim();if(!name)return;
+    const it={name};let rate=null;const rest=[];
+    nums.forEach(n=>{
+      if(n.u==='%'){rate=n.v;return;}
+      if(n.u==='分'){it.time=n.v;return;}
+      if(n.u==='秒'){it.time=+(n.v/60).toFixed(2);return;}
+      if(n.kind){it[n.kind]=n.v;return;}
+      rest.push(n.v);
+    });
+    ['price','cost','count'].forEach(k=>{if(it[k]===undefined&&rest.length)it[k]=rest.shift();});
+    if(rate!==null&&it.cost===undefined&&it.price)it.cost=Math.round(it.price*rate/100);
+    it.cat=curCat||guessCat(name)||undefined;
+    if(curGenre)it.genre=curGenre;
+    out.push(it);
+  });
+  return out;
+}
+
+/* ---------- 出数の取り込み ---------- */
+function normName(s){return z2h(String(s)).toLowerCase().replace(/^[a-z]{1,2}\d{1,4}\s*/,'').replace(/[\s・\-ー_()（）「」【】\[\]"'.,、。!！?？]/g,'').replace(/円/g,'');}
+function matchItem(raw){
+  const n=normName(raw);if(!n)return null;
+  if(S.aliases[n]){const it=S.items.find(x=>x.id===S.aliases[n]);if(it)return it;}
+  const ex=S.items.find(x=>normName(x.name)===n);if(ex)return ex;
+  let best=null,bestScore=0,tie=false;
+  S.items.forEach(x=>{const m=normName(x.name);if(!m)return;let sc=0;
+    if(m.includes(n))sc=n.length/m.length;else if(n.includes(m))sc=m.length/n.length;
+    if(sc>bestScore){best=x;bestScore=sc;tie=false;}else if(sc&&sc===bestScore)tie=true;});
+  return best&&bestScore>=0.5&&!tie?best:null;
+}
+function parseCounts(text){
+  const lines=z2h(text).split(/\r?\n/).filter(l=>l.trim());
+  const out=[];let map=null;
+  lines.forEach(line=>{
+    const cells=splitLine(line);
+    if(!map){const h=findHeader(cells);if(h.name!==undefined&&h.count!==undefined){map=h;return;}}
+    if(map){const name=(cells[map.name]||'').trim();const t=numToken((cells[map.count]||'').replace(/\s/g,''));if(name&&t)out.push({raw:name,qty:t.v});return;}
+    let toks=cells.slice();
+    if(toks.length>2&&numToken(toks[0])&&!numToken(toks[1]))toks.shift();
+    const nameParts=[],nums=[];
+    const unitN=[];toks.forEach(t=>{if(/^[A-Za-z]{1,2}\d{1,4}$/.test(t))return;const n=numToken(t);if(n&&/^(個|杯|点|品)$/.test(n.u)){unitN.push(n);nameParts.push(t);}else if(n)nums.push(n);else nameParts.push(t);});
+    if(!nums.length&&unitN.length){nums.push(unitN.pop());nameParts.pop();}
+    const name=nameParts.join(' ').trim();if(!name||!nums.length)return;
+    const nonMoney=nums.filter(n=>n.u!=='円'&&n.u!=='%'&&n.u!=='分'&&n.u!=='秒');
+    if(!nonMoney.length)return;
+    let qty=nonMoney[0].v;
+    if(nonMoney.length>1){
+      const it=matchItem(name);const vals=nums.map(n=>n.v);
+      let found=null;
+      if(it&&+it.price>0){nonMoney.forEach(a=>{vals.forEach(b=>{if(b!==a.v&&Math.abs(a.v*it.price-b)<=Math.max(2,b*0.11))found=found??a.v;});});}
+      qty=found??Math.min(...nonMoney.map(n=>n.v));
+    }
+    out.push({raw:name,qty});
+  });
+  return out;
+}
+
+/* ---------- 商品分析：データ ---------- */
+function P(){ if(!S.items)S.items=[]; if(!S.counts)S.counts={}; if(!S.aliases)S.aliases={}; if(!isNum(S.settings.otoshi))S.settings.otoshi=0; if(!S.prodMemo)S.prodMemo={}; return S; }
+const isDrinkI=i=>i.cat==='ドリンク';
+function countsMonths(){ P(); return Object.keys(S.counts).filter(m=>Object.values(S.counts[m]||{}).some(v=>v>0)).sort(); }
+function itemStats(m){
+  P(); const c=S.counts[m]; if(!c) return null;
+  const r=getM(m); const G=isNum(r.guests)&&r.guests>0?r.guests:null;
+  const rows=S.items.map(i=>{const n=+(c[i.id]||0);const p=+i.price||0;return {i,c:n,p,s:n*p,or:G?n/G:null};}).filter(x=>x.c>0);
+  const sum={F:{s:0,c:0},D:{s:0,c:0},O:{s:0,c:0}}; const genres={};
+  rows.forEach(x=>{const k=x.i.cat==='ドリンク'?'D':x.i.cat==='フード'?'F':'O';sum[k].s+=x.s;sum[k].c+=x.c;const g=x.i.genre||'未設定';const o=genres[g]=genres[g]||{cat:x.i.cat,s:0,c:0};o.s+=x.s;o.c+=x.c;});
+  const total=sum.F.s+sum.D.s+sum.O.s, fd=sum.F.s+sum.D.s;
+  return {m,r,G,rows,sum,genres,total,noPrice:rows.filter(x=>!x.p).length,
+    fR:fd?sum.F.s/fd:null,dR:fd?sum.D.s/fd:null,fCR:(sum.F.c+sum.D.c)?sum.F.c/(sum.F.c+sum.D.c):null,
+    dPer:G?sum.D.c/G:null,fPer:G?sum.F.c/G:null,dUnit:G?sum.D.s/G:null,fUnit:G?sum.F.s/G:null,oUnit:G?sum.O.s/G:null,
+    avgD:sum.D.c?sum.D.s/sum.D.c:null,avgF:sum.F.c?sum.F.s/sum.F.c:null};
+}
+function prodMonth(){ const ms=countsMonths(); if(!ms.length) return null; if(ms.includes(cur)) return cur; return ms.filter(m=>m<=cur).pop()||null; }
+
+/* ---------- 商品分析：画面 ---------- */
+let prodSub='ana', pending=[], pendingM=null, orShowAll=false;
+function hb(v,max,color){ return `<div class="hb"><span style="width:${Math.max(0,Math.min(100,v/max*100))}%;background:${color}"></span></div>`; }
+function renderProd(){
+  P(); const el=document.getElementById('v-prod');
+  let h=`<div class="seg" style="margin-bottom:14px">${[['ana','分析'],['cnt','出数の取り込み'],['menu','メニュー（売価・ジャンル）']].map(([k,l])=>`<button data-ps="${k}" class="${prodSub===k?'on':''}">${l}</button>`).join('')}</div>`;
+  if(prodSub==='ana') h+=prodAnaHTML();
+  else if(prodSub==='cnt') h+=prodCntHTML();
+  else h+=prodMenuHTML();
+  el.innerHTML=h;
+  el.querySelectorAll('[data-ps]').forEach(b=>b.onclick=()=>{prodSub=b.dataset.ps;renderProd();});
+  bindProd(el);
+}
+function prodAnaHTML(){
+  if(!S.items.length) return `<div class="card"><h2>商品分析</h2><p class="muted">まずメニュー（商品名・売価・ジャンル）を登録し、月の出数を取り込んでください。売上・客数はこのアプリの日別データをそのまま使います。</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="primary" data-ps="menu">メニューを登録</button><button data-act="psample">サンプルで試す</button></div></div>`;
+  const m=prodMonth();
+  if(!m) return `<div class="card"><h2>商品分析</h2><p class="muted">${ymLabel(cur)}以前の出数がまだありません。POSの商品別販売数を取り込んでください。</p><button class="primary" data-ps="cnt">出数を取り込む</button></div>`;
+  const x=itemStats(m), r=x.r; let h='';
+  if(m!==cur) h+=`<div class="banner info">${ymLabel(cur)}の出数がまだないため、${ymLabel(m)}の出数で表示しています。</div>`;
+  if(!x.G) h+=`<div class="banner">${ymLabel(m)}の客数がないため、注文率と1人あたりの数値は出せません。「データ取込」で客数を取り込んでください。</div>`;
+  if(x.noPrice) h+=`<div class="banner">売価が入っていない商品が${x.noPrice}品あります。メニューで売価を入れると、売上・FD率が正しく出ます。</div>`;
+  const pm=countsMonths().filter(z=>z<m).pop(); const p=pm?itemStats(pm):null;
+  const dlt=(a,b,f)=>isNum(a)&&isNum(b)?`前月 ${f(b)}（${a-b>=0?'+':'−'}${f(Math.abs(a-b))}）`:'';
+  h+=`<div class="kpis">
+   ${kpi('1人あたりドリンク',isNum(x.dPer)?x.dPer.toFixed(2)+'<small>杯</small>':'—',[`月 ${int(x.sum.D.c)}杯`,p&&dlt(x.dPer,p.dPer,v=>v.toFixed(2)+'杯')])}
+   ${kpi('1人あたりフード',isNum(x.fPer)?x.fPer.toFixed(2)+'<small>品</small>':'—',[`月 ${int(x.sum.F.c)}品`,p&&dlt(x.fPer,p.fPer,v=>v.toFixed(2)+'品')])}
+   ${kpi('FD率（売上）',isNum(x.fR)?`${Math.round(x.fR*100)}<small>:</small>${100-Math.round(x.fR*100)}`:'—',['フード : ドリンク',p&&isNum(p.fR)?`前月 ${Math.round(p.fR*100)}:${100-Math.round(p.fR*100)}`:''])}
+   ${kpi('1杯の平均単価',yen(x.avgD),[p&&dlt(x.avgD,p.avgD,yen)])}
+   ${kpi('1品の平均単価',yen(x.avgF),[p&&dlt(x.avgF,p.avgF,yen)])}
+  </div>`;
+  h+=`<div class="card"><h2>FD率<span class="sub">${ymLabel(m)}</span></h2><div class="fdbar"><div class="f" style="width:${(x.fR||0)*100}%">フード ${pct(x.fR,0)}</div><div class="d" style="width:${(x.dR||0)*100}%">ドリンク ${pct(x.dR,0)}</div></div><p class="muted small" style="margin:6px 0 0">売上ベース F${Math.round(x.fR*100)} : D${Math.round(x.dR*100)}　／　出数ベース F${Math.round(x.fCR*100)} : D${100-Math.round(x.fCR*100)}。FD率は結果なので、客単価・1人あたりの杯数と必ずセットで見てください。</p></div>`;
+  if(x.G&&isNum(r.unit)){
+    const other=r.unit-x.dUnit-x.fUnit-x.oUnit;
+    const parts=[['ドリンク',x.dUnit,'#86b6ef'],['フード',x.fUnit,'#f2a27e'],...(x.oUnit>0.5?[['その他の商品',x.oUnit,'#b9b7b0']]:[]),['お通し・値引き・税など',other,'#dcdad4']];
+    h+=`<div class="card"><h2>客単価の中身<span class="sub">客単価 ${yen(r.unit)}</span></h2><div class="stack">${parts.filter(q=>q[1]>0).map(q=>`<span style="width:${q[1]/r.unit*100}%;background:${q[2]}">${q[1]/r.unit>0.12?esc(q[0]):''}</span>`).join('')}</div>
+    <table class="grid"><tbody>${parts.map(q=>`<tr><td><span class="sw" style="background:${q[2]}"></span> ${q[0]}</td><td>${yen(q[1])}</td><td>${pct(q[1]/r.unit)}</td><td>${p&&p.G&&q[0]==='ドリンク'?dlt(q[1],p.dUnit,yen):p&&p.G&&q[0]==='フード'?dlt(q[1],p.fUnit,yen):''}</td></tr>`).join('')}</tbody></table>
+    <p class="muted small" style="margin:6px 0 0">ドリンク・フード＝出数×売価÷客数。日報の客単価との差は、お通し・値引き・メニューにない売上・税の扱いの違いなどです。</p></div>`;
+  }
+  const gs=Object.entries(x.genres).sort((a,b)=>b[1].s-a[1].s); const mg=gs.length?gs[0][1].s:1;
+  const pg=p?p.genres:{};
+  h+=`<div class="card"><h2>ジャンル別</h2><div class="scrollx"><table class="grid"><thead><tr><th>ジャンル</th><th>区分</th><th>売上</th><th>構成比</th><th></th><th>出数</th><th>注文率</th>${p&&p.G?'<th>前月比</th>':''}</tr></thead><tbody>${gs.map(([n,g])=>{const q=pg[n];const d=p&&p.G&&x.G&&q?g.c/x.G-q.c/p.G:null;return `<tr><td>${esc(n)}</td><td>${esc(g.cat)}</td><td>${yen(g.s)}</td><td>${pct(g.s/x.total)}</td><td style="width:20%">${hb(g.s,mg,g.cat==='ドリンク'?'#86b6ef':'#f2a27e')}</td><td>${int(g.c)}</td><td>${x.G?pct(g.c/x.G):'—'}</td>${p&&p.G?`<td class="${d>0?'up':d<0?'dn':''}">${isNum(d)?(d>=0?'+':'−')+Math.abs(d*100).toFixed(1)+'pt':'—'}</td>`:''}</tr>`;}).join('')}</tbody></table></div><p class="muted small" style="margin:6px 0 0">注文率＝出数÷客数（100人のうち何回注文されたか）。客数の増減に左右されないので、月ごとの比較に向いています。</p></div>`;
+  const genresList=[...new Set(S.items.map(i=>i.genre).filter(Boolean))];
+  h+=`<div class="card"><h2>商品別の注文率</h2><div style="margin-bottom:8px"><select id="orF"><option value="">すべて</option><option>ドリンク</option><option>フード</option>${genresList.map(g=>`<option>${esc(g)}</option>`).join('')}</select></div><div class="scrollx"><table class="grid"><thead><tr><th>#</th><th style="text-align:left">商品名</th><th style="text-align:left">ジャンル</th><th>出数</th><th>注文率</th><th>売上</th><th>売上構成比</th></tr></thead><tbody id="orB"></tbody></table></div><button id="orMore" style="margin-top:8px" hidden></button></div>`;
+  const ranked=[...x.rows].sort((a,b)=>b.s-a.s); let cum=0; const cnt={A:0,B:0,C:0};
+  const rk=ranked.map((y,k)=>{cum+=y.s;const pc=x.total?cum/x.total:1;const g=pc<=0.7||k===0?'A':pc<=0.9?'B':'C';cnt[g]++;return {...y,pc,g};});
+  h+=`<div class="card"><h2>売上ランキング（ABC）</h2><p class="muted small" style="margin:0 0 8px">売上の7割を作るAランクが${cnt.A}品、Bランクが${cnt.B}品、残り1割のCランクが${cnt.C}品。Aランクは欠品や品質の低下が売上に直結します。Cランクは仕込みの手間とロスを見直す候補です。</p><div class="scrollx tbl-wrap"><table class="grid"><thead><tr><th>#</th><th style="text-align:left">商品名</th><th style="text-align:left">ジャンル</th><th>売上</th><th>構成比</th><th>累計</th><th>ランク</th><th>出数</th></tr></thead><tbody>${rk.map((y,k)=>`<tr><td>${k+1}</td><td style="text-align:left">${esc(y.i.name)}</td><td style="text-align:left">${esc(y.i.genre||'')}</td><td>${yen(y.s)}</td><td>${pct(y.s/x.total)}</td><td>${pct(y.pc)}</td><td><span class="rk rk-${y.g}">${y.g}</span></td><td>${int(y.c)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  if(p){
+    const useOr=x.G&&p.G; const pmap={}; p.rows.forEach(y=>pmap[y.i.id]=y);
+    const diffs=S.items.map(i=>{const a=x.rows.find(y=>y.i.id===i.id),b=pmap[i.id];if(!a&&!b)return null;const ca=a?a.c:0,cb=b?b.c:0;const oa=useOr?ca/x.G:ca,ob=useOr?cb/p.G:cb;return {i,d:oa-ob,oa,ob,gain:(ca-(useOr?ob*x.G:cb))*(+i.price||0)};}).filter(Boolean);
+    const up=[...diffs].sort((a,b)=>b.d-a.d).filter(y=>y.d>0).slice(0,10), dn=[...diffs].sort((a,b)=>a.d-b.d).filter(y=>y.d<0).slice(0,10);
+    const f=v=>useOr?(v*100).toFixed(1)+'%':int(v), fd=v=>useOr?(v>=0?'+':'−')+Math.abs(v*100).toFixed(1)+'pt':(v>=0?'+':'−')+int(Math.abs(v));
+    const t=(list,c)=>list.length?`<table class="grid"><thead><tr><th>商品名</th><th>${ymLabel(pm,true)}</th><th>${ymLabel(m,true)}</th><th>差</th><th>売上への影響</th></tr></thead><tbody>${list.map(y=>`<tr><td>${esc(y.i.name)}</td><td>${f(y.ob)}</td><td>${f(y.oa)}</td><td class="${c}">${fd(y.d)}</td><td>${useOr?signYen(y.gain):'—'}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">該当なし</p>';
+    const memo=(S.prodMemo||{})[m];
+    h+=`<div class="card"><h2>伸びた商品・落ちた商品<span class="sub">${ymLabel(pm)} → ${ymLabel(m)}</span></h2><p class="muted small" style="margin:0 0 8px">${useOr?'注文率':'出数'}で比べています。「売上への影響」は、客数が同じだった場合に注文率の変化で増減した売上の目安です。</p>
+    <div class="field" style="margin-bottom:10px">この月にやった販促（POP・おすすめなど）<input type="text" id="prodMemo" value="${esc(memo||'')}" placeholder="例：レモンサワーのPOPを全卓に設置"></div>
+    <div class="two"><div><h3 class="up">伸びた</h3><div class="scrollx">${t(up,'up')}</div></div><div><h3 class="dn">落ちた</h3><div class="scrollx">${t(dn,'dn')}</div></div></div></div>`;
+  }
+  if(isNum(r.sales)&&x.total){
+    const diff=r.sales-x.total, ot=+S.settings.otoshi||0, otE=isNum(r.guests)?r.guests*ot:0, rest=diff-otE;
+    h+=`<div class="card"><h2>売上との照合<span class="sub">${ymLabel(m)}</span></h2><table class="grid"><tbody>
+     <tr><td>日報の売上</td><td>${yen(r.sales)}</td></tr><tr><td>出数 × 売価の合計</td><td>${yen(x.total)}</td></tr>
+     <tr><td>差額</td><td>${yen(diff)}（${pct(diff/r.sales)}）</td></tr>
+     <tr><td>お通しの想定（客数 ${int(r.guests)}人 × ${yen(ot)}）</td><td>${ot?yen(otE):'<span class="muted">設定で金額を入力</span>'}</td></tr>
+     <tr class="tot"><td>残り（値引き・税の扱い・取り込み漏れなど）</td><td>${yen(rest)}（${pct(rest/r.sales)}）</td></tr></tbody></table>
+     <p class="muted small" style="margin:6px 0 0">${!r.complete?'日報が月の途中までなので、月の出数とは期間がずれています。':Math.abs(rest)/r.sales>0.05?'残りが売上の5%を超えています。売上と売価の税込・税抜がそろっているか、出数の取り込み漏れ、メニューにない商品、値引きの増加を確認してください。':'差額はお通し・値引きの範囲に収まっています。'}</p>
+     <div class="field" style="max-width:200px;margin-top:8px">お通し（1人あたり）<input type="number" id="otoshiIn" value="${ot||''}"></div></div>`;
+  }
+  return h;
+}
+function prodCntHTML(){
+  const ms=countsMonths();
+  let h=`<div class="card"><h2>月の商品出数を貼り付ける</h2><p class="muted small" style="margin:0 0 8px">POSの商品別販売数をそのまま貼り付けてください。商品名と数量を読み取り、メニューと自動で結びつけます。金額や商品コードの列、見出しの行があっても大丈夫です。同じ月を貼り直すと上書きされます。</p>
+  <div class="fields" style="margin-bottom:8px"><label class="field">対象の月<input type="month" id="cntM" value="${cur}"></label></div>
+  <textarea id="cntT" rows="9" style="width:100%" placeholder="例）
+ハイボール 2,140
+唐揚げ 3個	290	113,100"></textarea>
+  <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="primary" id="cntGo">取り込む</button><span id="cntMsg" class="msg"></span></div><div id="pend"></div></div>`;
+  h+=`<div class="card"><h2>取り込み済みの月</h2>${ms.length?`<table class="grid"><thead><tr><th>月</th><th>商品数</th><th>総出数</th><th>出数×売価</th><th></th></tr></thead><tbody>${ms.slice().reverse().map(m=>{const x=itemStats(m);return `<tr><td>${ymLabel(m)}</td><td>${x.rows.length}</td><td>${int(x.rows.reduce((a,y)=>a+y.c,0))}</td><td>${yen(x.total)}</td><td><button class="ghost" data-delc="${m}">削除</button></td></tr>`;}).join('')}</tbody></table>`:'<p class="muted">まだありません</p>'}</div>`;
+  return h;
+}
+function prodMenuHTML(){
+  const gl=[...new Set(S.items.map(i=>i.genre).filter(Boolean))];
+  let h=`<div class="card"><h2>メニューを貼り付けて登録</h2><p class="muted small" style="margin:0 0 8px">1行に「商品名 売価」。【ジャンル名】の行で、その下の商品のジャンルが決まります（【フード】【ドリンク】は区分）。売価は日報の売上と同じ基準（税込か税抜）にそろえてください。同じ商品名は売価とジャンルだけ更新されます。</p>
+  <textarea id="menuT" rows="8" style="width:100%" placeholder="【ドリンク】
+【ハイボール】
+ハイボール 450円
+【フード】
+【揚げ物】
+唐揚げ 3個 390円"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="primary" id="menuGo">読み取って登録</button><span id="menuMsg" class="msg"></span></div></div>`;
+  h+=`<div class="card"><h2>登録済みのメニュー<span class="sub">${S.items.length}品</span></h2><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap"><input type="text" id="mF" placeholder="商品名・ジャンルで絞り込み"><button id="mAdd">1品追加</button></div><datalist id="gList">${gl.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+  <div class="scrollx tbl-wrap"><table class="grid mtbl"><thead><tr><th>商品名</th><th>区分</th><th>ジャンル</th><th>売価</th><th></th></tr></thead><tbody id="mB"></tbody></table></div></div>`;
+  return h;
+}
+function drawMenuRows(){
+  const q=(document.getElementById('mF').value||'').trim();
+  document.getElementById('mB').innerHTML=S.items.filter(i=>!q||i.name.includes(q)||(i.genre||'').includes(q)).map(i=>`<tr data-id="${i.id}"><td><input type="text" data-k="name" value="${esc(i.name)}" style="width:190px"></td><td><select data-k="cat">${PCATS.map(c=>`<option${c===i.cat?' selected':''}>${c}</option>`).join('')}</select></td><td><input type="text" data-k="genre" list="gList" value="${esc(i.genre||'')}" style="width:110px"></td><td><input type="number" data-k="price" value="${i.price??''}" style="width:90px"></td><td><button class="ghost" data-del="${i.id}">削除</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">商品がありません</td></tr>';
+}
+function bindProd(el){
+  el.querySelectorAll('[data-act="psample"]').forEach(b=>b.onclick=()=>{prodSample();});
+  const orF=document.getElementById('orF');
+  if(orF){const m=prodMonth();const x=itemStats(m);orShowAll=false;
+    const draw=()=>{const f=orF.value;const all=x.rows.filter(y=>!f||y.i.cat===f||y.i.genre===f).sort((a,b)=>b.c-a.c);const list=orShowAll?all:all.slice(0,30);
+      document.getElementById('orB').innerHTML=list.map((y,k)=>`<tr><td>${k+1}</td><td style="text-align:left">${esc(y.i.name)}</td><td style="text-align:left">${esc(y.i.genre||'')}</td><td>${int(y.c)}</td><td>${x.G?pct(y.or):'—'}</td><td>${yen(y.s)}</td><td>${pct(y.s/x.total)}</td></tr>`).join('');
+      const mb=document.getElementById('orMore');mb.hidden=orShowAll||all.length<=30;mb.textContent=`残り${all.length-30}品も表示`;};
+    orF.onchange=draw;document.getElementById('orMore').onclick=()=>{orShowAll=true;draw();};draw();}
+  const pmemo=document.getElementById('prodMemo'); if(pmemo) pmemo.onchange=()=>{S.prodMemo[prodMonth()]=pmemo.value.trim();save();};
+  const oi=document.getElementById('otoshiIn'); if(oi) oi.onchange=()=>{S.settings.otoshi=+oi.value||0;save();renderProd();};
+  const cg=document.getElementById('cntGo');
+  if(cg){cg.onclick=()=>{const m=document.getElementById('cntM').value;const msg=document.getElementById('cntMsg');
+      if(!m){msg.className='msg ng';msg.textContent='対象の月を選んでください';return;}
+      if(!S.items.length){msg.className='msg ng';msg.textContent='先にメニューを登録してください';return;}
+      const rows=parseCounts(document.getElementById('cntT').value);
+      if(!rows.length){msg.className='msg ng';msg.textContent='読み取れる行がありませんでした。商品名と数字が1行に入っているか確認してください';return;}
+      if(S.counts[m]&&!confirm(ymLabel(m)+'の出数はすでにあります。上書きしますか？'))return;
+      const c=S.counts[m]={};pending=[];pendingM=m;let ok=0;
+      rows.forEach(r=>{const it=matchItem(r.raw);if(it){c[it.id]=(c[it.id]||0)+r.qty;ok++;}else pending.push(r);});
+      save();renderProd();const m2=document.getElementById('cntMsg');m2.className='msg ok';m2.textContent=`${ymLabel(m)}：${rows.length}行を読み取り、${ok}行を商品に結びつけました${pending.length?`。${pending.length}行は下で割り当ててください`:''}`;};
+    drawPending();
+    el.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>{if(!confirm(ymLabel(b.dataset.delc)+'の出数を削除しますか？'))return;delete S.counts[b.dataset.delc];save();renderProd();});}
+  const mg=document.getElementById('menuGo');
+  if(mg){mg.onclick=()=>{const list=parseMenu(document.getElementById('menuT').value);let add=0,upd=0;
+      list.forEach(p=>{let it=S.items.find(x=>x.name===p.name);if(it){upd++;if(p.cat)it.cat=p.cat;if(p.genre)it.genre=p.genre;}else{it={id:Math.random().toString(36).slice(2,10),name:p.name,cat:p.cat||'その他',genre:p.genre||'',price:null};S.items.push(it);add++;}if(p.price!==undefined)it.price=p.price;});
+      save();renderProd();const m=document.getElementById('menuMsg');m.className=list.length?'msg ok':'msg ng';m.textContent=list.length?`${list.length}件を読み取りました（追加 ${add}件・更新 ${upd}件）`:'読み取れる行がありませんでした';};
+    drawMenuRows();document.getElementById('mF').oninput=drawMenuRows;
+    document.getElementById('mAdd').onclick=()=>{S.items.unshift({id:Math.random().toString(36).slice(2,10),name:'新しい商品',cat:'フード',genre:'',price:null});save();drawMenuRows();};
+    const mb=document.getElementById('mB');
+    mb.onchange=e=>{const k=e.target.dataset.k;if(!k)return;const it=S.items.find(x=>x.id===e.target.closest('tr').dataset.id);if(!it)return;it[k]=k==='price'?(e.target.value===''?null:+e.target.value):e.target.value;save();};
+    mb.onclick=e=>{const id=e.target.dataset.del;if(!id)return;const it=S.items.find(x=>x.id===id);if(!confirm(`「${it.name}」を削除しますか？`))return;S.items=S.items.filter(x=>x.id!==id);save();drawMenuRows();};}
+}
+function drawPending(){
+  const el=document.getElementById('pend'); if(!el) return;
+  if(!pending.length){el.innerHTML='';return;}
+  const opts=[...S.items].sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('');
+  el.innerHTML=`<h3 style="margin:14px 0 4px;font-size:14px">商品と結びつかなかった行（${pending.length}件）</h3><p class="muted small" style="margin:0 0 6px">どの商品か選んで「反映」を押すと、次回から自動で結びつきます。</p><div class="scrollx"><table class="grid"><thead><tr><th>貼り付けた名前</th><th>出数</th><th>割り当て先</th></tr></thead><tbody>${pending.map((p,i)=>`<tr><td>${esc(p.raw)}</td><td>${int(p.qty)}</td><td><select data-pi="${i}"><option value="">無視する</option><option value="__new">新しい商品として追加</option>${opts}</select></td></tr>`).join('')}</tbody></table></div><button class="primary" id="pendGo" style="margin-top:8px">反映</button>`;
+  document.getElementById('pendGo').onclick=()=>{const c=S.counts[pendingM];let n=0;
+    el.querySelectorAll('[data-pi]').forEach(s=>{const p=pending[+s.dataset.pi];const v=s.value;if(!v)return;let it;
+      if(v==='__new'){const cat=guessCat(p.raw)||'フード';it={id:Math.random().toString(36).slice(2,10),name:p.raw,cat,genre:'',price:null};S.items.push(it);}
+      else{it=S.items.find(x=>x.id===v);S.aliases[normName(p.raw)]=v;}
+      if(it){c[it.id]=(c[it.id]||0)+p.qty;n++;}});
+    pending=[];save();renderProd();const m=document.getElementById('cntMsg');m.className='msg ok';m.textContent=`${n}件を反映しました`;};
+}
+
+/* ---------- 経営診断に入れる商品の所見 ---------- */
+function prodDiagHTML(M, print){
+  P(); if(!countsMonths().includes(M)) return '';
+  const x=itemStats(M); if(!x||!x.total) return '';
+  const pm=countsMonths().filter(z=>z<M).pop(); const p=pm?itemStats(pm):null;
+  const L=[]; const add=(c,ic,t)=>L.push(`<li><span class="st ${c}"><i>${ic}</i></span><span>${t}</span></li>`);
+  add('good','i',`FD率は F${Math.round(x.fR*100)} : D${Math.round(x.dR*100)}${p&&isNum(p.fR)?`（前月 F${Math.round(p.fR*100)} : D${Math.round(p.dR*100)}）`:''}。`);
+  if(isNum(x.dPer)){
+    if(p&&isNum(p.dPer)){const d=x.dPer-p.dPer;add(d>=0?'good':'bad',d>=0?'↑':'↓',`1人あたりドリンク ${x.dPer.toFixed(2)}杯（前月比 ${d>=0?'+':'−'}${Math.abs(d).toFixed(2)}杯、月の売上に換算して約${signYen(d*x.G*(x.avgD||0))}）。`);}
+    else add('good','i',`1人あたりドリンク ${x.dPer.toFixed(2)}杯・フード ${x.fPer.toFixed(2)}品。`);
+  }
+  if(p&&isNum(x.fPer)&&isNum(p.fPer)){const d=x.fPer-p.fPer;add(d>=0?'good':'bad',d>=0?'↑':'↓',`1人あたりフード ${x.fPer.toFixed(2)}品（前月比 ${d>=0?'+':'−'}${Math.abs(d).toFixed(2)}品）。`);}
+  if(p&&isNum(x.dPer)&&isNum(p.dPer)&&isNum(x.fPer)&&isNum(p.fPer)){
+    if(x.dR>p.dR&&x.fPer<p.fPer) add('ser','!','ドリンク構成比は上がりましたが、フードの注文が減ったことによる上昇です。ドリンクが進むつまみ（揚げ物・塩気のあるもの）の提案を強めてください。');
+    else if(x.dPer<p.dPer) add('ser','!','1人あたりの杯数が落ちています。2杯目以降の声かけと、ドリンクが進むフードの提案を見直してください。');
+  }
+  if(p&&x.G&&p.G){const pmap={};p.rows.forEach(y=>pmap[y.i.id]=y);
+    const ds=x.rows.map(y=>{const b=pmap[y.i.id];return {y,d:y.c/x.G-(b?b.c/p.G:0)};}).sort((a,b)=>b.d-a.d);
+    const up=ds.filter(z=>z.d>0).slice(0,3).map(z=>z.y.i.name), dn=ds.slice().reverse().filter(z=>z.d<0).slice(0,3).map(z=>z.y.i.name);
+    if(up.length) add('good','↑',`注文率が伸びた商品：${esc(up.join('、'))}。${(S.prodMemo||{})[M]?'この月の販促：'+esc(S.prodMemo[M])+'。':''}`);
+    if(dn.length) add('ser','↓',`注文率が落ちた商品：${esc(dn.join('、'))}。品切れ・提供の遅れ・メニューの見せ方を確認してください。`);
+  }
+  return `<div class="card"><h2>商品・注文の所見<span class="sub">月の出数から</span></h2><ul class="evals">${L.join('')}</ul>${print?'':'<button style="margin-top:8px" onclick="goView(\'prod\')">商品分析を開く</button>'}</div>`;
+}
+
+/* ---------- サンプル ---------- */
+function prodSample(){
+  const ms=allYMs().filter(m=>getM(m).complete).slice(-3);
+  if(!ms.length){ if(confirm('売上・客数のデータがないため、先に全体のサンプルデータを入れます。よろしいですか？')){ loadSample(); } else return; }
+  const ms2=allYMs().filter(m=>getM(m).complete).slice(-3); if(!ms2.length) return;
+  if(!S.items.length){
+    const menu=[['ドリンク','ハイボール','ハイボール',450,30],['ドリンク','ハイボール','メガハイボール',750,4],['ドリンク','ハイボール','ジンジャーハイボール',500,6],['ドリンク','サワー','レモンサワー',420,14],['ドリンク','サワー','ウーロンハイ',450,6],['ドリンク','サワー','緑茶ハイ',450,4],['ドリンク','ビール','生ビール',550,10],['ドリンク','その他の酒','梅酒',450,2],['ドリンク','その他の酒','日本酒 1合',500,2],['ドリンク','ソフトドリンク','烏龍茶',350,4],['ドリンク','ソフトドリンク','コーラ',350,2],
+      ['フード','とりあえず','枝豆',350,9],['フード','とりあえず','冷やしトマト',380,3],['フード','とりあえず','ポテトサラダ',480,4],['フード','揚げ物','唐揚げ 3個',390,8],['フード','揚げ物','フライドポテト',430,6],['フード','揚げ物','ハムカツ',450,4],['フード','粉もの','たこ焼 6個',520,12],['フード','逸品','もつ煮',500,6],['フード','逸品','水餃子',500,4],['フード','点心','焼売 3個',390,3],['フード','デザート','アイス',300,1.5]];
+    S.items=menu.map(([cat,genre,name,price,w])=>({id:Math.random().toString(36).slice(2,10),name,cat,genre,price,_w:w}));
+  }
+  let seed=11; const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  ms2.forEach((m,k)=>{const r=getM(m); const base=S.items.reduce((a,i)=>a+(i._w||3)*(+i.price||0),0);
+    const target=(r.sales-(r.guests||0)*(+S.settings.otoshi||0))*0.92; const f=target/base; const c=S.counts[m]={};
+    S.items.forEach(i=>{let w=(i._w||3)*(0.92+rnd()*0.16); if(k===ms2.length-1&&/レモンサワー|水餃子/.test(i.name))w*=1.3; if(k===ms2.length-1&&/枝豆/.test(i.name))w*=0.85; const n=Math.round(w*f); if(n>0)c[i.id]=n;});
+    if(k===ms2.length-1) S.prodMemo[m]='レモンサワーと水餃子のPOPを設置（サンプル）';});
+  S.items.forEach(i=>delete i._w);
+  save(); cur=ms2[ms2.length-1]; prodSub='ana'; render();
+}
+return {renderProd, prodDiagHTML, prodSample};
+
+})();
+const renderProd=PROD.renderProd, prodDiagHTML=PROD.prodDiagHTML, prodSample=PROD.prodSample;
 
 /* ========== サンプル ========== */
 function loadSample(){
