@@ -225,7 +225,7 @@ summary.sum2{font-size:15px;color:var(--ink)}
 .sdh{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .sdh .dt{font-size:17px}
 .sdh .dt.sat{color:#2a78d6}.sdh .dt.sun{color:var(--crit)}
-.sdh input{width:110px;text-align:right}
+.sdh input{width:96px;text-align:right}
 .lvls{font-size:12px;color:var(--ink2)}
 table.sin td,table.sin th{padding:4px 5px}
 table.sin input{width:100%;min-width:62px;text-align:right;padding:6px 7px}
@@ -1749,7 +1749,9 @@ function SL(){
   if(!Array.isArray(c.hours)||!c.hours.length) c.hours=[18,19,20,21,22];
   if(!c.curves) c.curves=JSON.parse(JSON.stringify(SL_CURVES0));
   if(!c.tax) c.tax='net';
-  d.days=d.days||{}; d.weeks=d.weeks||{};
+  if(!c.gcurves) c.gcurves=JSON.parse(JSON.stringify(c.curves));
+  if(c.gsame==null) c.gsame=true;
+  d.days=d.days||{}; d.weeks=d.weeks||{}; d.months=d.months||{};
   return d;
 }
 const WDJ=['日','月','火','水','木','金','土'];
@@ -1769,6 +1771,7 @@ function sumOf(arr, f){ let s=0, n=0; arr.forEach(x=>{ const v=f(x); if(isNum(v)
 function salesLabel(){ return SL().cfg.tax==='gross' ? '税込純売上' : '純売上'; }
 
 function slBudget(ds){ const sd=SL().days[ds]; if(sd&&isNum(sd.budget)) return sd.budget; const d=S.days[ds]; return d&&isNum(d.budget)? d.budget : null; }
+function slGb(ds){ const sd=SL().days[ds]; return sd&&isNum(sd.gb)? sd.gb : null; }
 function slFin(ds){ const f=(SL().days[ds]||{}).fin||{}, d=S.days[ds]||{}; return {s:isNum(f.s)?f.s:n0(d.sales), g:n0(f.g), c:isNum(f.c)?f.c:n0(d.guests)}; }
 // 目標客単価：設定 → 直近の締まった月の客単価
 function slUnit(mon){
@@ -1809,26 +1812,28 @@ const SL_ACT = {
 };
 function actsFor(band, cause, k=2){ return (SL_ACT[band]||SL_ACT.peak)[cause==='unit'?'unit':'guest'].slice(0,k); }
 
-function slDay(ds, U){
-  const L=SL(), H=L.cfg.hours, cv=L.cfg.curves[curveType(ds)]||{}, sd=L.days[ds]||{}, hh=sd.h||{};
-  const B=slBudget(ds);
-  const pts=H.map(h=>{ const a=hh[h]||{}, r=cv[h]; return {h, r, t:isNum(B)&&isNum(r)? Math.round(B*r/100)*100 : null, s:n0(a.s), g:n0(a.g), c:n0(a.c)}; });
-  const mk=(from,to,t,a,ga)=>({from,to,t,a,ga,label:segLabel(from,to),band:bandOf(to)});
-  const segs=[]; let pT=0, pS=0, pC=0, from=null;
-  pts.forEach(p=>{ segs.push(mk(from,p.h, isNum(p.t)&&isNum(pT)?p.t-pT:null, isNum(p.s)&&isNum(pS)?p.s-pS:null, isNum(p.c)&&isNum(pC)?p.c-pC:null)); pT=p.t; pS=p.s; pC=p.c; from=p.h; });
+function slDay(ds, U0){
+  const L=SL(), c=L.cfg, H=c.hours, ty=curveType(ds), cv=c.curves[ty]||{}, gv=(c.gsame? c.curves[ty] : c.gcurves[ty])||{}, sd=L.days[ds]||{}, hh=sd.h||{};
+  const B=slBudget(ds), Gb=slGb(ds);
+  const U = isNum(B)&&isNum(Gb)&&Gb>0? B/Gb : U0;   // 稼働予算があればその日の目標客単価＝予算÷稼働予算
+  const pts=H.map(h=>{ const a=hh[h]||{}, r=cv[h], gr=gv[h]; return {h, r, t:isNum(B)&&isNum(r)? Math.round(B*r/100)*100 : null, gt:isNum(Gb)&&isNum(gr)? Math.round(Gb*gr) : null, s:n0(a.s), g:n0(a.g), c:n0(a.c)}; });
+  const df=(x,y)=>isNum(x)&&isNum(y)? x-y : null;
+  const mk=(from,to,t,gt,a,ga)=>({from,to,t,gt,a,ga,label:segLabel(from,to),band:bandOf(to)});
+  const segs=[]; let pT=0, pG=0, pS=0, pC=0, from=null;
+  pts.forEach(p=>{ segs.push(mk(from,p.h, df(p.t,pT), df(p.gt,pG), df(p.s,pS), df(p.c,pC))); pT=p.t; pG=p.gt; pS=p.s; pC=p.c; from=p.h; });
   const fin=slFin(ds);
-  segs.push(mk(from,'close', isNum(B)&&isNum(pT)?B-pT:null, isNum(fin.s)&&isNum(pS)?fin.s-pS:null, isNum(fin.c)&&isNum(pC)?fin.c-pC:null));
-  segs.forEach(s=>{ s.gap=isNum(s.t)&&isNum(s.a)? s.a-s.t : null; if(isNum(U)&&isNum(s.gap)&&isNum(s.ga)){ s.ge=(s.ga-s.t/U)*U; s.ue=s.a-s.ga*U; } });
+  segs.push(mk(from,'close', df(B,pT), df(Gb,pG), df(fin.s,pS), df(fin.c,pC)));
+  segs.forEach(s=>{ s.gap=df(s.a,s.t); if(isNum(U)&&isNum(s.gap)&&isNum(s.ga)){ const gt=isNum(s.gt)? s.gt : s.t/U; s.ge=(s.ga-gt)*U; s.ue=s.gap-s.ge; } });
   const lastP=[...pts].reverse().find(p=>isNum(p.s));
   const closed=isNum(fin.s);
-  const d={ds, B, pts, segs, fin, closed, has:!!lastP||closed, U, memo:sd.memo||''};
+  const d={ds, B, Gb, pts, segs, fin, closed, has:!!lastP||closed, U, memo:sd.memo||''};
   d.F = closed? fin.s : (lastP? lastP.s : null);
   d.G = closed? fin.c : (lastP? lastP.c : null);
   d.Gr = closed? fin.g : (lastP? lastP.g : null);
   d.ach = closed? ratio(d.F,B) : null;
   d.gap = closed&&isNum(B)? d.F-B : null;
   d.unitA = ratio(d.F,d.G);
-  if(closed&&isNum(B)&&isNum(U)&&isNum(d.G)&&d.G>0){ d.Gt=B/U; d.ge=(d.G-d.Gt)*U; d.ue=d.F-d.G*U; }
+  if(closed&&isNum(B)&&isNum(U)&&isNum(d.G)&&d.G>0){ d.Gt=isNum(Gb)? Gb : B/U; d.ge=(d.G-d.Gt)*U; d.ue=d.gap-d.ge; }
   d.hits = pts.filter(p=>isNum(p.s)&&isNum(p.t)&&p.t>0).map(p=>p.s>=p.t);
   const sg=segs.filter(s=>isNum(s.gap));
   d.worst = sg.reduce((m,s)=>!m||s.gap<m.gap? s:m, null);
@@ -1842,11 +1847,13 @@ function slWeek(mon){
   let days=weekDays(mon).map(ds=>slDay(ds,U));
   if(!isNum(U)){ const F=sumOf(days.filter(d=>d.closed&&isNum(d.G)),d=>d.F), G=sumOf(days.filter(d=>d.closed),d=>d.G);
     if(isNum(F)&&G>0){ U=Math.round(F/G); usrc='今週の客単価（目標客単価が未設定のため）'; days=weekDays(mon).map(ds=>slDay(ds,U)); } }
+  const gbd=days.filter(d=>isNum(d.Gb)&&d.Gb>0&&isNum(d.B));
+  if(gbd.length){ U=Math.round(sumOf(gbd,d=>d.B)/sumOf(gbd,d=>d.Gb)); usrc='日別予算÷稼働予算'; }
   const W={mon, days, U, usrc};
   const cl=days.filter(d=>d.closed&&isNum(d.B));
   W.cl=cl; W.B=sumOf(cl,d=>d.B); W.F=sumOf(cl,d=>d.F); W.Ball=sumOf(days,d=>d.B); W.ach=ratio(W.F,W.B);
   const cg=cl.filter(d=>isNum(d.G)); W.G=sumOf(cg,d=>d.G); W.unit=ratio(sumOf(cg,d=>d.F),W.G);
-  W.Gr=sumOf(cl,d=>d.Gr); W.won=cl.filter(d=>d.F>=d.B).length;
+  W.Gr=sumOf(cl,d=>d.Gr); W.Gb=sumOf(cl,d=>d.Gb); W.won=cl.filter(d=>d.F>=d.B).length;
   const hits=days.flatMap(d=>d.hits); W.hitN=hits.filter(Boolean).length; W.hitT=hits.length;
   W.ge=sumOf(cl,d=>d.ge); W.ue=sumOf(cl,d=>d.ue);
   // 時間帯ごとの週合計
@@ -1876,7 +1883,7 @@ function slWeek(mon){
     let cause=null;
     if(isNum(d.ge)){
       cause=causeOf(d.ge,d.ue);
-      lines.push(`客数 ${int(d.G)}人（予算に必要な目安 ${int(d.Gt)}人、${signInt(d.G-d.Gt,'人')}）、客単価 ${int(d.unitA)}円（目標 ${int(d.U)}円、${signInt(d.unitA-d.U,'円')}）。主な原因は<b>${cause==='unit'?'客単価':'客数'}</b>（客数で${signMan(d.ge)}、客単価で${signMan(d.ue)}）。`);
+      lines.push(`客数 ${int(d.G)}人（${isNum(d.Gb)?'稼働予算':'予算に必要な目安'} ${int(d.Gt)}人、${signInt(d.G-d.Gt,'人')}）、客単価 ${int(d.unitA)}円（目標 ${int(d.U)}円${isNum(d.Gb)?'＝予算÷稼働予算':''}、${signInt(d.unitA-d.U,'円')}）。主な原因は<b>${cause==='unit'?'客単価':'客数'}</b>（客数で${signMan(d.ge)}、客単価で${signMan(d.ue)}）。`);
     }
     const how=[];
     if(isNum(d.unitA)&&d.unitA>0) how.push(`あと<b>${Math.ceil(-d.gap/d.unitA)}人</b>来店（今の客単価のまま）`);
@@ -1940,7 +1947,7 @@ function renderSlot(){
   const el=document.getElementById('v-slot');
   const W=slWeek(slWk);
   const head=`<div class="card"><div class="slbar">
-    <div class="seg">${[['in','実績の入力'],['ev','週の評価'],['cfg','配分・設定']].map(([k,l])=>`<button data-sm="${k}" class="${slMode===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="seg">${[['in','実績の入力'],['ev','週の評価'],['bud','月の予算'],['cfg','配分・設定']].map(([k,l])=>`<button data-sm="${k}" class="${slMode===k?'on':''}">${l}</button>`).join('')}</div>
     <div class="wknav"><button data-wk="-7" aria-label="前の週">◀</button><select id="wSel" aria-label="週">${slWeekOptions().map(m=>`<option value="${m}" ${m===slWk?'selected':''}>${wkLabel(m)}${m===monOf(TODAY)?'（今週）':''}</option>`).join('')}</select><button data-wk="7" aria-label="次の週">▶</button></div>
     <span class="sp"></span>
     <button class="primary" data-act="rep">報告用画面</button>
@@ -1949,10 +1956,12 @@ function renderSlot(){
   let body='';
   if(slMode==='in') body=slInputHTML(W);
   else if(slMode==='ev') body=slEvalHTML(W);
+  else if(slMode==='bud') body=slBudHTML();
   else body=slCfgHTML();
   el.innerHTML=head+body;
   if(slMode==='ev') bindSlEval();
   if(slMode==='cfg') bindSlCfg();
+  if(slMode==='bud') bindSlBud();
 }
 document.getElementById('v-slot').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
@@ -1980,6 +1989,7 @@ function slSet(ds,h,f,v){
   const L=SL(); const sd=L.days[ds]=L.days[ds]||{};
   const put=(o,k)=>{ if(v==null||v==='') delete o[k]; else o[k]=v; };
   if(f==='budget') put(sd,'budget');
+  else if(f==='gb') put(sd,'gb');
   else if(f==='memo') put(sd,'memo');
   else if(h==='fin'){ sd.fin=sd.fin||{}; put(sd.fin,f); if(!Object.keys(sd.fin).length) delete sd.fin; }
   else { sd.h=sd.h||{}; sd.h[h]=sd.h[h]||{}; put(sd.h[h],f); if(!Object.keys(sd.h[h]).length) delete sd.h[h]; if(!Object.keys(sd.h).length) delete sd.h; }
@@ -1987,9 +1997,10 @@ function slSet(ds,h,f,v){
   save();
 }
 function inpS(ds,h,f,v,ph){ return `<input class="si" data-ds="${ds}" data-h="${h}" data-f="${f}" inputmode="numeric" autocomplete="off" value="${isNum(v)?v:''}" placeholder="${ph!=null?esc(ph):''}">`; }
-function slRes(s,t){ return isNum(s)&&isNum(t)&&t>0? `${hcell(s/t)} <span class="small muted">${signMan(s-t)}</span>` : ''; }
+function slRes(s,t,c,gt){ return isNum(s)&&isNum(t)&&t>0? `${hcell(s/t)} <span class="small muted">${signMan(s-t)}</span>${isNum(c)&&isNum(gt)?`<div class="small muted">客数 ${signInt(c-gt,'人')}</div>`:''}` : ''; }
+function tgCell(t,gt){ return tg(t)+(isNum(gt)?`<div class="small muted">${int(gt)}人</div>`:''); }
 function slDayHead(d){
-  const B=d.B; const lv=isNum(B)? `<span class="lvls">60% ${man(B*.6)}／80% ${man(B*.8)}／100% ${man(B)}</span>` : '<span class="lvls" style="color:var(--crit)">日別予算を入れてください</span>';
+  const B=d.B; const lv=isNum(B)? `<span class="lvls">60% ${tg(B*.6)}／80% ${tg(B*.8)}／100% ${tg(B)}${isNum(d.Gb)?`　稼働 ${int(d.Gb)}人・客単価目標 ${int(d.U)}円`:''}</span>` : '<span class="lvls" style="color:var(--crit)">日別予算がありません（「月の予算」で貼り付け）</span>';
   const st = d.closed&&isNum(B)? `${hcell(d.ach)} <span class="small">${lvMark(d.ach)}ライン ${signMan(d.gap)}</span>` : (d.has? '<span class="small muted">日計の入力待ち</span>' : '');
   return `${lv} <span id="st-${d.ds}">${st}</span>`;
 }
@@ -1999,10 +2010,10 @@ function slDayCard(d){
   const daySales = S.days[ds]&&isNum(S.days[ds].sales)? S.days[ds].sales : null;
   let rows='';
   d.pts.forEach(p=>{ const a=hh[p.h]||{};
-    rows+=`<tr><td>${p.h}:00</td><td id="t-${ds}-${p.h}">${tg(p.t)}</td><td class="w1">${inpS(ds,p.h,'s',a.s)}</td><td class="w2">${inpS(ds,p.h,'g',a.g)}</td><td class="w2">${inpS(ds,p.h,'c',a.c)}</td><td id="r-${ds}-${p.h}">${slRes(p.s,p.t)}</td></tr>`; });
-  rows+=`<tr class="tot"><td>日計</td><td id="t-${ds}-fin">${isNum(d.B)?man(d.B):'—'}</td><td class="w1">${inpS(ds,'fin','s',f.s, daySales!=null?int(daySales)+'（取込）':'閉店時')}</td><td class="w2">${inpS(ds,'fin','g',f.g)}</td><td class="w2">${inpS(ds,'fin','c',f.c, S.days[ds]&&isNum(S.days[ds].guests)?S.days[ds].guests:'')}</td><td id="r-${ds}-fin">${d.closed?slRes(d.F,d.B):''}</td></tr>`;
+    rows+=`<tr><td>${p.h}:00</td><td id="t-${ds}-${p.h}">${tgCell(p.t,p.gt)}</td><td class="w1">${inpS(ds,p.h,'s',a.s)}</td><td class="w2">${inpS(ds,p.h,'g',a.g)}</td><td class="w2">${inpS(ds,p.h,'c',a.c)}</td><td id="r-${ds}-${p.h}">${slRes(p.s,p.t,p.c,p.gt)}</td></tr>`; });
+  rows+=`<tr class="tot"><td>日計</td><td id="t-${ds}-fin">${tgCell(d.B,d.Gb)}</td><td class="w1">${inpS(ds,'fin','s',f.s, daySales!=null?int(daySales)+'（取込）':'閉店時')}</td><td class="w2">${inpS(ds,'fin','g',f.g)}</td><td class="w2">${inpS(ds,'fin','c',f.c, S.days[ds]&&isNum(S.days[ds].guests)?S.days[ds].guests:'')}</td><td id="r-${ds}-fin">${d.closed?slRes(d.F,d.B,d.G,d.Gb):''}</td></tr>`;
   return `<div class="card sday" id="sd-${ds}"><div class="sdh"><span class="dt ${dw===6?'sat':(dw===0||HOL.has(ds)?'sun':'')}">${dLabel(ds)}</span>${curveNote(ds)?`<span class="cat">${curveNote(ds)}</span>`:''}
-    <label class="small muted" style="display:flex;align-items:center;gap:6px">日別予算 ${inpS(ds,'budget','budget',sd.budget,bPh)}</label></div>
+    <label class="small muted" style="display:flex;align-items:center;gap:6px">日別予算 ${inpS(ds,'budget','budget',sd.budget,bPh)}</label><label class="small muted" style="display:flex;align-items:center;gap:6px">稼働予算 ${inpS(ds,'gb','gb',sd.gb)}</label></div>
     <div class="sdh" id="sh-${ds}">${slDayHead(d)}</div>
     <table class="grid sin"><thead><tr><th>時刻</th><th>目安</th><th>${salesLabel()}</th><th>組数</th><th>来客数</th><th>目安比</th></tr></thead><tbody>${rows}</tbody></table>
     <div style="margin-top:8px"><input class="si" data-ds="${ds}" data-h="memo" data-f="memo" style="width:100%" placeholder="メモ（天気・団体・イベント・人員など）" value="${esc(sd.memo||'')}"></div></div>`;
@@ -2017,8 +2028,8 @@ function slInputHTML(W){
 }
 function slRefresh(ds){
   const W=slWeek(slWk), d=W.days.find(x=>x.ds===ds); if(!d) return;
-  d.pts.forEach(p=>{ const t=document.getElementById(`t-${ds}-${p.h}`), r=document.getElementById(`r-${ds}-${p.h}`); if(t) t.innerHTML=tg(p.t); if(r) r.innerHTML=slRes(p.s,p.t); });
-  const tf=document.getElementById(`t-${ds}-fin`), rf=document.getElementById(`r-${ds}-fin`); if(tf) tf.innerHTML=isNum(d.B)?man(d.B):'—'; if(rf) rf.innerHTML=d.closed?slRes(d.F,d.B):'';
+  d.pts.forEach(p=>{ const t=document.getElementById(`t-${ds}-${p.h}`), r=document.getElementById(`r-${ds}-${p.h}`); if(t) t.innerHTML=tgCell(p.t,p.gt); if(r) r.innerHTML=slRes(p.s,p.t,p.c,p.gt); });
+  const tf=document.getElementById(`t-${ds}-fin`), rf=document.getElementById(`r-${ds}-fin`); if(tf) tf.innerHTML=tgCell(d.B,d.Gb); if(rf) rf.innerHTML=d.closed?slRes(d.F,d.B,d.G,d.Gb):'';
   const sh=document.getElementById('sh-'+ds); if(sh) sh.innerHTML=slDayHead(d);
   const mi=document.getElementById('slMini'); if(mi) mi.innerHTML=slMiniHTML(W);
 }
@@ -2027,10 +2038,10 @@ function slHeatHTML(W){
   const H=SL().cfg.hours;
   let h=`<div class="scrollx"><table class="grid heat"><thead><tr><th>日付</th><th>予算</th>${H.map(x=>`<th>${x}時</th>`).join('')}<th>日計</th><th>達成</th><th>客数</th><th>客単価</th></tr></thead><tbody>`;
   W.days.forEach(d=>{
-    h+=`<tr><td>${dLabel(d.ds)}</td><td>${man(d.B)}</td>${d.pts.map(p=>`<td>${isNum(p.s)&&isNum(p.t)&&p.t>0?hcell(p.s/p.t,0):'<span class="hc n">—</span>'}</td>`).join('')}<td>${d.closed?man(d.F):'—'}</td><td>${d.closed?hcell(d.ach):'<span class="hc n">—</span>'}</td><td>${int(d.G)}</td><td>${int(d.unitA)}</td></tr>`;
+    h+=`<tr><td>${dLabel(d.ds)}</td><td>${man(d.B)}</td>${d.pts.map(p=>`<td>${isNum(p.s)&&isNum(p.t)&&p.t>0?hcell(p.s/p.t,0):'<span class="hc n">—</span>'}</td>`).join('')}<td>${d.closed?man(d.F):'—'}</td><td>${d.closed?hcell(d.ach):'<span class="hc n">—</span>'}</td><td>${int(d.G)}${isNum(d.Gb)?'<span class="muted small">/'+int(d.Gb)+'</span>':''}</td><td>${int(d.unitA)}</td></tr>`;
   });
-  h+=`<tr class="tot"><td>週計</td><td>${man(W.B)}</td>${H.map(()=>'<td></td>').join('')}<td>${man(W.F)}</td><td>${W.cl.length?hcell(W.ach):'—'}</td><td>${int(W.G)}</td><td>${int(W.unit)}</td></tr></tbody></table></div>
-  <div class="muted small" style="margin-top:6px">時刻の列は、その時刻の目安（累計）に対する達成率。緑＝目安クリア、黄＝90%以上、赤＝90%未満。予算・日計の週計は日計が入った日だけ。</div>`;
+  h+=`<tr class="tot"><td>週計</td><td>${man(W.B)}</td>${H.map(()=>'<td></td>').join('')}<td>${man(W.F)}</td><td>${W.cl.length?hcell(W.ach):'—'}</td><td>${int(W.G)}${isNum(W.Gb)?'<span class="muted small">/'+int(W.Gb)+'</span>':''}</td><td>${int(W.unit)}</td></tr></tbody></table></div>
+  <div class="muted small" style="margin-top:6px">時刻の列は、その時刻の目安（累計）に対する達成率。緑＝目安クリア、黄＝90%以上、赤＝90%未満。客数の「/」の右は稼働予算。予算・日計の週計は日計が入った日だけ。</div>`;
   return h;
 }
 function slBandHTML(W){
@@ -2077,35 +2088,134 @@ function bindSlEval(){
 /* 配分・設定 */
 function slCfgHTML(){
   const c=SL().cfg, H=c.hours, order=[1,2,3,4,5,6,0,7];
-  let t=`<div class="scrollx"><table class="grid ctbl"><thead><tr><th>曜日</th>${H.map(h=>`<th>${h}:00まで</th>`).join('')}</tr></thead><tbody>`;
-  order.forEach(k=>{ const cv=c.curves[k]||{}; t+=`<tr><td>${TYPEN[k]}</td>${H.map(h=>`<td><input class="cv" data-k="${k}" data-h="${h}" inputmode="decimal" value="${isNum(cv[h])?+(cv[h]*100).toFixed(1):''}">%</td>`).join('')}</tr>`; });
-  t+='</tbody></table></div>';
-  return `<div class="card"><h2>時刻ごとの目安の割合<span class="sub">日別予算のうち、その時刻までに売れていてほしい割合（累計）</span></h2>${t}
-    <p class="muted small">祝前日（平日・日曜）は金曜、祝日は「祝日」の行を使います。初期値は中間集計表（10/19週）の目安から逆算した値です。</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="cfLearn">実績の売れ方に合わせる（直近8週）</button><button id="cfReset">最初の値に戻す</button></div><div id="cfMsg" class="msg"></div></div>
+  const tbl=(cls,key)=>{ let t=`<div class="scrollx"><table class="grid ctbl"><thead><tr><th>曜日</th>${H.map(h=>`<th>${h}:00まで</th>`).join('')}</tr></thead><tbody>`;
+    order.forEach(k=>{ const cv=c[key][k]||{}; t+=`<tr><td>${TYPEN[k]}</td>${H.map(h=>`<td><input class="${cls}" data-k="${k}" data-h="${h}" inputmode="decimal" value="${isNum(cv[h])?+(cv[h]*100).toFixed(1):''}">%</td>`).join('')}</tr>`; });
+    return t+'</tbody></table></div>'; };
+  return `<div class="banner info">ここで入れた割合はこの端末に保存され、変えるまで毎週・毎月そのまま使われます。月ごとに入れるのは「月の予算」だけです。</div>
+  <div class="card"><h2>売上：時刻ごとの目安の割合<span class="sub">日別予算のうち、その時刻までに売れていてほしい割合（累計）</span></h2>${tbl('cv','curves')}
+    <p class="muted small">祝前日（平日・日曜）は金曜、祝日は「祝日」の行を使います。初期値は中間集計表（10/19週）の目安から逆算した値です。</p></div>
+  <div class="card"><h2>稼働（客数）：時刻ごとの目安の割合<span class="sub">稼働予算のうち、その時刻までに入っていてほしい人数の割合（累計）</span></h2>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" id="cfGs" ${c.gsame?'checked':''}> 売上と同じ割合を使う</label>
+    ${c.gsame?'<p class="muted small" style="margin:0">チェックを外すと、稼働だけ別の割合を入れられます（来店は売上より早く入るので、別にすると目安が正確になります）。</p>':tbl('gcv','gcurves')}</div>
+  <div class="card"><h2>実績から作り直す</h2><p class="muted small" style="margin-top:0">直近8週の実績（日計まで入った日）の売れ方・入り方の平均で、上の割合を書き換えます。押さない限り割合は変わりません。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="cfLearn">実績の売れ方に合わせる</button><button id="cfReset">最初の値に戻す</button></div><div id="cfMsg" class="msg"></div></div>
   <div class="card"><h2>入力と評価の設定</h2><div class="fields">
     <label class="field">チェックする時刻（カンマ区切り）<input type="text" id="cfH" value="${H.join(',')}"></label>
     <label class="field">入力する売上<select id="cfTax"><option value="net" ${c.tax==='net'?'selected':''}>純売上（税抜）</option><option value="gross" ${c.tax==='gross'?'selected':''}>税込純売上</option></select></label>
-    <label class="field">目標客単価（円・空欄なら直近の月から）<input type="number" id="cfU" value="${isNum(c.unit)?c.unit:''}"></label>
-  </div><p class="muted small">日別予算と同じ基準（税抜か税込か）の売上を入れてください。日別予算は「データ取込」で日報から取り込んだ値を自動で使い、入力画面で上書きもできます。</p></div>`;
+    <label class="field">目標客単価（稼働予算がない日に使う）<input type="number" id="cfU" value="${isNum(c.unit)?c.unit:''}" placeholder="空欄なら直近の月"></label>
+  </div><p class="muted small">日別予算と同じ基準（税抜か税込か）の売上を入れてください。</p></div>`;
 }
 function bindSlCfg(){
   const c=SL().cfg, msg=t=>{ const m=document.getElementById('cfMsg'); m.className='msg ok'; m.textContent=t; };
-  document.querySelectorAll('#v-slot input.cv').forEach(i=>i.onchange=()=>{ const v=parseNum(i.value); const k=i.dataset.k, h=i.dataset.h; c.curves[k]=c.curves[k]||{}; if(v==null) delete c.curves[k][h]; else c.curves[k][h]=Math.min(v,200)/100; save(); msg('保存しました。'); });
+  const bindT=(cls,key)=>document.querySelectorAll('#v-slot input.'+cls).forEach(i=>i.onchange=()=>{ const v=parseNum(i.value); const k=i.dataset.k, h=i.dataset.h; c[key][k]=c[key][k]||{}; if(v==null) delete c[key][k][h]; else c[key][k][h]=Math.min(v,200)/100; save(); msg('保存しました。次に変えるまでこの割合を使います。'); });
+  bindT('cv','curves'); bindT('gcv','gcurves');
+  document.getElementById('cfGs').onchange=e=>{ c.gsame=e.target.checked; if(!c.gsame&&!c.gcustom){ c.gcurves=JSON.parse(JSON.stringify(c.curves)); c.gcustom=true; } save(); renderSlot(); };
   document.getElementById('cfH').onchange=e=>{ const a=[...new Set(e.target.value.split(/[,、\s]+/).map(Number).filter(n=>Number.isInteger(n)&&n>=0&&n<=29))].sort((a,b)=>a-b); if(!a.length){ alert('時刻を入れてください（例：18,19,20,21,22）'); return; } c.hours=a; save(); renderSlot(); };
   document.getElementById('cfTax').onchange=e=>{ c.tax=e.target.value; save(); };
   document.getElementById('cfU').onchange=e=>{ const v=parseNum(e.target.value); if(v>0) c.unit=v; else delete c.unit; save(); };
-  document.getElementById('cfReset').onclick=()=>{ if(!confirm('割合を最初の値に戻しますか？')) return; c.curves=JSON.parse(JSON.stringify(SL_CURVES0)); save(); renderSlot(); };
+  document.getElementById('cfReset').onclick=()=>{ if(!confirm('割合を最初の値に戻しますか？')) return; c.curves=JSON.parse(JSON.stringify(SL_CURVES0)); c.gcurves=JSON.parse(JSON.stringify(SL_CURVES0)); save(); renderSlot(); };
   document.getElementById('cfLearn').onclick=()=>{
-    const from=shiftDate(monOf(TODAY),-56), acc={};
-    Object.keys(SL().days).forEach(ds=>{ if(ds<from) return; const d=slDay(ds,null); if(!d.closed||!(d.F>0)) return; const k=curveType(ds); d.pts.forEach(p=>{ if(!isNum(p.s)) return; acc[k]=acc[k]||{}; (acc[k][p.h]=acc[k][p.h]||[]).push(p.s/d.F); }); });
-    const done=[];
-    Object.keys(acc).forEach(k=>{ let ok=false; Object.keys(acc[k]).forEach(h=>{ const a=acc[k][h]; if(a.length>=2){ c.curves[k]=c.curves[k]||{}; c.curves[k][h]=Math.round(avg(a)*1000)/1000; ok=true; } }); if(ok) done.push(TYPEN[k]); });
-    if(!done.length){ alert('同じ曜日で日計まで入った日が2日以上ないため、まだ合わせられません。'); return; }
-    save(); renderSlot(); msg(done.join('・')+'の割合を実績に合わせました。');
+    const from=shiftDate(monOf(TODAY),-56), acc={s:{},c:{}};
+    Object.keys(SL().days).forEach(ds=>{ if(ds<from) return; const d=slDay(ds,null); if(!d.closed||!(d.F>0)) return; const k=curveType(ds);
+      d.pts.forEach(p=>{ if(isNum(p.s)){ acc.s[k]=acc.s[k]||{}; (acc.s[k][p.h]=acc.s[k][p.h]||[]).push(p.s/d.F); }
+        if(isNum(p.c)&&d.G>0){ acc.c[k]=acc.c[k]||{}; (acc.c[k][p.h]=acc.c[k][p.h]||[]).push(p.c/d.G); } }); });
+    const apply=(A,key)=>{ const done=[]; Object.keys(A).forEach(k=>{ let ok=false; Object.keys(A[k]).forEach(h=>{ const a=A[k][h]; if(a.length>=2){ c[key][k]=c[key][k]||{}; c[key][k][h]=Math.round(avg(a)*1000)/1000; ok=true; } }); if(ok) done.push(TYPEN[k]); }); return done; };
+    const has=Object.values(acc.s).some(o=>Object.values(o).some(a=>a.length>=2));
+    if(!has){ alert('同じ曜日で日計まで入った日が2日以上ないため、まだ合わせられません。'); return; }
+    if(!confirm('今の割合を、直近8週の実績の平均で書き換えます。よろしいですか？')) return;
+    const d1=apply(acc.s,'curves'); if(!c.gsame) apply(acc.c,'gcurves');
+    save(); renderSlot(); msg(d1.join('・')+'の割合を実績に合わせました。');
   };
 }
 
+/* 月の予算（月1回の貼り付け） */
+let slBudYM=null, slBudRes=null;
+function slParseBlock(text, ym){
+  const out={}; let lines=String(text||'').replace(/\r\n?/g,'\n').split('\n');
+  while(lines.length&&!lines[lines.length-1].trim()) lines.pop();
+  while(lines.length&&!lines[0].trim()) lines.shift();
+  if(!lines.length) return out;
+  const ctx={year:Number(ym.slice(0,4)), month:ym, lastM:Number(ym.slice(5))};
+  const rows=lines.map(l=>{ const cells=(l.includes('\t')? l.split('\t') : l.trim().split(/\s+/)).map(x=>x.trim());
+    let date=null; const nums=[]; let first=true;
+    cells.forEach(c=>{ if(!c) return;
+      if(first&&cells.filter(Boolean).length>=2){ first=false; const p=parseDateCell(c,ctx); if(p&&p.kind==='day'&&validKey(p)&&p.key.startsWith(ym)){ date=p.key; return; } }
+      first=false; const v=parseNum(c); if(v!=null) nums.push(v); });
+    return {date, nums, blank:!l.trim()}; });
+  if(rows.some(r=>r.date)) rows.forEach(r=>{ if(r.date&&r.nums.length) out[r.date]=r.nums; });
+  else { let i=0; rows.forEach(r=>{ if(r.blank){ i++; return; } if(!r.nums.length) return; i++; if(i<=dim(ym)) out[ym+'-'+pad(i)]=r.nums; }); }
+  return out;
+}
+function slBudParse(){
+  const ym=slBudYM, a=slParseBlock(document.getElementById('bdS').value, ym), b=slParseBlock(document.getElementById('bdG').value, ym);
+  const res={ym, rows:{}, notes:[]};
+  let bv=Object.values(a).map(n=>n[0]).filter(isNum);
+  const isMan = bv.length && bv.every(v=>v<10000);
+  if(isMan) res.notes.push('売上予算は「万円」として読みました（例：57 → 570,000円）。');
+  for(let d=1; d<=dim(ym); d++){ const ds=ym+'-'+pad(d), r={};
+    if(a[ds]){ let v=a[ds][0]; if(isNum(v)) r.b=isMan? Math.round(v*10000) : v;
+      const g2=a[ds][1]; if(isNum(g2)&&isNum(r.b)&&g2<3000&&r.b/g2>300) r.g=g2; }
+    if(b[ds]&&isNum(b[ds][0])) r.g=b[ds][0];
+    if(Object.keys(r).length) res.rows[ds]=r; }
+  const n=Object.keys(res.rows).length, nb=Object.values(res.rows).filter(r=>isNum(r.b)).length, ng=Object.values(res.rows).filter(r=>isNum(r.g)).length;
+  res.nb=nb; res.ng=ng;
+  if(n && Object.keys(a).length>dim(ym)) res.notes.push('行数が月の日数より多いため、はみ出した分は使いません。');
+  slBudRes=res; return res;
+}
+function slBudStatus(){
+  const L=SL(); let h='<table class="grid"><thead><tr><th>月</th><th>日別予算</th><th>稼働予算</th><th>月の合計</th><th>貼り付けた日</th></tr></thead><tbody>';
+  for(let i=-2;i<=3;i++){ const ym=addMonth(TODAY_YM,i); let nb=0, ng=0, sb=0, sg=0;
+    for(let d=1; d<=dim(ym); d++){ const ds=ym+'-'+pad(d), b=slBudget(ds), g=slGb(ds); if(isNum(b)){nb++; sb+=b;} if(isNum(g)){ng++; sg+=g;} }
+    const m=L.months[ym];
+    h+=`<tr class="click" data-bym="${ym}"><td>${ymLabel(ym)}${ym===slBudYM?' ◀':''}</td><td>${nb?nb+'日':'—'}</td><td>${ng?ng+'日':'—'}</td><td>${nb?man(sb):''}${ng?' / '+int(sg)+'人':''}</td><td class="muted">${m&&m.at?new Date(m.at).toLocaleDateString('ja-JP'):''}</td></tr>`; }
+  return h+'</tbody></table>';
+}
+function slBudHTML(){
+  if(!slBudYM) slBudYM = Number(TODAY.slice(8))>=20? addMonth(TODAY_YM,1) : TODAY_YM;
+  const opts=[]; for(let i=-3;i<=3;i++){ const ym=addMonth(TODAY_YM,i); opts.push(`<option value="${ym}" ${ym===slBudYM?'selected':''}>${ymLabel(ym)}</option>`); }
+  return `<div class="card"><h2>月の予算を貼り付け<span class="sub">月に1回。日別予算と稼働予算を、それぞれコピーした列のまま貼るだけ</span></h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><label class="field" style="flex-direction:row;align-items:center;gap:8px">貼り付ける月 <select id="bdYM">${opts.join('')}</select></label></div>
+    <div class="note-grid">
+      <label class="field">日別予算（売上）<textarea id="bdS" rows="9" placeholder="1日から順に1行1日で貼り付け&#10;例）&#10;570000&#10;550000&#10;…&#10;&#10;日付つき（11/1 570000）や、予算と稼働の2列でもOK"></textarea></label>
+      <label class="field">稼働予算（客数）<textarea id="bdG" rows="9" placeholder="1日から順に1行1日で貼り付け&#10;例）&#10;113&#10;108&#10;…"></textarea></label>
+    </div>
+    <div id="bdPrev" style="margin-top:10px"></div></div>
+  <div class="card"><h2>貼り付けの状況<span class="sub">月を押すとその月に切り替わります</span></h2>${slBudStatus()}
+    <p class="muted small">日別予算を貼っていない日は、「データ取込」で日報から取り込んだ予算を使います。休業日は空行のままでOKです。</p></div>`;
+}
+function slBudPreview(){
+  const r=slBudParse(), el=document.getElementById('bdPrev');
+  if(!Object.keys(r.rows).length){ el.innerHTML='<div class="muted small">貼り付けると、ここに読み取った内容が出ます。</div>'; return; }
+  let t=`<div class="confirm"><div class="ch">${ymLabel(r.ym)}：日別予算 ${r.nb}日分・稼働予算 ${r.ng}日分を読み取りました</div>${r.notes.map(n=>`<div class="small muted">${n}</div>`).join('')}
+    <div class="preview"><table><thead><tr><th>日付</th><th>日別予算</th><th>稼働予算</th><th>客単価目標</th><th>今の値</th></tr></thead><tbody>`;
+  let sb=0, sg=0;
+  for(let d=1; d<=dim(r.ym); d++){ const ds=r.ym+'-'+pad(d), x=r.rows[ds]||{}; if(isNum(x.b)) sb+=x.b; if(isNum(x.g)) sg+=x.g;
+    const ob=slBudget(ds), og=slGb(ds);
+    t+=`<tr><td>${dLabel(ds)}</td><td style="text-align:right">${isNum(x.b)?int(x.b):'<span class="muted">—</span>'}</td><td style="text-align:right">${isNum(x.g)?int(x.g):'<span class="muted">—</span>'}</td><td style="text-align:right">${isNum(x.b)&&x.g>0?int(x.b/x.g):''}</td><td class="muted" style="text-align:right">${isNum(ob)?int(ob):''}${isNum(og)?' / '+og+'人':''}</td></tr>`; }
+  t+=`<tr><td>合計</td><td style="text-align:right">${int(sb)}</td><td style="text-align:right">${int(sg)}</td><td style="text-align:right">${sg>0?int(sb/sg):''}</td><td></td></tr></tbody></table></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="primary big-btn" id="bdGo">この内容で反映する</button><button class="ghost" id="bdClr">${ymLabel(r.ym)}の貼り付けた予算を消す</button></div><div id="bdMsg" class="msg"></div></div>`;
+  el.innerHTML=t;
+  document.getElementById('bdGo').onclick=slBudApply;
+  document.getElementById('bdClr').onclick=slBudClear;
+}
+function slBudApply(){
+  const r=slBudRes; if(!r) return; const L=SL();
+  Object.entries(r.rows).forEach(([ds,x])=>{ const sd=L.days[ds]=L.days[ds]||{}; if(isNum(x.b)) sd.budget=x.b; if(isNum(x.g)) sd.gb=x.g; });
+  L.months[r.ym]=Object.assign(L.months[r.ym]||{}, {at:Date.now()});
+  save(); renderSlot();
+  const m=document.getElementById('bdPrev'); m.innerHTML=`<div class="msg ok">${ymLabel(r.ym)}の予算を反映しました（日別予算${r.nb}日・稼働予算${r.ng}日）。この月は貼り直すまでこの値を使います。</div>`;
+}
+function slBudClear(){
+  const ym=slBudYM; if(!confirm(ymLabel(ym)+'の貼り付けた日別予算・稼働予算を消しますか？（入力した実績は残ります）')) return;
+  const L=SL(); for(let d=1; d<=dim(ym); d++){ const ds=ym+'-'+pad(d), sd=L.days[ds]; if(!sd) continue; delete sd.budget; delete sd.gb; if(!Object.keys(sd).length) delete L.days[ds]; }
+  delete L.months[ym]; save(); renderSlot();
+}
+function bindSlBud(){
+  document.getElementById('bdYM').onchange=e=>{ slBudYM=e.target.value; renderSlot(); };
+  ['bdS','bdG'].forEach(id=>document.getElementById(id).oninput=slBudPreview);
+  document.querySelectorAll('#v-slot tr[data-bym]').forEach(tr=>tr.onclick=()=>{ slBudYM=tr.dataset.bym; renderSlot(); });
+  slBudPreview();
+}
 /* 報告用画面（写真・スクリーンショット用） */
 function slReportHTML(W){
   const st=S.settings, wk=SL().weeks[W.mon]||{};
@@ -2139,9 +2249,9 @@ function printSheet(){
   if(!memo){ const P=slWeek(pm); memo=P.focus.map(f=>f.short).join('　／　'); }
   const tint=ds=>{ const w=dateObj(ds).getDay(); return HOL.has(ds)||w===0? '#f8e1dc' : w===6? '#dff0e4' : w===5? '#fbe6d6' : '#e3ebf5'; };
   const col=d=>{ const B=d.B, bg=tint(d.ds);
-    return `<div class="ss-col"><div class="ss-top" style="background:${bg}"><div class="d">${dLabel(d.ds)}</div><div>日別予算：${isNum(B)?tg(B):'＿＿＿'}</div>
+    return `<div class="ss-col"><div class="ss-top" style="background:${bg}"><div class="d">${dLabel(d.ds)}</div><div>日別予算：${isNum(B)?tg(B):'＿＿＿'}${isNum(d.Gb)?'　稼働：'+int(d.Gb)+'人':''}</div>
       <div class="ss-lv">${[.6,.8,1].map(r=>`<div>${r*100}%<br>${isNum(B)?tg(Math.round(B*r/100)*100):''}<br>□</div>`).join('')}</div></div>
-      ${H.map(h=>{ const p=d.pts.find(x=>x.h===h); return `<div class="ss-cell"><div class="ct" style="background:${bg}">${h}:00　目安 ${p&&isNum(p.t)?tg(p.t):'＿＿'}</div><div class="pl">レシート貼付</div></div>`; }).join('')}</div>`; };
+      ${H.map(h=>{ const p=d.pts.find(x=>x.h===h); return `<div class="ss-cell"><div class="ct" style="background:${bg}">${h}:00　目安 ${p&&isNum(p.t)?tg(p.t):'＿＿'}${p&&isNum(p.gt)?'・'+int(p.gt)+'人':''}</div><div class="pl">レシート貼付</div></div>`; }).join('')}</div>`; };
   const page=(ds,i,n)=>`<div class="ssheet"><div class="ss-h"><span>売上中間集計表：${esc(st.storeName||'')}</span><span style="font-size:12px">${wkLabel(mon)}</span></div>
     <div class="ss-memo"><span class="k">前回事項<br>（メモ）</span><span>${esc(memo)}</span></div>
     <div class="ss-cols" style="grid-template-columns:repeat(${ds.length},1fr)">${ds.map(col).join('')}</div><div class="ss-f">${i}/${n}　数値マネージャー</div></div>`;
