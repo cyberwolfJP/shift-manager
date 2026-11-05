@@ -2433,18 +2433,62 @@ function parseCounts(text){
   return out;
 }
 
+/* POSの商品別CSVの読み取り（商品名・数量・金額・分類） */
+function csvSplit(line){const out=[];let cur='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(q){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;}else if(ch==='"')q=true;else if(ch===','){out.push(cur.trim());cur='';}else cur+=ch;}out.push(cur.trim());return out;}
+const PH={name:/商品名|品名|メニュー|名称|名前|商品$/,count:/出数|販売数|数量|個数|注文数|点数|件数|販売点数/,amount:/金額|売上|小計|総額/,price:/単価|売価|価格/,cat:/カテゴリ|分類|部門|種別|ジャンル|グループ/};
+function posCatOf(name,catText){
+  if(/お通し|チャージ|席料|サービス料/.test(name)) return 'その他';
+  return guessCat(catText||'')||guessCat(name)||'フード';
+}
+function parsePOS(text){
+  const lines=z2h(text).split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length) return [];
+  const mode=lines.some(l=>l.includes('\t'))?'tab':(lines[0].includes(',')&&(lines[0].includes('"')||/[^\d\s],|,[^\d\s]/.test(lines[0])))?'csv':'free';
+  const cellsOf=l=>mode==='tab'?l.split('\t').map(s=>s.trim().replace(/^"|"$/g,'')):mode==='csv'?csvSplit(l):splitLine(l);
+  const num=t=>{if(t===undefined||t===null)return null;const s=String(t).replace(/[\s¥円,]/g,'');if(!/^-?\d+(\.\d+)?$/.test(s))return null;return parseFloat(s);};
+  const out=[];let map=null;
+  for(const line of lines){
+    const cells=cellsOf(line);
+    if(!map){const h={cats:[]};cells.forEach((c,i)=>{if(PH.cat.test(c)){h.cats.push(i);return;}for(const k of ['name','count','amount','price']){if(h[k]===undefined&&PH[k].test(c)&&!(k==='amount'&&/単価/.test(c))){h[k]=i;break;}}});
+      if(h.name!==undefined&&h.count!==undefined){map=h;continue;}}
+    if(map){
+      const name=(cells[map.name]||'').trim();const qty=num(cells[map.count]);
+      if(!name||qty===null||qty<=0||/^(合計|総計|小計|計)$/.test(name)||/値引|割引/.test(name))continue;
+      let amt=map.amount!==undefined?num(cells[map.amount]):null;const pr=map.price!==undefined?num(cells[map.price]):null;
+      if(amt===null&&pr!==null)amt=pr*qty;
+      const catVals=map.cats.map(i=>(cells[i]||'').trim()).filter(Boolean);
+      out.push({raw:name,qty,amt,catText:catVals.join(' '),genre:catVals.length?catVals[catVals.length-1]:''});continue;
+    }
+    // 見出しなし：商品名＋数字（数量・金額）
+    let toks=cells.slice();
+    if(toks.length>2&&numToken(toks[0])&&!numToken(toks[1]))toks.shift();
+    const nameParts=[],nums=[],unitN=[];
+    toks.forEach(t=>{if(/^[A-Za-z]{1,2}\d{1,4}$/.test(t))return;const n=numToken(t);if(n&&/^(個|杯|点|品)$/.test(n.u)){unitN.push(n);nameParts.push(t);}else if(n)nums.push(n);else nameParts.push(t);});
+    if(!nums.length&&unitN.length){nums.push(unitN.pop());nameParts.pop();}
+    const name=nameParts.join(' ').trim();if(!name||!nums.length||/^(合計|総計|小計|計)$/.test(name)||/値引|割引/.test(name))continue;
+    const money=nums.filter(n=>n.u==='円'),plain=nums.filter(n=>n.u!=='円'&&n.u!=='%');
+    if(!plain.length)continue;
+    const qty=Math.min(...plain.map(n=>n.v));
+    const others=[...money,...plain].map(n=>n.v).filter(v=>v!==qty);
+    const amt=others.length?Math.max(...others):null;
+    out.push({raw:name,qty,amt:amt!==null&&amt>qty?amt:null,catText:'',genre:''});
+  }
+  return out;
+}
+
 /* ---------- 商品分析：データ ---------- */
-function P(){ if(!S.items)S.items=[]; if(!S.counts)S.counts={}; if(!S.aliases)S.aliases={}; if(!isNum(S.settings.otoshi))S.settings.otoshi=0; if(!S.prodMemo)S.prodMemo={}; return S; }
+function P(){ if(!S.items)S.items=[]; if(!S.counts)S.counts={}; if(!S.aliases)S.aliases={}; if(!isNum(S.settings.otoshi))S.settings.otoshi=0; if(!S.prodMemo)S.prodMemo={}; if(!S.amounts)S.amounts={}; return S; }
 const isDrinkI=i=>i.cat==='ドリンク';
 function countsMonths(){ P(); return Object.keys(S.counts).filter(m=>Object.values(S.counts[m]||{}).some(v=>v>0)).sort(); }
 function itemStats(m){
   P(); const c=S.counts[m]; if(!c) return null;
   const r=getM(m); const G=isNum(r.guests)&&r.guests>0?r.guests:null;
-  const rows=S.items.map(i=>{const n=+(c[i.id]||0);const p=+i.price||0;return {i,c:n,p,s:n*p,or:G?n/G:null};}).filter(x=>x.c>0);
+  const am=(S.amounts||{})[m]||{};
+  const rows=S.items.map(i=>{const n=+(c[i.id]||0);const p=+i.price||0;const s=isNum(am[i.id])?am[i.id]:n*p;return {i,c:n,p:n?s/n:p,s,or:G?n/G:null};}).filter(x=>x.c>0);
   const sum={F:{s:0,c:0},D:{s:0,c:0},O:{s:0,c:0}}; const genres={};
   rows.forEach(x=>{const k=x.i.cat==='ドリンク'?'D':x.i.cat==='フード'?'F':'O';sum[k].s+=x.s;sum[k].c+=x.c;const g=x.i.genre||'未設定';const o=genres[g]=genres[g]||{cat:x.i.cat,s:0,c:0};o.s+=x.s;o.c+=x.c;});
   const total=sum.F.s+sum.D.s+sum.O.s, fd=sum.F.s+sum.D.s;
-  return {m,r,G,rows,sum,genres,total,noPrice:rows.filter(x=>!x.p).length,
+  return {m,r,G,rows,sum,genres,total,noPrice:rows.filter(x=>!x.s).length,
     fR:fd?sum.F.s/fd:null,dR:fd?sum.D.s/fd:null,fCR:(sum.F.c+sum.D.c)?sum.F.c/(sum.F.c+sum.D.c):null,
     dPer:G?sum.D.c/G:null,fPer:G?sum.F.c/G:null,dUnit:G?sum.D.s/G:null,fUnit:G?sum.F.s/G:null,oUnit:G?sum.O.s/G:null,
     avgD:sum.D.c?sum.D.s/sum.D.c:null,avgF:sum.F.c?sum.F.s/sum.F.c:null};
@@ -2456,7 +2500,7 @@ let prodSub='ana', pending=[], pendingM=null, orShowAll=false;
 function hb(v,max,color){ return `<div class="hb"><span style="width:${Math.max(0,Math.min(100,v/max*100))}%;background:${color}"></span></div>`; }
 function renderProd(){
   P(); const el=document.getElementById('v-prod');
-  let h=`<div class="seg" style="margin-bottom:14px">${[['ana','分析'],['cnt','出数の取り込み'],['menu','メニュー（売価・ジャンル）']].map(([k,l])=>`<button data-ps="${k}" class="${prodSub===k?'on':''}">${l}</button>`).join('')}</div>`;
+  let h=`<div class="seg" style="margin-bottom:14px">${[['ana','分析'],['cnt','出数の取り込み'],['menu','商品の区分・ジャンル']].map(([k,l])=>`<button data-ps="${k}" class="${prodSub===k?'on':''}">${l}</button>`).join('')}</div>`;
   if(prodSub==='ana') h+=prodAnaHTML();
   else if(prodSub==='cnt') h+=prodCntHTML();
   else h+=prodMenuHTML();
@@ -2465,7 +2509,7 @@ function renderProd(){
   bindProd(el);
 }
 function prodAnaHTML(){
-  if(!S.items.length) return `<div class="card"><h2>商品分析</h2><p class="muted">まずメニュー（商品名・売価・ジャンル）を登録し、月の出数を取り込んでください。売上・客数はこのアプリの日別データをそのまま使います。</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="primary" data-ps="menu">メニューを登録</button><button data-act="psample">サンプルで試す</button></div></div>`;
+  if(!S.items.length) return `<div class="card"><h2>商品分析</h2><p class="muted">POSの商品別のCSV（商品名・数量・金額）を月ごとに貼り付けると、商品は自動で登録されます。売上・客数はこのアプリの日別データをそのまま使います。</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="primary" data-ps="cnt">出数を取り込む</button><button data-act="psample">サンプルで試す</button></div></div>`;
   const m=prodMonth();
   if(!m) return `<div class="card"><h2>商品分析</h2><p class="muted">${ymLabel(cur)}以前の出数がまだありません。POSの商品別販売数を取り込んでください。</p><button class="primary" data-ps="cnt">出数を取り込む</button></div>`;
   const x=itemStats(m), r=x.r; let h='';
@@ -2509,38 +2553,33 @@ function prodAnaHTML(){
     <div class="two"><div><h3 class="up">伸びた</h3><div class="scrollx">${t(up,'up')}</div></div><div><h3 class="dn">落ちた</h3><div class="scrollx">${t(dn,'dn')}</div></div></div></div>`;
   }
   if(isNum(r.sales)&&x.total){
-    const diff=r.sales-x.total, ot=+S.settings.otoshi||0, otE=isNum(r.guests)?r.guests*ot:0, rest=diff-otE;
+    const hasOt=x.rows.some(y=>/お通し|チャージ|席料/.test(y.i.name)); const diff=r.sales-x.total, ot=hasOt?0:(+S.settings.otoshi||0), otE=isNum(r.guests)?r.guests*ot:0, rest=diff-otE;
     h+=`<div class="card"><h2>売上との照合<span class="sub">${ymLabel(m)}</span></h2><table class="grid"><tbody>
      <tr><td>日報の売上</td><td>${yen(r.sales)}</td></tr><tr><td>出数 × 売価の合計</td><td>${yen(x.total)}</td></tr>
      <tr><td>差額</td><td>${yen(diff)}（${pct(diff/r.sales)}）</td></tr>
-     <tr><td>お通しの想定（客数 ${int(r.guests)}人 × ${yen(ot)}）</td><td>${ot?yen(otE):'<span class="muted">設定で金額を入力</span>'}</td></tr>
+     ${hasOt?'<tr><td>お通し</td><td><span class="muted">CSVの商品に含まれています</span></td></tr>':`<tr><td>お通しの想定（客数 ${int(r.guests)}人 × ${yen(ot)}）</td><td>${ot?yen(otE):'<span class="muted">下の欄に金額を入力</span>'}</td></tr>`}
      <tr class="tot"><td>残り（値引き・税の扱い・取り込み漏れなど）</td><td>${yen(rest)}（${pct(rest/r.sales)}）</td></tr></tbody></table>
      <p class="muted small" style="margin:6px 0 0">${!r.complete?'日報が月の途中までなので、月の出数とは期間がずれています。':Math.abs(rest)/r.sales>0.05?'残りが売上の5%を超えています。売上と売価の税込・税抜がそろっているか、出数の取り込み漏れ、メニューにない商品、値引きの増加を確認してください。':'差額はお通し・値引きの範囲に収まっています。'}</p>
-     <div class="field" style="max-width:200px;margin-top:8px">お通し（1人あたり）<input type="number" id="otoshiIn" value="${ot||''}"></div></div>`;
+     ${hasOt?'':`<div class="field" style="max-width:200px;margin-top:8px">お通し（1人あたり）<input type="number" id="otoshiIn" value="${ot||''}"></div>`}</div>`;
   }
   return h;
 }
 function prodCntHTML(){
   const ms=countsMonths();
-  let h=`<div class="card"><h2>月の商品出数を貼り付ける</h2><p class="muted small" style="margin:0 0 8px">POSの商品別販売数をそのまま貼り付けてください。商品名と数量を読み取り、メニューと自動で結びつけます。金額や商品コードの列、見出しの行があっても大丈夫です。同じ月を貼り直すと上書きされます。</p>
+  let h=`<div class="card"><h2>POSの商品別CSVを貼り付ける</h2><p class="muted small" style="margin:0 0 8px">CSVの中身を見出しの行ごとコピーして貼り付けてください。商品名・数量を読み取り、金額の列があれば売上もそのまま使います。分類（部門・カテゴリ）の列があればジャンルにします。初めて出てきた商品は自動で登録され、ドリンクかフードかを商品名から判定します。同じ月を貼り直すと上書きされます。</p>
   <div class="fields" style="margin-bottom:8px"><label class="field">対象の月<input type="month" id="cntM" value="${cur}"></label></div>
   <textarea id="cntT" rows="9" style="width:100%" placeholder="例）
-ハイボール 2,140
-唐揚げ 3個	290	113,100"></textarea>
+商品名,分類,数量,金額
+ハイボール,ハイボール,2140,963000
+唐揚げ 3個,揚げ物,290,113100"></textarea>
   <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="primary" id="cntGo">取り込む</button><span id="cntMsg" class="msg"></span></div><div id="pend"></div></div>`;
   h+=`<div class="card"><h2>取り込み済みの月</h2>${ms.length?`<table class="grid"><thead><tr><th>月</th><th>商品数</th><th>総出数</th><th>出数×売価</th><th></th></tr></thead><tbody>${ms.slice().reverse().map(m=>{const x=itemStats(m);return `<tr><td>${ymLabel(m)}</td><td>${x.rows.length}</td><td>${int(x.rows.reduce((a,y)=>a+y.c,0))}</td><td>${yen(x.total)}</td><td><button class="ghost" data-delc="${m}">削除</button></td></tr>`;}).join('')}</tbody></table>`:'<p class="muted">まだありません</p>'}</div>`;
   return h;
 }
 function prodMenuHTML(){
   const gl=[...new Set(S.items.map(i=>i.genre).filter(Boolean))];
-  let h=`<div class="card"><h2>メニューを貼り付けて登録</h2><p class="muted small" style="margin:0 0 8px">1行に「商品名 売価」。【ジャンル名】の行で、その下の商品のジャンルが決まります（【フード】【ドリンク】は区分）。売価は日報の売上と同じ基準（税込か税抜）にそろえてください。同じ商品名は売価とジャンルだけ更新されます。</p>
-  <textarea id="menuT" rows="8" style="width:100%" placeholder="【ドリンク】
-【ハイボール】
-ハイボール 450円
-【フード】
-【揚げ物】
-唐揚げ 3個 390円"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="primary" id="menuGo">読み取って登録</button><span id="menuMsg" class="msg"></span></div></div>`;
-  h+=`<div class="card"><h2>登録済みのメニュー<span class="sub">${S.items.length}品</span></h2><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap"><input type="text" id="mF" placeholder="商品名・ジャンルで絞り込み"><button id="mAdd">1品追加</button></div><datalist id="gList">${gl.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+  let h=`<div class="banner info">FD率やジャンル別の集計は、ここの区分（ドリンク・フード・その他）とジャンルで分けています。自動判定が違う商品だけ直してください。売価はCSVの金額÷数量で自動で入ります。</div>`;
+  h+=`<div class="card"><h2>商品の区分・ジャンル<span class="sub">${S.items.length}品</span></h2><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap"><input type="text" id="mF" placeholder="商品名・ジャンルで絞り込み"><button id="mAdd">1品追加</button></div><datalist id="gList">${gl.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
   <div class="scrollx tbl-wrap"><table class="grid mtbl"><thead><tr><th>商品名</th><th>区分</th><th>ジャンル</th><th>売価</th><th></th></tr></thead><tbody id="mB"></tbody></table></div></div>`;
   return h;
 }
@@ -2561,19 +2600,24 @@ function bindProd(el){
   const cg=document.getElementById('cntGo');
   if(cg){cg.onclick=()=>{const m=document.getElementById('cntM').value;const msg=document.getElementById('cntMsg');
       if(!m){msg.className='msg ng';msg.textContent='対象の月を選んでください';return;}
-      if(!S.items.length){msg.className='msg ng';msg.textContent='先にメニューを登録してください';return;}
-      const rows=parseCounts(document.getElementById('cntT').value);
-      if(!rows.length){msg.className='msg ng';msg.textContent='読み取れる行がありませんでした。商品名と数字が1行に入っているか確認してください';return;}
+      const rows=parsePOS(document.getElementById('cntT').value);
+      if(!rows.length){msg.className='msg ng';msg.textContent='読み取れる行がありませんでした。商品名と数量が入っているか確認してください';return;}
       if(S.counts[m]&&!confirm(ymLabel(m)+'の出数はすでにあります。上書きしますか？'))return;
-      const c=S.counts[m]={};pending=[];pendingM=m;let ok=0;
-      rows.forEach(r=>{const it=matchItem(r.raw);if(it){c[it.id]=(c[it.id]||0)+r.qty;ok++;}else pending.push(r);});
-      save();renderProd();const m2=document.getElementById('cntMsg');m2.className='msg ok';m2.textContent=`${ymLabel(m)}：${rows.length}行を読み取り、${ok}行を商品に結びつけました${pending.length?`。${pending.length}行は下で割り当ててください`:''}`;};
+      const c=S.counts[m]={}, a=S.amounts[m]={};let add=0,amtN=0;const newIds=[];
+      rows.forEach(r=>{const n=normName(r.raw);let it=(S.aliases[n]&&S.items.find(x=>x.id===S.aliases[n]))||S.items.find(x=>normName(x.name)===n);
+        if(!it){const cat=posCatOf(r.raw,r.catText);it={id:Math.random().toString(36).slice(2,10),name:r.raw.trim(),cat,genre:r.genre||'',price:null};S.items.push(it);add++;newIds.push(it.id);}
+        else if(r.genre&&!it.genre) it.genre=r.genre;
+        c[it.id]=(c[it.id]||0)+r.qty;
+        if(isNum(r.amt)){a[it.id]=(a[it.id]||0)+r.amt;amtN++;}
+        if(isNum(r.amt)&&r.qty>0) it.price=Math.round(a[it.id]/c[it.id]);});
+      if(!amtN) delete S.amounts[m];
+      save();renderProd();const m2=document.getElementById('cntMsg');m2.className='msg ok';
+      const nd=newIds.map(id=>S.items.find(x=>x.id===id));
+      m2.innerHTML=`${ymLabel(m)}：${rows.length}品を取り込みました${amtN?'（金額あり）':'（金額の列がないため、売上は登録済みの売価×出数で計算）'}。${add?`新しい商品${add}品を登録し、ドリンク${nd.filter(x=>x.cat==='ドリンク').length}品・フード${nd.filter(x=>x.cat==='フード').length}品・その他${nd.filter(x=>x.cat==='その他').length}品に自動で分けました。<button data-ps="menu" class="ghost">区分とジャンルを確認する</button>`:''}`;
+      m2.querySelectorAll('[data-ps]').forEach(b=>b.onclick=()=>{prodSub='menu';renderProd();});};
     drawPending();
-    el.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>{if(!confirm(ymLabel(b.dataset.delc)+'の出数を削除しますか？'))return;delete S.counts[b.dataset.delc];save();renderProd();});}
-  const mg=document.getElementById('menuGo');
-  if(mg){mg.onclick=()=>{const list=parseMenu(document.getElementById('menuT').value);let add=0,upd=0;
-      list.forEach(p=>{let it=S.items.find(x=>x.name===p.name);if(it){upd++;if(p.cat)it.cat=p.cat;if(p.genre)it.genre=p.genre;}else{it={id:Math.random().toString(36).slice(2,10),name:p.name,cat:p.cat||'その他',genre:p.genre||'',price:null};S.items.push(it);add++;}if(p.price!==undefined)it.price=p.price;});
-      save();renderProd();const m=document.getElementById('menuMsg');m.className=list.length?'msg ok':'msg ng';m.textContent=list.length?`${list.length}件を読み取りました（追加 ${add}件・更新 ${upd}件）`:'読み取れる行がありませんでした';};
+    el.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>{if(!confirm(ymLabel(b.dataset.delc)+'の出数を削除しますか？'))return;delete S.counts[b.dataset.delc];delete S.amounts[b.dataset.delc];save();renderProd();});}
+  if(document.getElementById('mB')){
     drawMenuRows();document.getElementById('mF').oninput=drawMenuRows;
     document.getElementById('mAdd').onclick=()=>{S.items.unshift({id:Math.random().toString(36).slice(2,10),name:'新しい商品',cat:'フード',genre:'',price:null});save();drawMenuRows();};
     const mb=document.getElementById('mB');
