@@ -302,6 +302,18 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
 .up{color:#0a7a0a}.dn{color:var(--crit)}
 .rk{display:inline-block;font-size:11px;padding:1px 8px;border-radius:9px}.rk-A{background:#dff3e6;color:#0a6a2a}.rk-B{background:#e3eefb;color:#1d5aa6}.rk-C{background:#efeee9;color:var(--ink2)}
 .small{font-size:12.5px}
+
+/* 打ち手 */
+.pl-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.pl-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:600}
+.pl-no{background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto}
+.pl-imp{margin-left:auto;color:var(--crit);font-size:13.5px;font-variant-numeric:tabular-nums}
+.pl-item p{margin:6px 0 4px;font-size:13.5px;color:var(--ink2)}
+.pl-item ul,.pl-ul{margin:4px 0 0;padding-left:20px;font-size:14px}.pl-item li,.pl-ul li{margin:3px 0}
+.pl-h3{font-size:14px;margin:14px 0 6px}
+.pl-note{background:#eef5fd;border-radius:8px;padding:8px 12px;font-size:13.5px;margin:10px 0 0}
+.pl-tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:9px;white-space:nowrap}.pl-up{background:#dff3e6;color:#0a6a2a}.pl-fix{background:#fde5e1;color:#a2281c}.pl-with{background:#e3eefb;color:#1d5aa6}
+@media print{header,nav.tabs,#backupBanner,#planCopy{display:none!important}}
 </style>
 </head>
 <body>
@@ -318,6 +330,7 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
   </div>
   <nav class="tabs" id="tabs">
     <button data-v="dash" class="on">ダッシュボード</button>
+    <button data-v="plan">今月・来月の打ち手</button>
     <button data-v="diag">経営診断</button>
     <button data-v="prod">商品分析</button>
     <button data-v="slot">時間帯ノルマ</button>
@@ -331,6 +344,7 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
 <main>
   <div id="backupBanner"></div>
   <section class="view on" id="v-dash"></section>
+  <section class="view" id="v-plan"></section>
   <section class="view" id="v-list"></section>
   <section class="view" id="v-fc"></section>
   <section class="view" id="v-diag"></section>
@@ -679,7 +693,7 @@ function render(){
   fillMonthSel();
   renderBanner();
   document.querySelector('.monthnav').style.visibility = view==='slot' ? 'hidden' : '';
-  const f = {dash:renderDash, list:renderList, fc:renderFc, diag:renderDiag, prod:renderProd, slot:renderSlot, imp:renderImp, set:renderSet}[view];
+  const f = {dash:renderDash, plan:renderPlan, list:renderList, fc:renderFc, diag:renderDiag, prod:renderProd, slot:renderSlot, imp:renderImp, set:renderSet}[view];
   f();
 }
 function renderBanner(){
@@ -2680,10 +2694,175 @@ function prodSample(){
   S.items.forEach(i=>delete i._w);
   save(); cur=ms2[ms2.length-1]; prodSub='ana'; render();
 }
-return {renderProd, prodDiagHTML, prodSample};
+return {renderProd, prodDiagHTML, prodSample, itemStats, countsMonths};
 
 })();
 const renderProd=PROD.renderProd, prodDiagHTML=PROD.prodDiagHTML, prodSample=PROD.prodSample;
+
+/* ========== 今月・来月の打ち手 ========== */
+const PLAN=(function(){
+const itemStats=PROD.itemStats, countsMonths=PROD.countsMonths;
+const isDriver=i=>i.cat!=='ドリンク'&&(/揚げ物|とりあえず|つまみ/.test(i.genre||'')||/辛|麻辣|塩|唐揚|から揚|ポテト|のり天|ウインナー|ハムカツ|フライ|枝豆|皮/.test(i.name));
+const strongDay=ds=>{const t=dayType(ds);return t===5||t===6||preWeekday(ds)||(t===7&&isPreHol(ds));};
+function cmLE(M){return countsMonths().filter(m=>m<=M).pop()||null;}
+function cmBefore(M){return countsMonths().filter(m=>m<M).pop()||null;}
+function rankA(x){const r=[...x.rows].sort((a,b)=>b.s-a.s);let c=0;const A=new Set();r.forEach((y,k)=>{c+=y.s;if(c/x.total<=0.7||k===0)A.add(y.i.id);});return A;}
+function movers(x,p){
+  if(!x||!p||!x.G||!p.G) return [];
+  const pm={};p.rows.forEach(y=>pm[y.i.id]=y);
+  return x.rows.map(y=>{const b=pm[y.i.id];const ob=b?b.c/p.G:0,oa=y.c/x.G;return {i:y.i,d:oa-ob,oa,ob,yen:(oa-ob)*x.G*(y.p||0),p:y.p};});
+}
+function issueCard(n,x){
+  return `<div class="pl-item"><div class="pl-h"><span class="pl-no">${n}</span><span class="pl-t">${esc(x.title)}</span>${isNum(x.impact)&&x.impact>0?`<span class="pl-imp">月 ${yen(x.impact)}</span>`:''}</div><p>${x.why}</p>${x.actions&&x.actions.length?`<ul>${x.actions.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}</div>`;
+}
+let shareLines=[];
+function planHTML(){
+  const T=cur, N=addMonth(T,1);
+  const L=lastComplete(addMonth(T,-1));
+  shareLines=[];
+  if(!L&&!isNum(getM(T).sales)) return `<div class="card"><h2>今月・来月の打ち手</h2><p class="muted">締まった月の売上データが必要です。「データ取込」から日報を貼り付けるか、設定からサンプルデータで試してください。</p></div>`;
+  let h=`<div class="banner info">数値だけから優先順位をつけた提案です。天気・イベント・人員など数字に出ない事情は、店長の判断で選んでください。</div>`;
+  /* 1. いまの課題 */
+  const issues=[];
+  if(L){
+    const A=analyze(L);
+    A.recs.filter(x=>x.cat!=='計画').slice(0,3).forEach(x=>issues.push({title:x.title,impact:x.impact,why:esc(x.why),actions:(x.actions||[]).slice(0,2)}));
+    const cl=countsMonths().includes(L)?L:null, cp=cl?cmBefore(cl):null;
+    const x=cl?itemStats(cl):null, p=cp?itemStats(cp):null;
+    if(x&&p&&x.G&&p.G){
+      const drv=x.rows.filter(y=>isDriver(y.i)).sort((a,b)=>b.c-a.c).slice(0,2).map(y=>y.i.name);
+      if(isNum(x.dPer)&&isNum(p.dPer)&&x.dPer<p.dPer) issues.push({title:'1人あたりのドリンクが減った',impact:(p.dPer-x.dPer)*x.G*(x.avgD||0),why:`${ymLabel(cp)}の${p.dPer.toFixed(2)}杯から${x.dPer.toFixed(2)}杯へ（${(x.dPer-p.dPer).toFixed(2)}杯）。客数${int(x.G)}人で換算すると月 ${yen((p.dPer-x.dPer)*x.G*(x.avgD||0))} の売上減です。`,actions:['グラスが半分になった卓に、2杯目の声かけを徹底する',drv.length?`ドリンクが進むつまみ（${drv.join('、')}）を1品目で勧める`:'ドリンクが進むつまみ（揚げ物・塩気のあるもの）を1品目で勧める']});
+      if(isNum(x.fPer)&&isNum(p.fPer)&&x.fPer<p.fPer) issues.push({title:'1人あたりのフードが減った',impact:(p.fPer-x.fPer)*x.G*(x.avgF||0),why:`${p.fPer.toFixed(2)}品から${x.fPer.toFixed(2)}品へ（${(x.fPer-p.fPer).toFixed(2)}品）。月 ${yen((p.fPer-x.fPer)*x.G*(x.avgF||0))} の売上減です。フードが減るとドリンクも続かなくなります。`,actions:['着席後すぐに出せる1品（とりあえずのつまみ）を必ず提案する','追加注文のタイミングで、すぐ出せる商品を名指しで勧める']});
+      const A2=rankA(x);
+      movers(x,p).filter(m=>A2.has(m.i.id)&&m.d<0).sort((a,b)=>a.yen-b.yen).slice(0,2).forEach(m=>issues.push({title:`主力の「${m.i.name}」の注文が落ちた`,impact:-m.yen,why:`注文率 ${pct(m.ob)} → ${pct(m.oa)}（${(m.d*100).toFixed(1)}pt）。売上の上位7割を作る商品なので、影響が大きく出ます。`,actions:['品切れ・提供の遅れ・品質のぶれがなかったか確認する','メニューやPOPで目に入る位置にあるか見直す']}));
+    }
+  }
+  issues.sort((a,b)=>(b.impact||0)-(a.impact||0));
+  h+=`<div class="card"><h2>1. いまの課題<span class="sub">${L?ymLabel(L)+'の実績から':''}・影響の大きい順</span></h2>${issues.length?issues.slice(0,4).map((x,k)=>issueCard(k+1,x)).join(''):'<p class="muted">数値上の大きな課題は見当たりません。</p>'}</div>`;
+  if(issues.length) shareLines.push('【いまの課題】',...issues.slice(0,3).map((x,k)=>`${k+1}. ${x.title}${isNum(x.impact)&&x.impact>0?`（月 ${yen(x.impact)}）`:''}`),'');
+
+  /* 2. 今月やること */
+  const r=getM(T); const kt=kpiTargets(T);
+  const goal=isNum(r.budget)?r.budget:(kt?kt.sales:null);
+  const closed=new Set(((S.months[T]||{}).plan||{}).closed||[]);
+  if(r.complete){
+    h+=`<div class="card"><h2>2. 今月やること<span class="sub">${ymLabel(T)}</span></h2><p class="muted">${ymLabel(T)}は締まっています。表示する月を進めると、その月の打ち手が出ます。</p></div>`;
+  } else if(isNum(goal)){
+    const start=r.daily&&r.lastDay?shiftDate(r.lastDay,1):T+'-01';
+    const pS=weekdayProfile(start,'sales'), pG=weekdayProfile(start,'guests');
+    const rem=[];for(let d=1;d<=dim(T);d++){const ds=T+'-'+pad(d);if(ds>=start&&!closed.has(ds))rem.push(ds);}
+    const done=r.daily?r.sales:0;
+    const expRem=pS?rem.reduce((a,ds)=>a+dayWeight(ds,pS),0):null;
+    const guestRem=pG?rem.reduce((a,ds)=>a+dayWeight(ds,pG),0):null;
+    const land=isNum(expRem)?done+expRem:null;
+    const gap=isNum(land)?goal-land:null;
+    const unit=r.daily&&isNum(r.unit)?r.unit:(L?getM(L).unit:null);
+    const cl=cmLE(T), x=cl?itemStats(cl):null, cp=cl?cmBefore(cl):null, p=cp?itemStats(cp):null;
+    h+=`<div class="card"><h2>2. 今月やること<span class="sub">${ymLabel(T)}${r.daily?'・'+Number(r.lastDay.slice(8))+'日まで':''}</span></h2><div class="kpis">
+      ${kpi('今月の目標',man(goal)+'<small>円</small>',[isNum(r.budget)?'予算':'見込みから算出'])}
+      ${kpi('このままの着地',isNum(land)?man(land)+'<small>円</small>':'—',[isNum(land)?`目標比 ${pct(land/goal)}`:'曜日データ不足'])}
+      ${kpi(isNum(gap)&&gap>0?'足りない額':'上回る額',isNum(gap)?man(Math.abs(gap))+'<small>円</small>':'—',[`残り${rem.length}日`])}
+      ${kpi('必要な日販',rem.length?man((goal-done)/rem.length)+'<small>円</small>':'—',[r.daily?`いまの日販 ${man(r.sales/r.elapsed)}`:''])}
+    </div>`;
+    const todo=[];
+    if(isNum(gap)&&gap>0&&rem.length){
+      const strong=rem.filter(strongDay);
+      if(isNum(unit)&&unit>0) todo.push(`客数で埋めるなら、残り${rem.length}日で ${int(gap/unit)}人（1日 ${(gap/unit/rem.length).toFixed(1)}人）`);
+      if(isNum(guestRem)&&guestRem>0){const per=gap/guestRem;todo.push(`客単価で埋めるなら、1人あと ${yen(per)}${x&&x.avgD?`（ドリンクなら1人 ${(per/x.avgD).toFixed(2)}杯）`:''}`);}
+      if(strong.length) todo.push(`金・土・祝前日（残り${strong.length}日）に寄せるなら、その日だけで1日 ${man(gap/strong.length)}円の上積み`);
+    } else if(isNum(gap)) todo.push(`このペースなら目標を ${man(-gap)}円上回る見込みです。上積みの目標として、1日 ${man(Math.max(10000,-gap/Math.max(rem.length,1)))}円を狙えます`);
+    h+=todo.length?`<h3 class="pl-h3">差の埋め方</h3><ul class="pl-ul">${todo.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'';
+    if(pS&&rem.length&&goal>done){
+      const need=goal-done, k=need/expRem; const wk={};
+      rem.forEach(ds=>{const mon=monOf(ds);const w=wk[mon]=wk[mon]||{from:ds,to:ds,t:0,n:0};w.to=ds;w.t+=dayWeight(ds,pS)*k;w.n++;});
+      h+=`<h3 class="pl-h3">週ごとの目標（目標まで届く配分）</h3><div class="scrollx"><table class="grid"><thead><tr><th>週</th><th>日数</th><th>週の目標</th><th>1日平均</th></tr></thead><tbody>${Object.values(wk).map(w=>`<tr><td>${dLabel(w.from)}〜${dLabel(w.to)}</td><td>${w.n}</td><td>${yen(w.t)}</td><td>${yen(w.t/w.n)}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+    const focus=[];
+    if(x&&p&&x.G&&p.G){
+      const mv=movers(x,p);const A2=rankA(x);
+      const prices=x.rows.map(y=>y.p).filter(v=>v>0).sort((a,b)=>a-b);const med=prices[Math.floor(prices.length/2)]||0;
+      const up=mv.filter(m=>m.d>0).sort((a,b)=>b.yen-a.yen).slice(0,2);
+      const fix=mv.filter(m=>m.d<0&&A2.has(m.i.id)).sort((a,b)=>a.yen-b.yen).slice(0,2);
+      up.forEach(m=>focus.push(['伸ばす',m.i.name,`先月 注文率が${(m.d*100).toFixed(1)}pt上昇（売上で月 ${yen(m.yen)}）。${(m.p||0)>=med?'単価も高めなので、':''}引き続きPOPと声かけの中心に`]));
+      fix.forEach(m=>focus.push(['立て直す',m.i.name,`主力なのに注文率が${Math.abs(m.d*100).toFixed(1)}pt低下（売上で月 ${yen(-m.yen)}）。品切れ・提供時間・見せ方を確認`]));
+    }
+    if(x){const used=new Set(focus.map(f=>f[1]));x.rows.filter(y=>isDriver(y.i)&&!used.has(y.i.name)).sort((a,b)=>b.c-a.c).slice(0,2).forEach(y=>focus.push(['一緒に勧める',y.i.name,'ドリンクが進むつまみ。1品目の提案に入れて、杯数を伸ばす']));}
+    if(focus.length) h+=`<h3 class="pl-h3">今月の重点商品</h3><div class="scrollx"><table class="grid"><thead><tr><th>役割</th><th style="text-align:left">商品</th><th style="text-align:left">理由とやること</th></tr></thead><tbody>${focus.map(f=>`<tr><td><span class="pl-tag pl-${f[0]==='伸ばす'?'up':f[0]==='立て直す'?'fix':'with'}">${f[0]}</span></td><td style="text-align:left">${esc(f[1])}</td><td style="text-align:left;white-space:normal">${esc(f[2])}</td></tr>`).join('')}</tbody></table></div>`;
+    else if(!x) h+=`<p class="muted small">商品分析で月の出数を取り込むと、今月の重点商品も出ます。</p>`;
+    h+='</div>';
+    shareLines.push(`【${ymLabel(T)}の目標】${man(goal)}円${isNum(land)?`（このままだと ${man(land)}円）`:''}`,...todo.map(t=>'・'+t),'');
+    if(focus.length) shareLines.push('【今月の重点商品】',...focus.map(f=>`・${f[0]}：${f[1]}`),'');
+  } else h+=`<div class="card"><h2>2. 今月やること</h2><p class="muted">今月の予算を入れるか、見込みが出せるだけのデータ（直近8週の日報）があると表示されます。</p></div>`;
+
+  /* 3. 来月の準備 */
+  const kn=kpiTargets(N), LY=getM(addMonth(N,-12));
+  const lyAvg=avg(monthsBack(addMonth(N,-12),12).map(getM).map(z=>z.sales));
+  const si=isNum(LY.sales)&&isNum(lyAvg)?LY.sales/lyAvg:null;
+  let nH=0,nFS=0,nPre=0;for(let d=1;d<=dim(N);d++){const ds=N+'-'+pad(d);const t=dayType(ds);if(t===7)nH++;if(t===5||t===6)nFS++;if(preWeekday(ds))nPre++;}
+  const busy=isNum(si)&&si>=1.08, slow=isNum(si)&&si<=0.93;
+  const prep=[];
+  if(kn) prep.push(`目標 ${man(kn.sales)}円（${kn.fromBudget?'予算':'見込み'}）。1日 ${man(kn.daily)}円${isNum(kn.guestsDay)?`・1日 ${kn.guestsDay.toFixed(0)}人・客単価 ${yen(kn.unit)}`:''}`);
+  prep.push(`金・土が${nFS}日、祝日が${nH}日、平日の祝前日が${nPre}日`);
+  const fcN=forecast(N);const fm=fcN.recommended?fcN.methods[fcN.recommended]:null;
+  if(fm&&kn&&kn.fromBudget){const d=fm.sales-kn.sales;if(d<-kn.sales*0.03)prep.push(`曜日と季節から見た見込みは ${man(fm.sales)}円で、予算に ${man(-d)}円足りません。月初から上積みの施策が必要です`);else prep.push(`見込みは ${man(fm.sales)}円で、予算に届くペースです`);}
+  const lyC=addMonth(N,-12), lyP=addMonth(N,-13);
+  let seasonal='';
+  if(countsMonths().includes(lyC)&&countsMonths().includes(lyP)){
+    const a=itemStats(lyC),b=itemStats(lyP);
+    if(a.G&&b.G){const gs=Object.entries(a.genres).map(([g,v])=>({g,d:v.c/a.G-((b.genres[g]||{}).c||0)/b.G})).sort((p,q)=>q.d-p.d).filter(z=>z.d>0).slice(0,3);
+      if(gs.length) seasonal=`前年の${ymLabel(lyC)}は、${gs.map(z=>`${z.g}（注文率 +${(z.d*100).toFixed(1)}pt）`).join('、')}が伸びました。月初からPOPとおすすめをこのジャンルに切り替えると、季節の流れに乗れます。`;}
+  }
+  const acts=busy?['シフトを早めに確定し、金・土と祝前日の人員を先に確保する','売れ筋の仕込み・仕入れを前倒しする','予約・団体の受け入れ枠を先に決めておく']:slow?['来店のきっかけ（早い時間のお得・限定メニュー）を店頭とSNSで打ち出す','シフトの総時間と在庫を、見込みに合わせて先に絞る','客単価を落とさないよう、高単価の看板商品を前面に出す']:['金・土と祝前日に人員と仕込みを寄せる','今月うまくいった商品のPOPは続け、落ちた商品の見せ方を変える'];
+  h+=`<div class="card"><h2>3. 来月の準備<span class="sub">${ymLabel(N)}${isNum(si)?`・季節の強さ ${pct(si,0)}${busy?'（繁忙）':slow?'（閑散）':''}`:''}</span></h2><ul class="pl-ul">${prep.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>${seasonal?`<p class="pl-note">${esc(seasonal)}</p>`:''}<h3 class="pl-h3">今月中にやっておくこと</h3><ul class="pl-ul">${acts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`;
+  shareLines.push(`【${ymLabel(N)}の準備】`,...acts.map(t=>'・'+t),'');
+
+  /* 4. 次に来そうな課題 */
+  const next=[];
+  const cms=countsMonths().filter(m=>m<=T).slice(-3);
+  if(cms.length===3){const st=cms.map(itemStats);
+    if(st.every(z=>z.G)&&st[0].dPer>st[1].dPer&&st[1].dPer>st[2].dPer) next.push(`1人あたりのドリンクが3か月続けて減っています（${st.map(z=>z.dPer.toFixed(2)).join(' → ')}杯）。客単価の前年割れにつながりやすい流れです。`);
+    if(st.every(z=>z.G)&&st[0].fPer>st[1].fPer&&st[1].fPer>st[2].fPer) next.push(`1人あたりのフードが3か月続けて減っています（${st.map(z=>z.fPer.toFixed(2)).join(' → ')}品）。このままだとドリンクも落ちやすくなります。`);
+    if(st[0].dR<st[1].dR&&st[1].dR<st[2].dR&&st[0].fPer>st[2].fPer) next.push('ドリンク構成比は上がり続けていますが、フードの注文が減ったことによる上昇です。見かけの改善に注意してください。');
+  }
+  const cm3=monthsBack(L||T,3).map(getM).filter(z=>z.complete);
+  if(cm3.length===3){const yu=cm3.map(z=>{const l=getM(addMonth(z.ym,-12));return l.complete?ratio(z.unit,l.unit):null;}),yg=cm3.map(z=>{const l=getM(addMonth(z.ym,-12));return l.complete?ratio(z.guests,l.guests):null;});
+    if(yu.every(v=>isNum(v)&&v<1)) next.push(`客単価の前年割れが3か月続いています（前年比 ${yu.map(v=>pct(v,0)).join(' → ')}）。`);
+    if(yg.every(v=>isNum(v)&&v<1)) next.push(`客数の前年割れが3か月続いています（前年比 ${yg.map(v=>pct(v,0)).join(' → ')}）。集客の手を早めに打つ時期です。`);}
+  const lc=cmLE(T);
+  if(lc){const x=itemStats(lc);if(x.rows.length>=10){const A2=rankA(x);const sorted=[...x.rows].sort((a,b)=>b.s-a.s);let c=0;const cRank=sorted.filter(y=>{c+=y.s;return c/x.total>0.9;}).length;
+      if(cRank/x.rows.length>0.4) next.push(`売上の最後の1割しか作っていない商品が${cRank}品（全体の${pct(cRank/x.rows.length,0)}）あります。仕込みの手間とロスが増えやすいので、メニューを絞る候補です。`);
+      const top=sorted[0];if(top&&top.s/x.total>0.25) next.push(`「${top.i.name}」1品で商品売上の${pct(top.s/x.total,0)}を占めています。品切れや値上げの影響を受けやすい形です。`);}}
+  if(L){const ws=weekdayStats(L);if(ws){const v=ws.avg.slice(0,7).filter(isNum);const mx=Math.max(...v),mn=Math.min(...v);if(mn/mx<0.55){const wi=ws.avg.indexOf(mn);next.push(`${WD[wi]}曜の日販が一番強い曜日の${pct(mn/mx,0)}しかありません。弱い曜日の来店理由づくりが次の伸びしろです。`);}}}
+  h+=`<div class="card"><h2>4. 次に来そうな課題<span class="sub">数字の流れから先回り</span></h2>${next.length?`<ul class="pl-ul">${next.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'<p class="muted">いまの数字の流れから、目立った兆候は見当たりません。</p>'}</div>`;
+  if(next.length) shareLines.push('【気をつけること】',...next.slice(0,2).map(t=>'・'+t),'');
+
+  /* 5. 施策の答え合わせ */
+  if(L){const memo=(S.prodMemo||{})[L];const cl=countsMonths().includes(L)?L:null,cp=cl?cmBefore(cl):null;
+    let a='';
+    if(memo) a+=`<p>${ymLabel(L)}にやったこと：<b>${esc(memo)}</b></p>`;
+    const r1=getM(L),r0=getM(addMonth(L,-1));
+    const lines=[];
+    if(isNum(r1.unit)&&isNum(r0.unit)) lines.push(`客単価 ${yen(r0.unit)} → ${yen(r1.unit)}（${signYen(r1.unit-r0.unit)}）`);
+    if(cl&&cp){const x=itemStats(cl),p=itemStats(cp);if(isNum(x.dPer)&&isNum(p.dPer))lines.push(`1人あたりドリンク ${p.dPer.toFixed(2)} → ${x.dPer.toFixed(2)}杯`);
+      const mv=movers(x,p).sort((q,w)=>w.d-q.d).slice(0,3).filter(m=>m.d>0);if(mv.length)lines.push(`注文率が伸びた商品：${mv.map(m=>`${m.i.name}（+${(m.d*100).toFixed(1)}pt）`).join('、')}`);
+      if(memo){let hit=x.rows.filter(y=>memo.includes(y.i.name));if(!hit.length)hit=x.rows.filter(y=>y.i.genre&&memo.includes(y.i.genre));const mvAll=movers(x,p);
+        hit.slice(0,3).forEach(y=>{const m=mvAll.find(z=>z.i.id===y.i.id);if(m)lines.push(`施策の対象「${y.i.name}」：注文率 ${pct(m.ob)} → ${pct(m.oa)}（${m.d>=0?'効果あり':'効果は見えず'}）`);});}}
+    a+=lines.length?`<ul class="pl-ul">${lines.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'';
+    if(!memo) a+=`<p class="muted small">商品分析の「伸びた商品・落ちた商品」に、その月にやった販促を書いておくと、ここで効果を判定します。商品名かジャンル名を入れると、その商品の注文率の変化を自動で拾います。</p>`;
+    h+=`<div class="card"><h2>5. 先月の施策の答え合わせ<span class="sub">${ymLabel(L)}</span></h2>${a||'<p class="muted">比べられるデータがまだありません。</p>'}</div>`;}
+  shareLines.push('迷ったら、まず上の重点商品からおすすめしてください。');
+  h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 20px"><button class="primary" id="planCopy">スタッフ共有用の文章をコピー</button><button onclick="window.print()">印刷・PDF</button></div>`;
+  return h;
+}
+function renderPlan(){
+  const el=document.getElementById('v-plan');
+  el.innerHTML=planHTML();
+  const b=document.getElementById('planCopy');if(b) b.onclick=()=>copyText(shareLines.join('\n'),b);
+}
+return {renderPlan};
+})();
+const renderPlan=PLAN.renderPlan;
+
 
 /* ========== サンプル ========== */
 function loadSample(){

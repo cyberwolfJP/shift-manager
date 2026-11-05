@@ -1,6 +1,6 @@
 // 数値マネージャー：オフライン用（同じサイト内のこのフォルダのファイルだけを保存。外部には一切アクセスしない）
 // アプリを更新したら VERSION の数字を1つ上げてください。
-const VERSION = 'v9';
+const VERSION = 'v10';
 const CACHE = 'suuchi-' + VERSION;
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-512.png'];
 
