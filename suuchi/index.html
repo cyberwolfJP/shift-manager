@@ -2543,6 +2543,7 @@ function prodAnaHTML(){
    ${kpi('1杯の平均単価',yen(x.avgD),[p&&dlt(x.avgD,p.avgD,yen)])}
    ${kpi('1品の平均単価',yen(x.avgF),[p&&dlt(x.avgF,p.avgF,yen)])}
   </div>`;
+  h+=kwHTML(x,p,m,pm);
   h+=`<div class="card"><h2>FD率<span class="sub">${ymLabel(m)}</span></h2><div class="fdbar"><div class="f" style="width:${(x.fR||0)*100}%">フード ${pct(x.fR,0)}</div><div class="d" style="width:${(x.dR||0)*100}%">ドリンク ${pct(x.dR,0)}</div></div><p class="muted small" style="margin:6px 0 0">売上ベース F${Math.round(x.fR*100)} : D${Math.round(x.dR*100)}　／　出数ベース F${Math.round(x.fCR*100)} : D${100-Math.round(x.fCR*100)}。FD率は結果なので、客単価・1人あたりの杯数と必ずセットで見てください。</p></div>`;
   if(x.G&&isNum(r.unit)){
     const other=r.unit-x.dUnit-x.fUnit-x.oUnit;
@@ -2613,6 +2614,7 @@ function bindProd(el){
       document.getElementById('orB').innerHTML=list.map((y,k)=>`<tr><td>${k+1}</td><td style="text-align:left">${esc(y.i.name)}</td><td style="text-align:left">${esc(y.i.genre||'')}</td><td>${int(y.c)}</td><td>${x.G?pct(y.or):'—'}</td><td>${yen(y.s)}</td><td>${pct(y.s/x.total)}</td></tr>`).join('');
       const mb=document.getElementById('orMore');mb.hidden=orShowAll||all.length<=30;mb.textContent=`残り${all.length-30}品も表示`;};
     orF.onchange=draw;document.getElementById('orMore').onclick=()=>{orShowAll=true;draw();};draw();}
+  bindKw();
   const pmemo=document.getElementById('prodMemo'); if(pmemo) pmemo.onchange=()=>{S.prodMemo[prodMonth()]=pmemo.value.trim();save();};
   const oi=document.getElementById('otoshiIn'); if(oi) oi.onchange=()=>{S.settings.otoshi=+oi.value||0;save();renderProd();};
   const cg=document.getElementById('cntGo');
@@ -2656,6 +2658,47 @@ function drawPending(){
       else{it=S.items.find(x=>x.id===v);S.aliases[normName(p.raw)]=v;}
       if(it){c[it.id]=(c[it.id]||0)+p.qty;n++;}});
     pending=[];save();renderProd();const m=document.getElementById('cntMsg');m.className='msg ok';m.textContent=`${n}件を反映しました`;};
+}
+
+/* キーワード別の構成比 */
+let kwOpen=null;
+function kwMatch(i,q){
+  const hay=z2h((i.name||'')+' '+(i.genre||'')).toLowerCase();
+  const toks=z2h(String(q)).toLowerCase().split(/\s+/).filter(Boolean);
+  const exc=toks.filter(w=>/^[-−]./.test(w)).map(w=>w.slice(1));
+  if(exc.some(w=>hay.includes(w))) return false;
+  const pos=toks.filter(w=>!/^[-−]./.test(w));
+  if(!pos.length) return false;
+  return pos.every(w=>w.split(/[|｜、,，\/]+/).filter(Boolean).some(o=>hay.includes(o)));
+}
+function kwStat(x,q){
+  const rows=x.rows.filter(y=>kwMatch(y.i,q));const c=rows.reduce((a,y)=>a+y.c,0),s=rows.reduce((a,y)=>a+y.s,0);
+  const cnt={D:0,F:0,O:0};rows.forEach(y=>{cnt[y.i.cat==='ドリンク'?'D':y.i.cat==='フード'?'F':'O']++;});
+  const k=cnt.F>=cnt.D&&cnt.F>=cnt.O?'F':cnt.D>=cnt.O?'D':'O';
+  const base=x.sum[k];const allC=x.sum.F.c+x.sum.D.c+x.sum.O.c;
+  return {rows,c,s,k,catLabel:k==='F'?'フード':k==='D'?'ドリンク':'その他',cC:base.c?c/base.c:null,cS:base.s?s/base.s:null,aC:allC?c/allC:null,aS:x.total?s/x.total:null,or:x.G?c/x.G:null};
+}
+function kwHTML(x,p,m,pm){
+  if(!S.prodKeywords) S.prodKeywords=['たこ焼','ハイボール','メガ','サワー'];
+  const K=S.prodKeywords;
+  const pp=v=>isNum(v)?(v*100).toFixed(1)+'%':'—';
+  const dpt=(a,b)=>isNum(a)&&isNum(b)?`<span class="${a-b>=0?'up':'dn'}" style="font-size:11.5px;display:block">${a-b>=0?'+':'−'}${Math.abs((a-b)*100).toFixed(1)}pt</span>`:'';
+  let rows=K.map((q,ix)=>{const a=kwStat(x,q),b=p?kwStat(p,q):null;
+    const open=kwOpen===ix;
+    let tr=`<tr class="kwrow" data-kw="${ix}" style="cursor:pointer"><td style="text-align:left"><b>${esc(q)}</b> <span class="muted small">${a.rows.length}品${open?' ▲':' ▼'}</span></td><td>${int(a.c)}</td><td>${yen(a.s)}</td><td>${a.catLabel}</td><td>${pp(a.cC)}${b?dpt(a.cC,b.cC):''}</td><td>${pp(a.cS)}${b?dpt(a.cS,b.cS):''}</td><td>${pp(a.aC)}${b?dpt(a.aC,b.aC):''}</td><td>${pp(a.aS)}${b?dpt(a.aS,b.aS):''}</td><td>${x.G?pp(a.or):'—'}${b&&p.G&&x.G?dpt(a.or,b.or):''}</td><td><button class="ghost" data-kwdel="${ix}" title="削除">×</button></td></tr>`;
+    if(open) tr+=`<tr><td colspan="10" style="text-align:left;background:var(--bg2,#faf9f6)">${a.rows.length?`<table class="grid" style="margin:4px 0"><thead><tr><th style="text-align:left">該当する商品</th><th>出数</th><th>金額</th><th>${a.catLabel}内の出数構成比</th><th>${a.catLabel}内の金額構成比</th></tr></thead><tbody>${[...a.rows].sort((u,v)=>v.s-u.s).map(y=>{const bs=x.sum[a.k];return `<tr><td style="text-align:left">${esc(y.i.name)}</td><td>${int(y.c)}</td><td>${yen(y.s)}</td><td>${pp(bs.c?y.c/bs.c:null)}</td><td>${pp(bs.s?y.s/bs.s:null)}</td></tr>`;}).join('')}</tbody></table>`:'<span class="muted">該当する商品がありません</span>'}</td></tr>`;
+    return tr;}).join('');
+  return `<div class="card"><h2>キーワード別の構成比<span class="sub">${ymLabel(m)}${pm?`・小さい字は${ymLabel(pm,true)}との差`:''}</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><input type="text" id="kwIn" placeholder="例：たこ焼　／　レモン|サワー　／　ハイボール -メガ" style="min-width:280px;flex:1"><button class="primary" id="kwAdd">追加</button></div>
+  <div class="scrollx"><table class="grid"><thead><tr><th style="text-align:left">キーワード</th><th>出数</th><th>金額</th><th>区分</th><th>区分内<br>出数構成比</th><th>区分内<br>金額構成比</th><th>全体<br>出数構成比</th><th>全体<br>金額構成比</th><th>注文率</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="muted">キーワードを追加してください</td></tr>'}</tbody></table></div>
+  <p class="muted small" style="margin:6px 0 0">商品名とジャンルにキーワードを含む商品を合計します。「|」や「、」で区切ると「どれかを含む」、スペースで区切ると「すべてを含む」、「-メガ」のように頭にマイナスを付けると「含まないもの」です。区分内の構成比は、該当商品が多い区分（フード・ドリンク・その他）の合計に対する割合です。行を押すと該当する商品の一覧が開きます。</p></div>`;
+}
+function bindKw(){
+  const add=document.getElementById('kwAdd'); if(!add) return;
+  const go=()=>{const v=document.getElementById('kwIn').value.trim();if(!v)return;if(!S.prodKeywords)S.prodKeywords=[];if(!S.prodKeywords.includes(v))S.prodKeywords.push(v);save();renderProd();};
+  add.onclick=go; document.getElementById('kwIn').onkeydown=e=>{if(e.key==='Enter')go();};
+  document.querySelectorAll('[data-kwdel]').forEach(b=>b.onclick=e=>{e.stopPropagation();S.prodKeywords.splice(+b.dataset.kwdel,1);kwOpen=null;save();renderProd();});
+  document.querySelectorAll('.kwrow').forEach(r=>r.onclick=()=>{const i=+r.dataset.kw;kwOpen=kwOpen===i?null:i;renderProd();});
 }
 
 /* ---------- 経営診断に入れる商品の所見 ---------- */
