@@ -2766,7 +2766,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.85'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.86'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3625,8 +3625,21 @@ function vFare(){
   <div class="kpis"><div class="kpi"><span class="k">前日までの合計</span><span class="v">${yen(prev)}</span></div>
     <div class="kpi"><span class="k">${md(date)} の交通費</span><span class="v">${yen(todayT)}</span></div>
     <div class="kpi hi"><span class="k">${md(date)} までの累計</span><span class="v">${yen(prev+todayT)}</span></div></div>
-  ${list.length?`<table class="t"><thead><tr><th>スタッフ</th><th class="r">往復</th><th>出勤</th><th class="r">期間累計</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="empty">P/Aのスタッフがいません。</div>'}</section>`;
+  ${list.length?`<table class="t"><thead><tr><th>スタッフ</th><th class="r">往復</th><th>出勤</th><th class="r">期間累計</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="empty">P/Aのスタッフがいません。</div>'}</section>${farePeriod(list)}`;
 }
+// 期間を決めて、アルバイトごとの出勤日数と交通費の合計を出す
+function farePeriodData(list,from,to){const R=list.map(s=>{const days=[];for(let d=from;d<=to;d=addDays(d,1))if(worked(d,s.id))days.push(d);return {s,days,fare:Number(s.fare)||0,sum:days.length*(Number(s.fare)||0)}});return R}
+function farePeriod(list){const from=S.fareFrom||today.slice(0,8)+'01',to=S.fareTo&&S.fareTo>=from?S.fareTo:monthDays(from.slice(0,7)).slice(-1)[0];
+  const R=farePeriodData(list,from,to),tot=R.reduce((a,x)=>a+x.sum,0),totD=R.reduce((a,x)=>a+x.days.length,0),nOn=R.filter(x=>x.days.length).length;
+  const quick=[['今月',today.slice(0,8)+'01',monthDays(today.slice(0,7)).slice(-1)[0]],['先月',addDays(today.slice(0,8)+'01',-1).slice(0,8)+'01',addDays(today.slice(0,8)+'01',-1)],['今週',S.week,addDays(S.week,6)]];
+  return `<section class="panel" style="max-width:760px"><div class="bar"><h2>期間の交通費（アルバイト）</h2>
+      <label class="field"><span>から</span><input type="date" data-f="fareFrom" value="${from}"></label><label class="field"><span>まで</span><input type="date" data-f="fareTo" value="${to}"></label>
+      ${quick.map(([l,a,b])=>`<button class="btn sm ghost" data-act="fareQuick" data-a="${a}" data-b="${b}">${l}</button>`).join('')}</div>
+    <div class="kpis"><div class="kpi hi"><span class="k">${md(from)}〜${md(to)} の交通費合計</span><span class="v">${yen(tot)}</span></div><div class="kpi"><span class="k">出勤した人</span><span class="v">${nOn}人</span></div><div class="kpi"><span class="k">出勤日数の合計</span><span class="v">${totD}日</span></div></div>
+    <div class="scroll"><table class="t"><thead><tr><th>スタッフ</th><th class="r">往復</th><th class="r">出勤日数</th><th class="r">交通費</th><th>出勤日</th></tr></thead><tbody>
+      ${R.map(x=>`<tr${x.days.length?'':' class="muted"'}><td>${esc(x.s.name)}</td><td class="num">${yen(x.fare)}</td><td class="num">${x.days.length}日</td><td class="num"><b>${yen(x.sum)}</b></td><td style="font-size:11px;color:var(--muted)">${x.days.map(d=>md(d)).join('・')}</td></tr>`).join('')}
+      <tr class="tot"><td><b>合計</b></td><td></td><td class="num"><b>${totD}日</b></td><td class="num"><b>${yen(tot)}</b></td><td></td></tr></tbody></table></div>
+    <div class="bar" style="gap:6px"><button class="btn sm" data-act="fareCopy">表をコピー（表計算に貼り付け用）</button><span class="hint">シフトに出勤が入っている日を数え、名簿の「往復の交通費」× 出勤日数で計算します。往復の金額は今の名簿の金額です</span></div></section>`}
 
 /* --- 設定 --- */
 const setLocked=()=>set().setLock!==false&&!S.setOpen;
@@ -3760,10 +3773,11 @@ app.addEventListener('change',e=>{
   if(el.id==='brk28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.brk28=el.checked;saveSettings();return render()}
   if(el.id==='paid28'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.paid28=el.checked;saveSettings();return render()}
   if(el.dataset.subf){const v=S.draft.days[el.dataset.d];v[el.dataset.subf]=el.value===''?null:Number(el.value);S.draft.dirty=true;return render()}
-  if(f&&S.tab==='shift'&&!['monthStart','monthEnd','fareDate','h28Start','me','subNote','budget','note','memo','ideal','posIdeal'].includes(f)&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return render()}
+  if(f&&S.tab==='shift'&&!['monthStart','monthEnd','fareDate','fareFrom','fareTo','h28Start','me','subNote','budget','note','memo','ideal','posIdeal'].includes(f)&&dayLocked(curDate())){toast('この日は確定しています。変えるときは「確定を解除」を押してください');return render()}
   if(f){
     if(f==='monthStart'||f==='monthEnd'){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings[f]=el.value;saveSettings();return render()}
     if(f==='fareDate'){S.fareDate=el.value||null;el.blur();return render()}
+    if(f==='fareFrom'||f==='fareTo'){S[f]=el.value||null;el.blur();return render()}
     if(f==='h28Start'){S.h28Start=el.value||null;el.blur();return render()}
     if(f==='me'){S.me=el.value||'';try{localStorage.setItem('shiftapp:me:'+S.store,S.me)}catch(_){};return render()}
     if(f==='subNote'){S.draft.note=el.value;S.draft.dirty=true;return}
@@ -3822,6 +3836,10 @@ app.addEventListener('click',e=>{
   if(a==='ocrReset'){if(!confirm('読み込んだスクショと下書きを全部消しますか？（登録済みのシフト希望はそのままです）'))return;S.rc.forEach(y=>{try{URL.revokeObjectURL(y.url)}catch(_){}});S.rc=[];S.rcP=[];S.rcN=0;return render()}
   if(a==='zRead'){const t=document.getElementById('zText')?.value||'';S.zText=t;const r=zParse(t);if(!r.length)return toast('「名前　2026/12/24」の形の行が見つかりません');S.zImp=r;toast(`${r.length}行を読み取りました（${r.filter(x=>x.sid).length}人を名簿に結びつけました）`);return render()}
   if(a==='zApply'){let n=0;for(const r of S.zImp||[]){if(!r.sid)continue;const st=S.staff[r.sid];if(!st||!st.limit28)continue;st.zairyu=r.date;if(!st.fullName)st.fullName=r.name.replace(/\s+/g,' ');saveStaff(st.id);n++}S.zImp=null;S.zText='';toast(`${n}人の在留カード期限を入れました`);return render()}
+  if(a==='fareQuick'){S.fareFrom=b.dataset.a;S.fareTo=b.dataset.b;return render()}
+  if(a==='fareCopy'){const from=S.fareFrom||today.slice(0,8)+'01',to=S.fareTo&&S.fareTo>=from?S.fareTo:monthDays(from.slice(0,7)).slice(-1)[0],R=farePeriodData(staffList(true).filter(s=>s.kind!=='社員'),from,to);
+    const txt=[`期間\t${from}〜${to}`,'スタッフ\t往復\t出勤日数\t交通費',...R.map(x=>`${x.s.name}\t${x.fare}\t${x.days.length}\t${x.sum}`),`合計\t\t${R.reduce((a,x)=>a+x.days.length,0)}\t${R.reduce((a,x)=>a+x.sum,0)}`].join('\n');
+    (navigator.clipboard?.writeText(txt)||Promise.reject()).then(()=>toast('コピーしました。表計算やメモに貼り付けられます'),()=>toast('コピーできませんでした'));return}
   if(a==='setSec'){S.setSec=b.dataset.k;return render()}
   if(a==='setUnlock'){const st=set();if(st.setPin){const v=(document.getElementById('setPinIn')?.value||'').trim();if(sha256hex('setpin:'+v)!==st.setPin){toast('暗証番号が違います');return}}S.setOpen=true;toast('鍵を開けました');return render()}
   if(a==='setLock'){S.setOpen=false;toast('鍵をかけました');return render()}
@@ -4118,7 +4136,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v97';
+  const APP_SW='v98';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
