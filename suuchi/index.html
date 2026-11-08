@@ -250,6 +250,43 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
 #rep h3{font-size:15px;margin:10px 0 5px;border-left:4px solid var(--accent);padding-left:8px}
 #rep .rr{font-size:13px;line-height:1.6;margin-bottom:6px}#rep .rr b{font-weight:500}
 #rep .fc-item{font-size:13px;line-height:1.6;padding:6px 10px;margin-bottom:6px}#rep .fc-item .ft{font-size:14px}
+/* 報告：ひと目でわかる */
+.hero{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;border-radius:12px;padding:14px 16px;background:#f4f3f0;border:1px solid var(--line);margin-bottom:10px}
+.hero.ok{background:#eaf7ea;border-color:#b9e2b9}.hero.ng{background:#fdeeec;border-color:#f2c3bd}
+.hk{font-size:12px;color:var(--ink2)}
+.hbig{font-size:44px;line-height:1.1;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:10px}
+.hero.ok .hbig{color:#0a640a}.hero.ng .hbig{color:#a3271c}
+.hbadge{font-size:15px;color:#fff;background:var(--ink3);border-radius:999px;padding:2px 12px}
+.hero.ok .hbadge{background:var(--good)}.hero.ng .hbadge{background:var(--crit)}
+.hsub{font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums}
+.hsub .hg{font-weight:500}.hero.ng .hg{color:#a3271c}.hero.ok .hg{color:#0a640a}
+.hbar{position:relative;height:12px;border-radius:6px;background:rgba(0,0,0,.08);margin:10px 0 16px}
+.hbar span{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--ink2)}
+.hero.ok .hbar span{background:var(--good)}.hero.ng .hbar span{background:var(--crit)}
+.hbar i{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.hbar em{position:absolute;top:15px;transform:translateX(-50%);font-size:10px;font-style:normal;color:var(--ink2)}
+.hp{font-size:12px;color:var(--ink2)}
+.hr{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;align-content:center}
+.hr>div{background:rgba(255,255,255,.75);border-radius:8px;padding:6px 10px}
+.hv{font-size:22px;font-variant-numeric:tabular-nums}.hv small{font-size:12px;color:var(--ink2);margin-left:2px}
+.dstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+.dc{border:1px solid var(--line);border-radius:8px;padding:5px 6px;text-align:center;display:grid;grid-template-rows:auto auto auto 34px;gap:1px}
+.dc .dd{font-size:12px}.dc .dp{font-size:18px;font-variant-numeric:tabular-nums}.dc .dg{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.dc.g{background:#eaf7ea}.dc.g .dp{color:#0a640a}.dc.w{background:#fff6dc}.dc.w .dp{color:#6e4e00}.dc.b{background:#fdeeec}.dc.b .dp{color:#a3271c}.dc.n .dp{color:var(--ink3)}
+.dc .db{position:relative;background:rgba(0,0,0,.05);border-radius:4px;overflow:hidden}
+.dc .db span{position:absolute;left:25%;right:25%;bottom:0;border-radius:3px 3px 0 0;background:var(--ink3)}
+.dc.g .db span{background:var(--good)}.dc.w .db span{background:#d9a400}.dc.b .db span{background:var(--crit)}
+.dc .db i{position:absolute;left:8%;right:8%;height:0;border-top:1.5px dashed var(--ink2)}
+.issues{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:8px}
+.issue{border:1px solid #f2c3bd;border-left:4px solid var(--crit);border-radius:8px;padding:7px 10px;background:#fff}
+.issue .ih{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.issue .idt{font-size:15px}.issue .ig{font-size:17px;color:#a3271c;font-variant-numeric:tabular-nums}.issue .ia{font-size:12px;color:var(--ink2)}
+.issue .ib{display:grid;grid-template-columns:4.4em 1fr;gap:3px 8px;font-size:13px;line-height:1.5}
+.issue .ik{color:var(--ink2);font-size:12px;padding-top:1px}
+.issue .iv.iact{font-weight:500}
+.issue .iv.igoal{color:var(--accent)}
+.issue .tag{display:inline-block;margin-left:6px;font-size:11px;border-radius:999px;padding:0 7px;background:#fbe0dc;color:#a3271c}
+#rep .h3s{font-size:12px;color:var(--ink2);margin-left:8px;font-weight:400}
 #rep .cm{white-space:pre-wrap;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px;min-height:40px}
 .score{display:flex;align-items:baseline;gap:6px}
 .score .pt{font-size:30px;font-variant-numeric:tabular-nums}
@@ -1933,8 +1970,20 @@ function slWeek(mon){
     if(isNum(d.unitA)&&d.unitA>0) how.push(`あと<b>${Math.ceil(-d.gap/d.unitA)}人</b>来店（今の客単価のまま）`);
     if(isNum(d.G)&&d.G>0) how.push(`1人あたり<b>+${int(Math.ceil(-d.gap/d.G/10)*10)}円</b>（今の客数のまま）`);
     if(how.length) lines.push(`${how.join('、または')}で予算に届いていた。`);
-    const acts = actsFor(w? w.band : 'peak', cause || (w&&isNum(w.ge)? causeOf(w.ge,w.ue) : 'guest'), 2);
-    W.recs.push({d, title:`${dLabel(d.ds)} 予算${man(d.B)} → ${man(d.F)}（${signMan(d.gap)}・${pct(d.ach)}）`, lines, acts, lv:d.ach>=.8?'中':'高'});
+    const cs = cause || (w&&isNum(w.ge)? causeOf(w.ge,w.ue) : 'guest');
+    const acts = actsFor(w? w.band : 'peak', cs, 2);
+    // 報告用の項目
+    const it={};
+    it.short = signMan(d.gap);
+    if(w&&w.gap<0) it.where = `${w.label}（目安${signMan(w.t)} → 実績${signMan(w.a)}、${signMan(w.gap)}）`;
+    if(isNum(d.ge)) it.why = cs==='unit'
+      ? `客単価 ${int(d.unitA)}円（目標 ${int(d.U)}円、${signInt(d.unitA-d.U,'円')}）`
+      : `客数 ${int(d.G)}人（${isNum(d.Gb)?'稼働予算':'目安'} ${int(d.Gt)}人、${signInt(d.G-d.Gt,'人')}）`;
+    it.need = how.length? how.map(x=>x.replace(/（今の.+?）/,'')).join(' または ') : '';
+    if(w){ const nd=shiftDate(d.ds,7), nday=slDay(nd,U), nx=nday.segs.find(z=>z.label===w.label);
+      const src = nx&&isNum(nx.t)? nx : w;
+      it.goal = `${dLabel(nd)}の${w.label}で 目安${signMan(src.t)}${isNum(src.gt)?'・'+signInt(src.gt,'人'):''} を取る`; }
+    W.recs.push({d, it, cause:cs, title:`${dLabel(d.ds)} 予算${man(d.B)} → ${man(d.F)}（${signMan(d.gap)}・${pct(d.ach)}）`, lines, acts, lv:d.ach>=.8?'中':'高'});
   });
   // 来週の重点（最大3つ）
   W.focus=[];
@@ -2096,10 +2145,15 @@ function slBandHTML(W){
   bs.forEach(b=>{ t+=`<tr><td>${b.label}</td><td>${man(b.t)}</td><td>${man(b.a)}</td><td style="color:${b.gap<0?'var(--crit)':'#0a7a0a'}">${signMan(b.gap)}</td><td>${b.gn?signMan(b.ge):'—'}</td><td>${b.gn?signMan(b.ue):'—'}</td><td>${b.n}</td></tr>`; });
   return c+t+'</tbody></table></div>';
 }
+function slIssueHTML(r){
+  const it=r.it, row=(k,v,cls='')=>v? `<div class="ik">${k}</div><div class="iv ${cls}">${v}</div>` : '';
+  return `<div class="issue"><div class="ih"><span class="idt">${dLabel(r.d.ds)}</span><span class="ig">${it.short}</span><span class="ia">予算${man(r.d.B)} → ${man(r.d.F)}（${pct(r.d.ach)}）</span></div>
+    <div class="ib">${row('どこで',it.where)}${row('なぜ',it.why? it.why+'<span class="tag">'+(r.cause==='unit'?'客単価不足':'客数不足')+'</span>' : '')}${row('達成には',it.need)}${row('やること',esc(r.acts[0]),'iact')}${row('来週は',it.goal,'igoal')}</div></div>`;
+}
 function slRecsHTML(W){
   let h='';
-  W.recs.forEach(r=>{ h+=`<div class="rec"><div class="rh"><span class="pri p${r.lv}">未達</span><span class="rt">${r.title}</span></div><div class="why">${r.lines.join('<br>')}</div><div class="acts"><div class="small muted">次に同じ曜日でやること</div><ul>${r.acts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>${r.d.memo?`<div class="small muted">メモ：${esc(r.d.memo)}</div>`:''}</div>`; });
-  if(W.goods.length) h+=`<div class="rec"><div class="rh"><span class="pri" style="background:var(--good)">達成</span><span class="rt">良かった日</span></div><ul class="dl" style="margin-top:6px">${W.goods.map(g=>`<li>${esc(g.text)}${g.d.memo?`<span class="muted small">（メモ：${esc(g.d.memo)}）</span>`:''}</li>`).join('')}</ul></div>`;
+  if(W.recs.length) h+=`<div class="issues">${W.recs.map(slIssueHTML).join('')}</div>`;
+  if(W.goods.length) h+=`<div class="rec" style="margin-top:12px"><div class="rh"><span class="pri" style="background:var(--good)">達成</span><span class="rt">良かった日</span></div><ul class="dl" style="margin-top:6px">${W.goods.map(g=>`<li>${esc(g.text)}${g.d.memo?`<span class="muted small">（メモ：${esc(g.d.memo)}）</span>`:''}</li>`).join('')}</ul></div>`;
   const open=W.days.filter(d=>d.has&&!d.closed);
   if(open.length) h+=`<div class="muted small">日計が未入力の日：${open.map(d=>dLabel(d.ds)).join('、')}（入力すると評価に入ります）</div>`;
   return h || '<div class="muted">日計が入ると、日ごとの評価と改善コメントが出ます。</div>';
@@ -2261,19 +2315,37 @@ function bindSlBud(){
   slBudPreview();
 }
 /* 報告用画面（写真・スクリーンショット用） */
+function slHeroHTML(W){
+  const done=W.cl.length, all=W.days.filter(d=>isNum(d.B)).length;
+  const ok=isNum(W.ach)&&W.ach>=1, gap=isNum(W.F)&&isNum(W.B)? W.F-W.B : null;
+  const w=Math.min(isNum(W.ach)?W.ach:0,1.2)/1.2*100;
+  const partial = done&&done<all? `<div class="hp">途中経過：日計あり${done}日分（週の予算は${man(W.Ball)}）</div>` : '';
+  const ms=[.8,1].map(r=>`<i style="left:${r/1.2*100}%"></i><em style="left:${r/1.2*100}%">${r*100}%</em>`).join('');
+  return `<div class="hero ${!done?'':ok?'ok':'ng'}">
+    <div class="hl">
+      <div class="hk">週の予算に対して</div>
+      <div class="hbig">${done?pct(W.ach):'—'}<span class="hbadge">${!done?'未入力':ok?'達成':'未達'}</span></div>
+      <div class="hsub">予算 ${man(W.B)} → 実績 ${man(W.F)}　<b class="hg">${signMan(gap)}</b></div>
+      <div class="hbar"><span style="width:${w}%"></span>${ms}</div>${partial}
+    </div>
+    <div class="hr">
+      <div><div class="hk">予算達成した日</div><div class="hv">${W.won}<small>/${done}日</small></div></div>
+      <div><div class="hk">時間帯の目安クリア</div><div class="hv">${W.hitN}<small>/${W.hitT}回</small></div></div>
+      <div><div class="hk">客数${isNum(W.Gb)?'（稼働予算）':''}</div><div class="hv">${int(W.G)}<small>人${isNum(W.Gb)?' / '+int(W.Gb):''}</small></div></div>
+      <div><div class="hk">客単価（目標）</div><div class="hv">${int(W.unit)}<small>円 / ${int(W.U)}</small></div></div>
+    </div></div>`;
+}
+function slStripHTML(W){
+  return `<div class="dstrip">${W.days.map(d=>{ const a=d.closed&&isNum(d.B)? d.ach : null, c=!isNum(a)?'n':a>=1?'g':a>=.9?'w':'b';
+    return `<div class="dc ${c}"><div class="dd">${dLabel(d.ds)}</div><div class="dp">${isNum(a)?pct(a,0):'—'}</div><div class="dg">${isNum(d.gap)?signMan(d.gap):(isNum(d.B)?'予算'+man(d.B):'')}</div><div class="db"><span style="height:${isNum(a)?Math.min(a,1.2)/1.2*100:0}%"></span><i style="bottom:${100/1.2}%"></i></div></div>`; }).join('')}</div>`;
+}
 function slReportHTML(W){
   const st=S.settings, wk=SL().weeks[W.mon]||{};
-  return `<div class="rh1"><div><div class="muted">${esc(st.storeName||'')}</div><h1>週次 時間帯ノルマ報告</h1></div><div style="text-align:right"><div>${wkLabel(W.mon)}</div><div class="muted small">作成 ${TODAY.replace(/-/g,'/')}</div></div></div>
-   <div class="kpis">
-    ${kpi('週の売上',man(W.F)+'<small>円</small>',['予算 '+man(W.B), W.cl.length?'達成率 '+pct(W.ach):''])}
-    ${kpi('予算達成日',W.won+'<small>/'+W.cl.length+'日</small>',[])}
-    ${kpi('目安クリア',W.hitN+'<small>/'+W.hitT+'回</small>',[W.hitT?pct(W.hitN/W.hitT,0):''])}
-    ${kpi('点数',isNum(W.score)?W.score+'<small>点 '+W.grade+'</small>':'—',['客数 '+int(W.G)+'人・客単価 '+int(W.unit)+'円'])}
-   </div>
-   <p style="font-size:13.5px;line-height:1.65;margin:2px 0 8px">${weekLead(W)}</p>
-   ${slHeatHTML(W).replace(/<div class="muted small"[\s\S]*$/,'')}
-   <h3>未達の日と改善策</h3>
-   ${W.recs.length? W.recs.map(r=>{ const d=r.d, w=d.worst, c=causeOf(d.ge,d.ue); const parts=[]; if(w&&w.gap<0) parts.push(`崩れ ${w.label} ${signMan(w.gap)}`); if(c) parts.push(`原因 ${c==='unit'?'客単価 '+signInt(d.unitA-d.U,'円'):'客数 '+signInt(d.G-d.Gt,'人')}`); if(isNum(d.unitA)&&d.unitA>0) parts.push(`あと${Math.ceil(-d.gap/d.unitA)}人 か 1人+${int(Math.ceil(-d.gap/d.G/10)*10)}円で達成`); return `<div class="rr"><b>${r.title}</b>　${parts.join('／')}<br>→ ${esc(r.acts[0])}</div>`; }).join('') : '<div class="muted">未達の日はありません。</div>'}
+  return `<div class="rh1"><div><div class="muted">${esc(st.storeName||'')}</div><h1>週次 時間帯ノルマ報告</h1></div><div style="text-align:right"><div>${wkLabel(W.mon)}</div><div class="muted small">作成 ${TODAY.replace(/-/g,'/')}${isNum(W.score)?'　点数 '+W.score+'点（'+W.grade+'）':''}</div></div></div>
+   ${slHeroHTML(W)}
+   ${slStripHTML(W)}
+   <h3>未達の日：何が足りず、どうするか<span class="h3s">${W.recs.length?W.recs.length+'日':''}</span></h3>
+   ${W.recs.length? `<div class="issues">${W.recs.map(slIssueHTML).join('')}</div>` : '<div class="muted">未達の日はありません。</div>'}
    <h3>来週の重点</h3>${slFocusHTML(W)}
    ${wk.next?`<div class="fc-item"><div class="ft">来週の取り組み</div>${esc(wk.next)}</div>`:''}
    ${wk.comment?`<h3>備考</h3><div class="cm">${esc(wk.comment)}</div>`:''}`;
