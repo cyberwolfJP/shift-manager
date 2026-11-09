@@ -4294,7 +4294,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v99';
+  const APP_SW='v100';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';

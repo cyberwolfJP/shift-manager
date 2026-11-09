@@ -66,4 +66,4 @@ URL：https://cyberwolfjp.github.io/shift-manager/
 | firebase-config.js | 空（クラウドは使わない） |
 | sw.js / manifest.webmanifest / icon-*.png | オフライン・ホーム画面アイコン |
 
-アプリを更新したら `sw.js` の `VERSION` を1つ上げてください。
+アプリを更新したら `sw.js` の `VERSION` と、`index.html` の `APP_SW` を同じ値で1つ上げてください（ずれていると「更新する」が出続けます）。
