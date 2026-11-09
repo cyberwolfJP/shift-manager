@@ -2768,7 +2768,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.88'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.89'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3394,7 +3394,7 @@ const tsOdd=dt=>TS_HOL.has(dt)||(TS_HOL.has(addDays(dt,1))&&![5,6].includes(wd(d
 const TS_CURVES0={0:{18:.25,19:.42,20:.62,21:.82,22:1},1:{18:.08,19:.18,20:.41,21:.64,22:.80},2:{18:.08,19:.18,20:.41,21:.64,22:.80},3:{18:.08,19:.18,20:.41,21:.64,22:.80},4:{18:.08,19:.18,20:.41,21:.64,22:.80},5:{18:.08,19:.18,20:.40,21:.68,22:.87},6:{18:.20,19:.35,20:.55,21:.78,22:.93}};
 const TS_OPEN0={1:[16,23],2:[16,23],3:[16,23],4:[16,23],5:[16,23],6:[14,23],0:[14,22]};
 function tsSuuchi(){try{const r=localStorage.getItem('suuchi-manager-v1');return r?JSON.parse(r):null}catch(_){return null}}
-function tsCfg(){const c=set().teisu||{};return {src:c.src||'auto',weeks:Number(c.weeks)||8,min:c.min!=null&&c.min!==''?Number(c.min):2,wage:Number(c.wage)||0,manual:c.manual||{},open:{...TS_OPEN0,...(c.open||{})}}}
+function tsCfg(){const c=set().teisu||{};return {cur:c.cur||'usual',src:c.src||'auto',weeks:Number(c.weeks)||8,min:c.min!=null&&c.min!==''?Number(c.min):2,wage:Number(c.wage)||0,manual:c.manual||{},open:{...TS_OPEN0,...(c.open||{})}}}
 function tsPut(k,v){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.teisu={...(S.settings.teisu||{}),[k]:v};saveSettings()}
 // 曜日の平均売上
 function tsSales(w,SU){const c=tsCfg();
@@ -3413,7 +3413,17 @@ function tsShare(w,SU){const c=tsCfg(),[o,cl]=c.open[w].map(Number),cfg=(SU&&SU.
   const sh=Array(24).fill(0);
   for(let k=1;k<pts.length;k++){const [a,ra]=pts[k-1],[b,rb]=pts[k];if(b<=a)continue;for(let h=a;h<b;h++){const i=h-8;if(i>=0&&i<24)sh[i]+=(rb-ra)/(b-a)}}
   return {sh,src:cfg&&cfg.curves?'数値マネージャーの時間帯ノルマ':'中間集計表の初期値',o,cl}}
-function tsCalc(w,SU){const c=tsCfg(),st=set(),A=c.wage||avgWage().avg,r=Number(st.monthRate??24)/100,sal=tsSales(w,SU),SH=tsShare(w,SU),cur=tplGet(w).ideal.map(Number);
+// 普段の人数：シフト作成で日ごとに入れた理想人数（直近8週・その曜日）の、時間ごとに一番多い数字。直近8週になければ過去の入力の新しい8日
+function tsUsual(w){const all=Object.keys(S.days).filter(dt=>wd(dt)===w&&dt<=addDays(today,14)&&!tsOdd(dt)&&idealHrs(S.days[dt].ideal)>0).sort().reverse();
+  let ds=all.filter(dt=>dt>=addDays(today,-56));if(!ds.length)ds=all.slice(0,8);if(!ds.length)return null;
+  const ideal=Array(24).fill(0).map((_,i)=>{const cnt={};let best=0,bn=0;for(const dt of ds){const v=Number(S.days[dt].ideal[i])||0;cnt[v]=(cnt[v]||0)+1;if(cnt[v]>bn){bn=cnt[v];best=v}}return best});
+  return {ideal,n:ds.length,from:ds[ds.length-1],to:ds[0]}}
+function tsCur(w){const c=tsCfg(),t=tplGet(w).ideal.map(Number),hasT=idealHrs(t)>0,u=tsUsual(w);
+  if(c.cur==='usual'&&u)return {ideal:u.ideal,src:`普段の入力 ${u.n}日`};
+  if(hasT)return {ideal:t,src:'毎週の基本'};
+  if(u)return {ideal:u.ideal,src:`普段の入力 ${u.n}日`};
+  return {ideal:Array(24).fill(0),src:'未設定'}}
+function tsCalc(w,SU){const c=tsCfg(),st=set(),A=avgWage().avg,r=Number(st.monthRate??24)/100,sal=tsSales(w,SU),SH=tsShare(w,SU),CU=tsCur(w),cur=CU.ideal.slice();
   const inBiz=i=>{const h=8+i;return h>=SH.o&&h<SH.cl};
   const fixed=cur.reduce((a,v,i)=>a+(inBiz(i)?0:v),0),cap=sal.v*r,Hb=A>0?cap/A:0,avail=Math.max(0,Hb-fixed);
   // 売上の割合で配分し、最低人数を下回る時間は最低人数で固定して残りを配り直す
@@ -3423,9 +3433,9 @@ function tsCalc(w,SU){const c=tsCfg(),st=set(),A=c.wage||avgWage().avg,r=Number(
     low.forEach(i=>x[i]=c.min);left=Math.max(0,left-c.min*low.length);free=free.filter(i=>!low.includes(i));if(!free.length)break}
   const rec=cur.map((v,i)=>inBiz(i)?Math.max(c.min,Math.round(x[i]*2)/2):v);
   const curH=cur.reduce((a,v)=>a+v,0),recH=rec.reduce((a,v)=>a+v,0),adj=idealAdjW(w),curCost=curH*A+adj;
-  return {w,A,r,sal,SH,cur,rec,fixed,cap,Hb,curH,recH,curCost,rate:sal.v>0?curCost/sal.v*100:null,inBiz,prod:A>0&&r>0?A/r:0}}
+  return {w,A,r,sal,SH,cur,rec,fixed,cap,Hb,curH,recH,curCost,curSrc:CU.src,rate:sal.v>0?curCost/sal.v*100:null,inBiz,prod:A>0&&r>0?A/r:0}}
 function teisuPanel(){const c=tsCfg(),st=set(),SU=tsSuuchi(),order=[1,2,3,4,5,6,0],R=Object.fromEntries(order.map(w=>[w,tsCalc(w,SU)])),MR=Number(st.monthRate??24),lk=moneyLocked();
-  const A=R[1].A;if(!(A>0))return `<section class="panel" id="teisuSec"><h2>定数の診断（売上と時給から）</h2><div class="empty">${lk?'金額がロックされているため計算できません。閲覧用パスワードで解除してください。':'名簿に時給が入っていません。名簿で時給を入れるか、下の「平均時給」に入れてください。'}</div>${tsSettings(c,SU)}</section>`;
+  const A=R[1].A;if(!(A>0))return `<section class="panel" id="teisuSec"><h2>定数の診断（売上と時給から）</h2><div class="empty">${lk?'金額がロックされているため計算できません。閲覧用パスワードで解除してください。':'マスタ → 名簿に時給が入っていません。名簿で時給を入れると、その平均で計算します。'}</div>${tsSettings(c,SU)}</section>`;
   const W=S.tsW??1,D=R[W];
   const lab=h=>h>=24?`翌${h-24}`:`${h}`;
   // 曜日ごとのまとめ
@@ -3434,7 +3444,7 @@ function teisuPanel(){const c=tsCfg(),st=set(),SU=tsSuuchi(),order=[1,2,3,4,5,6,
     const pill=over?`<span class="pill bad">${n1(dif)}h 多い</span>`:loose?`<span class="pill warn">${n1(-dif)}h 余裕</span>`:'<span class="pill good">適正</span>';
     return `<tr${w===W?' style="outline:2px solid var(--accent,#c0392b)"':''}><th class="${w===0?'sun':w===6?'sat':''}"><button class="btn sm${w===W?' pri':''}" data-act="tsW" data-w="${w}">${WD[w]}</button></th>
       <td class="num">${yen(x.sal.v)}<div class="muted" style="font-size:10px">${esc(x.sal.src)}${x.sal.n?` ${x.sal.n}日`:''}</div></td><td class="num">${yen(x.cap)}</td><td class="num">${n1(x.Hb)}h</td>
-      <td class="num">${n1(x.curH)}h</td><td class="num ${over?'cell-bad':loose?'':'cell-good'}">${x.rate.toFixed(1)}%</td><td>${pill}</td></tr>`}).join('');
+      <td class="num">${n1(x.curH)}h<div class="muted" style="font-size:10px">${esc(x.curSrc)}</div></td><td class="num ${over?'cell-bad':loose?'':'cell-good'}">${x.rate.toFixed(1)}%</td><td>${pill}</td></tr>`}).join('');
   // 一覧：時間 × 曜日（今の定数 → おすすめ）
   const used=HOURS.map((h,i)=>order.some(w=>R[w].cur[i]>0||R[w].rec[i]>0));
   const mtx=HOURS.map((h,i)=>i).filter(i=>used[i]).map(i=>`<tr><th class="num">${lab(HOURS[i])}時</th>${order.map(w=>{const x=R[w];if(!(x.sal.v>0))return `<td class="muted">${x.cur[i]||''}</td>`;
@@ -3449,7 +3459,7 @@ function teisuPanel(){const c=tsCfg(),st=set(),SU=tsSuuchi(),order=[1,2,3,4,5,6,
       <td class="num ${p==null?'':p<D.prod*0.85?'cell-bad':p>D.prod*1.3?'tsLow':'cell-good'}">${p==null?'—':yen(p)}</td></tr>`}).join(''):'';
   const recCost=D.recH*D.A+idealAdjW(W);
   return `<section class="panel" id="teisuSec"><h2>定数の診断（売上と時給から）</h2>
-    <p class="hint" style="margin:0">曜日ごとの平均売上 × 目標人件費率${MR}%（月間）＝ 人件費の枠。枠 ÷ 平均時給${lk?'':`（${yen(A)}）`} ＝ その曜日に使える人時。それを時間帯の売れ方の割合で配り、最低${c.min}人を下回る時間は${c.min}人にしたのが「おすすめ」です。1人が1時間で売るべき目安（目標の人時生産性）は ${yen(D.prod)} です。</p>
+    <p class="hint" style="margin:0">曜日ごとの平均売上 × 目標人件費率${MR}%（月間）＝ 人件費の枠。枠 ÷ 平均時給${lk?'':`（${yen(A)}・名簿${avgWage().n}人の平均）`} ＝ その曜日に使える人時。それを時間帯の売れ方の割合で配り、最低${c.min}人を下回る時間は${c.min}人にしたのが「おすすめ」です。1人が1時間で売るべき目安（目標の人時生産性）は ${yen(D.prod)} です。</p>
     <div class="scroll"><table class="t tpl"><thead><tr><th>曜日</th><th class="r">平均売上</th><th class="r">人件費の枠</th><th class="r">使える人時</th><th class="r">今の定数</th><th class="r">定数どおりの人件費率</th><th>判定</th></tr></thead><tbody>${sumRows}</tbody></table></div>
     <p class="hint" style="margin:0">「多い」は今の定数のまま全員入れると目標の${MR}%を超える曜日、「余裕」は2%以上下回る曜日（ピークに足せる人時があります）。曜日を押すと下に詳しく出ます。</p>
     <h3 style="margin:10px 0 4px">時間帯ごと（今の定数 → おすすめ）</h3>
@@ -3466,17 +3476,20 @@ function teisuPanel(){const c=tsCfg(),st=set(),SU=tsSuuchi(),order=[1,2,3,4,5,6,
     ${tsSettings(c,SU)}</section>`}
 function tsSettings(c,SU){const order=[1,2,3,4,5,6,0],lk=moneyLocked(),hs=Array.from({length:17},(_,k)=>8+k);
   const hSel=(w,j)=>`<select data-tsopen="${w}|${j}" aria-label="${WD[w]}曜の${j?'閉店':'開店'}">${hs.map(h=>`<option value="${h}"${Number(c.open[w][j])===h?' selected':''}>${h}時</option>`).join('')}</select>`;
-  return `<details style="margin-top:10px"><summary><b>診断の設定</b><span class="hint">売上の取り方・営業時間・最低人数・平均時給</span></summary>
+  return `<details style="margin-top:10px"><summary><b>診断の設定</b><span class="hint">今の定数・売上の取り方・営業時間・最低人数</span></summary>
     <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">
+      <label class="field"><span>今の定数の取り方</span><select data-ts="cur"><option value="usual"${c.cur==='usual'?' selected':''}>普段の入力（シフト作成で日ごとに入れた人数）</option><option value="tpl"${c.cur==='tpl'?' selected':''}>毎週の基本（上の表）</option></select></label>
       <label class="field"><span>売上の取り方</span><select data-ts="src"><option value="auto"${c.src==='auto'?' selected':''}>実績（なければ売上予算）</option><option value="actual"${c.src==='actual'?' selected':''}>実績だけ</option><option value="budget"${c.src==='budget'?' selected':''}>売上予算だけ</option></select></label>
       <label class="field"><span>実績の期間</span><select data-ts="weeks">${[4,8,12,26].map(n=>`<option value="${n}"${c.weeks===n?' selected':''}>直近${n}週</option>`).join('')}</select></label>
       <label class="field"><span>営業中の最低人数</span><input type="number" min="0" step="0.5" data-ts="min" value="${c.min}" style="width:80px"></label>
-      ${lk?'':`<label class="field"><span>平均時給（空欄＝名簿の平均 ${yen(avgWage().avg)}）</span><input type="number" min="0" step="10" data-ts="wage" value="${c.wage||''}" placeholder="自動" style="width:110px"></label>`}</div>
+      <div class="field"><span>平均時給</span><b class="num">${yen(avgWage().avg)}</b><span class="hint">マスタ → 名簿の在籍スタッフ${avgWage().n}人の時給から自動で計算</span></div></div>
     <p class="hint" style="margin:4px 0">実績は数値マネージャー（この端末）の日別売上を使います${SU?'':'（この端末に数値マネージャーのデータが見つかりません）'}。祝日と祝前日（平日）は平均から外しています。売れ方の割合を変えたいときは、数値マネージャーの「時間帯ノルマ → 配分・設定」で直してください。</p>
     <div class="scroll"><table class="t tpl"><thead><tr><th></th>${order.map(w=>`<th class="${w===0?'sun':w===6?'sat':''}">${WD[w]}</th>`).join('')}</tr></thead><tbody>
       <tr><th>開店</th>${order.map(w=>`<td>${hSel(w,0)}</td>`).join('')}</tr><tr><th>閉店</th>${order.map(w=>`<td>${hSel(w,1)}</td>`).join('')}</tr>
       ${lk?'':`<tr><th style="white-space:nowrap">売上の手入力</th>${order.map(w=>`<td><input type="number" min="0" step="1000" inputmode="numeric" data-tsman="${w}" value="${Number(c.manual[w])||''}" placeholder="自動" style="width:84px"></td>`).join('')}</tr>`}</tbody></table></div>
-    <p class="hint" style="margin:0">手入力した曜日はその金額を使います（空欄に戻すと自動）。</p></details>`}
+    <p class="hint" style="margin:0">手入力した曜日はその金額を使います（空欄に戻すと自動）。</p>
+    <p class="hint" style="margin:8px 0 0">普段の入力＝シフト作成で日ごとに入れた理想人数の、直近8週・同じ曜日で一番多い数字（祝日・祝前日は除く）。入力がない曜日は毎週の基本を使います。</p>
+    <div class="bar"><button class="btn" data-act="tsUsualSave">普段の人数を毎週の基本（上の表）に入れる</button></div></details>`}
 function idealPanel(date){
   const st=set(),d=dayDoc(date),W=WD[wd(date)],t=tplOf(date),raw=S.days[date]||{},usingT=useTpl(raw,date),has=hasIdeal(d);
   const norm=o=>JSON.stringify(Object.entries(o||{}).filter(([,v])=>Number(v)>0).sort());
@@ -3895,7 +3908,7 @@ app.addEventListener('change',e=>{
   if(el.dataset.otmode){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.otMode=el.value;saveSettings();toast('残業の数え方を「'+OT_MODES[el.value]+'」にしました');return render()}
   if(el.dataset.ocset){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings[el.dataset.ocset]=el.value===''?null:Number(el.value);saveSettings();return render()}
   if(el.dataset.popt){S.printOpt={...(S.printOpt||{week:true,days:true,recruit:true}),[el.dataset.popt]:el.checked};return render()}
-  if(el.dataset.ts){const k=el.dataset.ts;tsPut(k,k==='src'?el.value:(el.value===''?null:Number(el.value)));return render()}
+  if(el.dataset.ts){const k=el.dataset.ts;tsPut(k,k==='src'||k==='cur'?el.value:(el.value===''?null:Number(el.value)));return render()}
   if(el.dataset.tsman!=null){const m={...(tsCfg().manual)},v=Number(el.value)||0;if(v>0)m[el.dataset.tsman]=v;else delete m[el.dataset.tsman];tsPut('manual',m);return render()}
   if(el.dataset.tsopen){const [w,j]=el.dataset.tsopen.split('|').map(Number),o={...((set().teisu||{}).open||{})},cur=(o[w]||TS_OPEN0[w]).slice();cur[j]=Number(el.value);if(cur[1]<=cur[0])return toast('閉店は開店より後にしてください');o[w]=cur;tsPut('open',o);return render()}
   if(el.dataset.tpl){const [w,i]=el.dataset.tpl.split('|').map(Number),t=tplGet(w);t.ideal[i]=Math.max(0,Number(el.value)||0);tplPut(w,t);return render()}
@@ -4061,10 +4074,13 @@ app.addEventListener('click',e=>{
     for(const dt of ds){const d=S.days[dt];d.ideal=Array(24).fill(0);d.posIdeal={};d.idealSet=false;saveDay(dt)}toast(`${ds.length}日分を基本の人数に戻しました`);return render()}
   if(a==='idlAll'){S.idealAll=!S.idealAll;return render()}
   if(a==='tsW'){S.tsW=+b.dataset.w;return render()}
+  if(a==='tsUsualSave'){const ws=[1,2,3,4,5,6,0].filter(w=>tsUsual(w));if(!ws.length)return toast('シフト作成で日ごとに入れた理想人数が見つかりません');
+    if(!confirm(`${ws.map(w=>WD[w]).join('・')}曜日の毎週の基本を、普段の入力の人数に書き換えますか？（ポジション別の人数はそのまま）`))return;
+    for(const w of ws){const t=tplGet(w);t.ideal=tsUsual(w).ideal;tplPut(w,t)}toast(`${ws.map(w=>WD[w]).join('・')}曜日の基本を普段の人数にしました`);return render()}
   if(a==='tsApply'||a==='tsApplyAll'){const SU=tsSuuchi(),ws=a==='tsApply'?[+b.dataset.w]:[1,2,3,4,5,6,0];const ok=ws.filter(w=>tsCalc(w,SU).sal.v>0);
     if(!ok.length)return toast('売上がないため、おすすめを出せません');
     if(!confirm(`${ok.map(w=>WD[w]).join('・')}曜日の毎週の定数（営業時間内）を、おすすめの人数に書き換えますか？（準備・締めの時間とポジション別の人数はそのまま）`))return;
-    for(const w of ok){const x=tsCalc(w,SU),t=tplGet(w);t.ideal=t.ideal.map((v,i)=>x.inBiz(i)?x.rec[i]:v);tplPut(w,t)}
+    for(const w of ok){const x=tsCalc(w,SU),t=tplGet(w);t.ideal=x.cur.map((v,i)=>x.inBiz(i)?x.rec[i]:v);tplPut(w,t)}
     toast(`${ok.map(w=>WD[w]).join('・')}曜日の定数をおすすめにしました`);return render()}
   if(a==='idlFill'){const f=+document.getElementById('ifFrom').value,t=+document.getElementById('ifTo').value,n=Math.max(0,Number(document.getElementById('ifN').value)||0);
     S.ifFrom=f;S.ifTo=t;S.ifN=n;if(t<f)return toast('「ここまで」は「ここから」より後にしてください');
@@ -4294,7 +4310,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v100';
+  const APP_SW='v101';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
