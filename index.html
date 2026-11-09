@@ -458,6 +458,7 @@ body.out .brand{visibility:hidden}
     <button data-tab="paid" data-in="stats">有給</button>
     <button data-tab="fare" data-in="stats">交通費</button>
     <button data-tab="emp" data-in="stats">社員勤務時間</button>
+    <button data-tab="revise" data-in="stats">下方修正</button>
     <button data-tab="budget" data-in="master">売上予算</button>
     <button data-tab="ideal" data-in="master">理想人数</button>
     <button data-tab="roster" data-in="master">名簿</button>
@@ -1526,7 +1527,7 @@ function render(){if(S.tab!=='settings')S.setOpen=false;healPositions();healPaid
   if(S.role==='staff'&&!['submit','final'].includes(S.tab))S.tab='submit';
   if(S.role==='manager')maybeBackupPrompt();
   h+=moneyBar();
-  h+=({eval:vEval,hire:vHire,help:vHelp,req:vReq,paid:vPaid,year:vYear,skill:vSkill,submit:vSubmit,budget:vBudget,ideal:vIdealTpl,cal:vCal,shift:vShift,final:vFinal,week:vWeek,roster:vRoster,emp:vEmp,h28:v28,fare:vFare,settings:vSettings}[S.tab])();
+  h+=({eval:vEval,hire:vHire,help:vHelp,req:vReq,paid:vPaid,year:vYear,skill:vSkill,submit:vSubmit,budget:vBudget,ideal:vIdealTpl,cal:vCal,shift:vShift,final:vFinal,week:vWeek,roster:vRoster,emp:vEmp,h28:v28,fare:vFare,revise:vRevise,settings:vSettings}[S.tab])();
   app.innerHTML=h;
   const cv=document.getElementById('printCv');if(cv)drawPrint(cv);
   const g2=app.querySelector('.scroll'); if(g2&&gx!=null)g2.scrollLeft=gx; else if(g2&&S.tab==='shift'&&g2.dataset.init&&window.innerWidth<1100)g2.scrollLeft=g2.dataset.init;
@@ -1778,7 +1779,7 @@ function vShift(){
   ${shoteiPanel(date)}
   <section class="panel" aria-label="${md(date)}の集計">
     <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${(()=>{if(moneyLocked())return '<span class="ratechip muted">人件費率 🔒</span>';const W=weekStats(S.week),tr=targetRateOf(date),pc=v=>v==null?'—':(v*100).toFixed(1)+'%',col=(v,t)=>v==null||t==null?'':v>t+1e-9?'bad':'good';
-  return `<span class="ratechip ${col(C.rate,tr/100)}" title="この日の人件費 ${yen(C.cost)} ÷ 売上予算 ${C.budget?yen(C.budget):'未入力'}（目標${tr}%）">この日 人件費率 <b>${pc(C.rate)}</b><small>目標${tr}%${C.paidCost?`・うち有給 ${yen(C.paidCost)}`:''}</small></span><span class="ratechip ${col(W.rate,W.target)}" title="${md(S.week)}〜${md(addDays(S.week,6))}の人件費 ${yen(W.cost)} ÷ 売上予算 ${W.bud?yen(W.bud):'未入力'}">この週 人件費率 <b>${pc(W.rate)}</b><small>${W.target!=null?'目標'+(W.target*100).toFixed(1)+'%':''}${W.paidC?`・うち有給 ${yen(W.paidC)}`:''}</small></span>`})()}${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
+  return `<span class="ratechip ${col(C.rate,tr/100)}" title="この日の人件費 ${yen(C.cost)} ÷ 売上予算 ${C.budget?yen(C.budget):'未入力'}（目標${tr}%）">この日 人件費率 <b>${pc(C.rate)}</b><small>目標${tr}%${C.paidCost?`・うち有給 ${yen(C.paidCost)}`:''}</small></span>${reviseChip(date)}<span class="ratechip ${col(W.rate,W.target)}" title="${md(S.week)}〜${md(addDays(S.week,6))}の人件費 ${yen(W.cost)} ÷ 売上予算 ${W.bud?yen(W.bud):'未入力'}">この週 人件費率 <b>${pc(W.rate)}</b><small>${W.target!=null?'目標'+(W.target*100).toFixed(1)+'%':''}${W.paidC?`・うち有給 ${yen(W.paidC)}`:''}</small></span>`})()}${(()=>{const E=evalPeriod([date]);return E?`<button class="mini" data-act="go" data-t="eval" data-m="day" title="この日の評価を開く">評価 <b>${E.score}</b>点 <span class="grade g-${E.grade}" style="width:20px;height:20px;font-size:12px;border-radius:4px">${E.grade}</span></button>`:''})()}
       ${ocLabel(date)}<span class="muted" style="font-size:12px">${(()=>{const I=idealCostOf(date);return `理想人件費 ${yen(I)}／比較 <b class="num ${C.cost-I>0?'cell-bad':'cell-good'}">${C.cost?yen(C.cost-I):'—'}</b>`})()}</span></div>
     ${(()=>{const tr=targetRateOf(date),cap=C.budget*tr/100,over=C.cost-cap;
       const RI=set().rateMode==='weekday'?null:weekRateInfo(date);
@@ -2766,7 +2767,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.86'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.87'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3641,6 +3642,53 @@ function farePeriod(list){const from=S.fareFrom||today.slice(0,8)+'01',to=S.fare
       <tr class="tot"><td><b>合計</b></td><td></td><td class="num"><b>${totD}日</b></td><td class="num"><b>${yen(tot)}</b></td><td></td></tr></tbody></table></div>
     <div class="bar" style="gap:6px"><button class="btn sm" data-act="fareCopy">表をコピー（表計算に貼り付け用）</button><span class="hint">シフトに出勤が入っている日を数え、名簿の「往復の交通費」× 出勤日数で計算します。往復の金額は今の名簿の金額です</span></div></section>`}
 
+
+/* ---------- 下方修正 ----------
+ 入力：○日までの総売上（実績）と社員込み人件費率（実績）
+ 月末の売上見込み＝実績＋残りの日の売上予算（「今の達成率で下げる」なら × 実績÷ここまでの予算）
+ 残りに使える人件費＝月末の売上見込み × 月間目標人件費率 − ここまでの人件費（売上 × 人件費率）
+ 普段の人件費＝同じ曜日の直近8週の人件費の平均（なければ 売上予算 × 月間目標）。残りの日はみな同じ割合で減らす */
+function usualCost(dt,asOf){const w=wd(dt);let t=0,n=0;for(let k=7;k<=8*7+42&&n<8;k+=7){const d=addDays(dt,-k);if(d>asOf)continue;const C=calcDay(d);if(C.cost>0){t+=C.cost;n++}}
+  return n?{v:t/n,n}:{v:(Number(dayDoc(dt).budget)||0)*Number(set().monthRate??24)/100,n:0}}
+function reviseCalc(ym){const R=(set().revise||{})[ym];if(!R||!(Number(R.sales)>0)||R.rate==null||R.rate==='')return null;
+  const ds=monthDays(ym),asOf=R.asOf&&R.asOf.slice(0,7)===ym?R.asOf:addDays(today,-1),MR=Number(set().monthRate??24)/100;
+  const done=ds.filter(d=>d<=asOf),rest=ds.filter(d=>d>asOf),bud=d=>Number(dayDoc(d).budget)||0;
+  const budDone=done.reduce((a,d)=>a+bud(d),0),budRest=rest.reduce((a,d)=>a+bud(d),0),sales=Number(R.sales),rate=Number(R.rate)/100;
+  const ratio=budDone?sales/budDone:1,useRatio=R.mode!=='budget',k0=useRatio?ratio:1;
+  const costDone=sales*rate,salesRest=budRest*k0,fore=sales+salesRest,allowed=fore*MR,left=allowed-costDone;
+  const pa=staffList().filter(x=>x.kind!=='社員').map(x=>Number(x.wage)||0).filter(v=>v>0),paW=pa.length?pa.reduce((a,b)=>a+b,0)/pa.length:1100;
+  const days=rest.map(dt=>{const u=usualCost(dt,asOf),C=calcDay(dt),has=(dayDoc(dt).shifts||[]).some(sh=>calcShift(sh).on);return {dt,bud:bud(dt),sales:bud(dt)*k0,usual:u.v,usualN:u.n,cur:has?C.cost:null}});
+  const usualTot=days.reduce((a,x)=>a+x.usual,0),k=usualTot?Math.max(0,left)/usualTot:0;
+  days.forEach(x=>{x.cap=x.usual*k;x.cut=x.usual-x.cap;x.cutH=x.cut/paW;x.over=x.cur!=null?x.cur-x.cap:null});
+  return {R,ym,asOf,MR,sales,rate,budDone,budRest,ratio,useRatio,costDone,salesRest,fore,allowed,left,usualTot,k,cutTot:usualTot-Math.max(0,left),paW,days,rest,
+    foreRateUsual:fore?(costDone+usualTot)/fore:null}}
+function reviseChip(date){if(moneyLocked())return '';const V=reviseCalc(date.slice(0,7));if(!V)return '';const x=V.days.find(d=>d.dt===date);if(!x)return '';
+  const cur=calcDay(date).cost,diff=cur-x.cap;
+  return `<span class="ratechip ${diff>0?'bad':'good'}" title="下方修正：普段の人件費 ${yen(x.usual)} を ${Math.round(V.k*100)}% にした上限です">下方修正 上限 <b>${yen(x.cap)}</b><small>${diff>0?`あと${yen(diff)}減らす（約${n1(diff/V.paW)}h）`:`あと${yen(-diff)}使える`}</small></span>`}
+function vRevise(){const ym=S.rym||today.slice(0,7);S.rym=ym;const st=set(),R=(st.revise||{})[ym]||{},V=reviseCalc(ym),lk=moneyLocked(),MR=Number(st.monthRate??24);
+  const y=+ym.slice(0,4),m=+ym.slice(5,7),asOf=R.asOf||addDays(today,-1);
+  const form=`<section class="panel"><div class="bar"><h2>下方修正（${y}年${m}月）</h2><button class="btn sm ghost" data-act="rym" data-n="-1">前の月</button><button class="btn sm ghost" data-act="rym" data-n="1">次の月</button>
+      <span class="hint">今の売上と人件費率から、月末に月間目標（${MR}%）に収めるには、これからのシフトを普段よりいくら減らせばよいかを出します</span></div>
+    ${lk?'<div class="empty">金額に鍵がかかっています。見る用パスワードで開いてください。</div>':`<div class="bar" style="gap:10px;flex-wrap:wrap;align-items:end">
+      <label class="field"><span>この日までの実績</span><input type="date" id="rvAsOf" value="${asOf}"></label>
+      <label class="field"><span>総売上（実績）</span><input type="number" id="rvSales" inputmode="numeric" value="${R.sales??''}" placeholder="例 3200000" style="width:150px"></label>
+      <label class="field"><span>社員込み人件費率（実績・%）</span><input type="number" id="rvRate" step="0.1" value="${R.rate??''}" placeholder="例 26.5" style="width:110px"></label>
+      <label class="field"><span>残りの日の売上</span><select id="rvMode"><option value="ratio"${R.mode!=='budget'?' selected':''}>今の達成率で下げて見込む</option><option value="budget"${R.mode==='budget'?' selected':''}>売上予算どおり</option></select></label>
+      <button class="btn pri" data-act="rvSave">計算して使う</button>${V?'<button class="btn sm ghost" data-act="rvClear">やめる</button>':''}</div>`}</section>`;
+  if(lk||!V)return form+(lk?'':'<p class="hint">実績の総売上と人件費率を入れて「計算して使う」を押すと、シフト作成の日付の横にも、その日の人件費の上限が出るようになります。</p>');
+  const pc=v=>v==null?'—':(v*100).toFixed(1)+'%',ok=V.left>0;
+  const kp=`<div class="kpis">
+    <div class="kpi"><span class="k">${md(V.asOf)}までの実績</span><span class="v">${yen(V.sales)}</span><span class="muted" style="font-size:11px">人件費 ${yen(V.costDone)}（${(V.rate*100).toFixed(1)}%）・予算達成率 ${V.budDone?Math.round(V.ratio*100)+'%':'—'}</span></div>
+    <div class="kpi"><span class="k">月末の売上見込み</span><span class="v">${yen(V.fore)}</span><span class="muted" style="font-size:11px">残り${V.rest.length}日 ${yen(V.salesRest)}${V.useRatio?`（予算 ${yen(V.budRest)} × ${Math.round(V.ratio*100)}%）`:''}</span></div>
+    <div class="kpi"><span class="k">月の人件費の枠（${MR}%）</span><span class="v">${yen(V.allowed)}</span><span class="muted" style="font-size:11px">残りで使えるのは ${yen(V.left)}</span></div>
+    <div class="kpi hi"><span class="k">普段どおりだと</span><span class="v ${V.foreRateUsual>V.MR?'cell-bad':'cell-good'}">${pc(V.foreRateUsual)}</span><span class="muted" style="font-size:11px">残りの普段の人件費 ${yen(V.usualTot)}</span></div>
+    <div class="kpi hi"><span class="k">${ok&&V.k<1?'残りの日は普段の':ok?'普段どおりでも収まる':'目標には届きません'}</span><span class="v ${ok&&V.k<1?'cell-bad':ok?'cell-good':'cell-bad'}">${ok?(V.k<1?Math.round(V.k*100)+'%に':'余裕あり'):'—'}</span><span class="muted" style="font-size:11px">${ok?(V.k<1?`合計 ${yen(V.cutTot)} 減らす・1日平均 −${yen(V.cutTot/Math.max(1,V.rest.length))}（約${n1(V.cutTot/Math.max(1,V.rest.length)/V.paW)}h）`:`あと ${yen(-V.cutTot)} 使えます`):`残りを0にしても${pc(V.costDone/V.fore)}です`}</span></div></div>`;
+  const rows=V.days.map(x=>`<tr><td>${md(x.dt)}（${WD[wd(x.dt)]}）</td><td class="num">${yen(x.sales)}</td><td class="num">${yen(x.usual)}${x.usualN?'':'<small class="muted">予算から</small>'}</td><td class="num"><b>${yen(x.cap)}</b></td><td class="num cell-bad">${x.cut>0?'−'+yen(x.cut):'—'}</td><td class="num">${x.cut>0?'約'+n1(x.cutH)+'h':'—'}</td>
+    <td class="num">${x.cur!=null?yen(x.cur):'<span class="muted">未作成</span>'}</td><td class="num ${x.over==null?'muted':x.over>0?'cell-bad':'cell-good'}">${x.over==null?'—':x.over>0?'あと'+yen(x.over)+'減らす':'OK（'+yen(-x.over)+'余裕）'}</td></tr>`).join('');
+  return form+`<section class="panel">${kp}
+    <div class="scroll"><table class="t"><thead><tr><th>日付</th><th class="r">売上見込み</th><th class="r">普段の人件費</th><th class="r">人件費の上限</th><th class="r">普段より</th><th class="r">時間にすると</th><th class="r">今のシフト</th><th class="r">上限との差</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">普段の人件費は、同じ曜日の直近8週の人件費（社員込み）の平均です。残りの日はどの日も同じ割合（${Math.round(Math.min(1,V.k)*100)}%）にそろえています。時間はアルバイトの平均時給 ${yen(V.paW)} で割った目安です。シフト作成の日付の横にも、その日の上限と、あといくら減らすかが出ます。</p></section>`}
+
 /* --- 設定 --- */
 const setLocked=()=>set().setLock!==false&&!S.setOpen;
 function vSettings(){
@@ -3836,6 +3884,11 @@ app.addEventListener('click',e=>{
   if(a==='ocrReset'){if(!confirm('読み込んだスクショと下書きを全部消しますか？（登録済みのシフト希望はそのままです）'))return;S.rc.forEach(y=>{try{URL.revokeObjectURL(y.url)}catch(_){}});S.rc=[];S.rcP=[];S.rcN=0;return render()}
   if(a==='zRead'){const t=document.getElementById('zText')?.value||'';S.zText=t;const r=zParse(t);if(!r.length)return toast('「名前　2026/12/24」の形の行が見つかりません');S.zImp=r;toast(`${r.length}行を読み取りました（${r.filter(x=>x.sid).length}人を名簿に結びつけました）`);return render()}
   if(a==='zApply'){let n=0;for(const r of S.zImp||[]){if(!r.sid)continue;const st=S.staff[r.sid];if(!st||!st.limit28)continue;st.zairyu=r.date;if(!st.fullName)st.fullName=r.name.replace(/\s+/g,' ');saveStaff(st.id);n++}S.zImp=null;S.zText='';toast(`${n}人の在留カード期限を入れました`);return render()}
+  if(a==='rym'){const [y,m]=S.rym.split('-').map(Number),d=new Date(y,m-1+Number(b.dataset.n),1);S.rym=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;return render()}
+  if(a==='rvSave'){const g=id=>document.getElementById(id)?.value,sales=Number(g('rvSales')),rate=g('rvRate'),asOf=g('rvAsOf');if(!(sales>0)||rate===''||rate==null)return toast('総売上と人件費率を入れてください');
+    if(asOf&&asOf.slice(0,7)!==S.rym)return toast(`「この日までの実績」は${+S.rym.slice(5)}月の日付にしてください`);
+    S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.revise={...(S.settings.revise||{}),[S.rym]:{asOf,sales,rate:Number(rate),mode:g('rvMode')}};saveSettings();toast('下方修正を計算しました');return render()}
+  if(a==='rvClear'){S.settings=S.settings||clone(DEFAULT_SETTINGS);const r={...(S.settings.revise||{})};delete r[S.rym];S.settings.revise=r;saveSettings();toast('下方修正をやめました');return render()}
   if(a==='fareQuick'){S.fareFrom=b.dataset.a;S.fareTo=b.dataset.b;return render()}
   if(a==='fareCopy'){const from=S.fareFrom||today.slice(0,8)+'01',to=S.fareTo&&S.fareTo>=from?S.fareTo:monthDays(from.slice(0,7)).slice(-1)[0],R=farePeriodData(staffList(true).filter(s=>s.kind!=='社員'),from,to);
     const txt=[`期間\t${from}〜${to}`,'スタッフ\t往復\t出勤日数\t交通費',...R.map(x=>`${x.s.name}\t${x.fare}\t${x.days.length}\t${x.sum}`),`合計\t\t${R.reduce((a,x)=>a+x.days.length,0)}\t${R.reduce((a,x)=>a+x.sum,0)}`].join('\n');
@@ -4136,7 +4189,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v98';
+  const APP_SW='v99';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
