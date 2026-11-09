@@ -1501,7 +1501,7 @@ function healPositions(){try{
 function render(){if(S.tab!=='settings')S.setOpen=false;healPositions();healPaid();rateCache.clear();
   const a=document.activeElement;
   if(a&&app.contains(a)&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&!['checkbox','radio','file','button','date','time','month','week'].includes(a.type)))){S.deferRender=true;return}
-  S.deferRender=false;
+  S.deferRender=false;try{if(S.days&&Object.keys(S.days).length)tplMigrate()}catch(_){}
   const tabs=document.getElementById('tabs'), who=document.getElementById('who');
   tabs.hidden=!S.role||(S.role==='staff'&&!S.me);document.body.classList.toggle('out',!S.role);
   const GROUP={eval:'stats',hire:'stats',help:'master',budget:'master',ideal:'master',week:'stats',year:'stats',h28:'stats',paid:'stats',fare:'stats',emp:'stats',roster:'master',skill:'master',settings:'master'};
@@ -2768,7 +2768,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.89'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.90'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3359,8 +3359,24 @@ function vRoster(){
 /* ---------- 理想人数（曜日ごと・時間ごと）：毎週の基本 ----------
  シフト作成で、その日に個別の理想人数を入れていなければ、ここで決めた曜日の基本を使う */
 const tplGet=w=>{const t=(set().idealTpl||{})[w];return {ideal:(t?.ideal||Array(24).fill(0)).map(Number),posIdeal:{...(t?.posIdeal||{})}}};
-function tplPut(w,t){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.idealTpl={...(S.settings.idealTpl||{}),[w]:t};saveSettings()}
-function vIdealTpl(){const st=set(),order=[1,2,3,4,5,6,0],T=Object.fromEntries(order.map(w=>[w,tplGet(w)])),A=avgWage();
+function tplPut(w,t){tplMigrate();tplFreeze(w);S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.idealTpl={...(S.settings.idealTpl||{}),[w]:t};saveSettings();tplLink(w)}
+/* 理想人数のリンク（両方向）
+ マスタの毎週の基本を変える → 今日以降の同じ曜日のシフト（確定・「この日だけ」の日は除く）がその人数になる
+ シフト作成で今日以降の日の人数を変える → その曜日の毎週の基本も変わり、今日以降の同じ曜日にも入る */
+// 基本を変える前に、過去の日（基本の人数をそのまま使っていた日）にはその時の人数を残しておく（評価・集計が変わらないように）
+function tplFreeze(w){const old=(set().idealTpl||{})[w];if(!old)return;for(const dt of Object.keys(S.days)){if(dt>=today||wd(dt)!==w)continue;const d=S.days[dt];
+  if(useTpl(d,dt)){d.ideal=(old.ideal||[]).map(Number);d.posIdeal={...(old.posIdeal||{})};d.idealSet=true;saveDay(dt)}}}
+const idealOnly=dt=>!!(S.days[dt]&&S.days[dt].idealOnly);
+function tplLink(w){for(const dt of Object.keys(S.days)){if(dt<today||wd(dt)!==w||dayLocked(dt)||idealOnly(dt))continue;const d=S.days[dt];
+  if(d.idealSet||hasIdeal(d)){d.ideal=Array(24).fill(0);d.posIdeal={};d.idealSet=false;saveDay(dt)}}}
+function dayToTpl(dt){if(dt<today||idealOnly(dt))return false;const d=S.days[dt];if(!d)return false;
+  const t={ideal:(d.ideal||Array(24).fill(0)).map(v=>Number(v)||0),posIdeal:Object.fromEntries(Object.entries(d.posIdeal||{}).map(([k,v])=>[k,Number(v)||0]).filter(([,v])=>v>0))};tplPut(wd(dt),t);return true}
+// はじめて開いたとき1回だけ：毎週の基本を、シフト作成で普段入れている人数（直近8週で一番多い数字）にそろえる
+function tplMigrate(){const st=set();if(!S.settingsLoaded||st.linkV1||S.role!=='manager'||typeof tsUsual!=='function')return;let n=0;
+  for(const w of [1,2,3,4,5,6,0]){const u=tsUsual(w);if(!u)continue;const last=Object.keys(S.days).filter(dt=>wd(dt)===w&&dt<=today&&idealHrs(S.days[dt].ideal)>0).sort().pop();
+    const t=tplGet(w);t.ideal=u.ideal;if(last&&Object.values(S.days[last].posIdeal||{}).some(v=>Number(v)>0))t.posIdeal={...S.days[last].posIdeal};tplFreeze(w);S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.idealTpl={...(S.settings.idealTpl||{}),[w]:t};n++}
+  if(!n)return;S.settings.linkV1=true;saveSettings();for(const w of [1,2,3,4,5,6,0])tplLink(w);toast('毎週の理想人数を、普段シフト作成で入れている人数にそろえました')}
+function vIdealTpl(){tplMigrate();const st=set(),order=[1,2,3,4,5,6,0],T=Object.fromEntries(order.map(w=>[w,tplGet(w)])),A=avgWage();
   const used=HOURS.map((h,i)=>order.some(w=>T[w].ideal[i]>0));
   const show=HOURS.map((h,i)=>i).filter(i=>S.idealAll||used[i]||(i>=2&&i<=17));
   const lab=i=>{const h=HOURS[i];return `${h>=24?'翌'+(h-24):h}:00`};
@@ -3370,7 +3386,7 @@ function vIdealTpl(){const st=set(),order=[1,2,3,4,5,6,0],T=Object.fromEntries(o
   const prow=wp.map(p=>`<tr><th style="white-space:nowrap"><span class="legend"><span style="${posStyle(p)}">${esc(p)}</span></span></th>${order.map(w=>`<td><input type="number" min="0" step="1" inputmode="numeric" id="tq${w}_${esc(p)}" data-tplp="${w}|${esc(p)}" value="${Number(T[w].posIdeal[p])||''}" placeholder="0" class="tpin" aria-label="${WD[w]}曜 ${esc(p)}の人数"></td>`).join('')}</tr>`).join('');
   const chk=(id)=>order.map(w=>`<label class="wdchk"><input type="checkbox" data-${id}="${w}"${w>=1&&w<=5&&id==='itto'?'':''}>${WD[w]}</label>`).join('');
   return `<section class="panel"><div class="bar"><h2>理想人数（毎週の基本）</h2><button class="btn sm ghost" data-act="idlAll">${S.idealAll?'よく使う時間だけ表示':'早朝・深夜も表示'}</button></div>
-    <p class="hint" style="margin:0">曜日ごとに、各時間に何人いてほしいかを入れます。シフト作成では、その日に個別の人数を入れていなければこの人数を使い、不足の判定・社員の出勤日・人件費の調整・理想人件費の計算に使います。色のついた行はピーク帯（${st.peakFrom}〜${st.peakTo}時）です。</p>
+    <p class="hint" style="margin:0">曜日ごとに、各時間に何人いてほしいかを入れます。シフト作成の人数とリンクしていて、ここを変えると今日以降の同じ曜日のシフトにも入ります（確定した日・「この日だけ」にした日は除く）。シフト作成で人数を変えると、ここも変わります。不足の判定・社員の出勤日・人件費の調整・理想人件費の計算に使います。色のついた行はピーク帯（${st.peakFrom}〜${st.peakTo}時）です。</p>
     <div class="scroll"><table class="t tpl"><thead><tr><th>時間</th>${order.map(w=>`<th class="${w===0?'sun':w===6?'sat':''}">${WD[w]}</th>`).join('')}</tr></thead><tbody>${rows}
       <tr class="tot"><th>合計（人時）</th>${hrs.map(h=>`<td class="num">${h?n1(h)+'h':'—'}</td>`).join('')}</tr>
       <tr class="tot"><th>理想人件費の目安</th>${hrs.map((h,j)=>`<td class="num">${h&&A.n?yen(h*A.avg+idealAdjW(order[j])):'—'}</td>`).join('')}</tr></tbody></table></div>
@@ -3394,7 +3410,7 @@ const tsOdd=dt=>TS_HOL.has(dt)||(TS_HOL.has(addDays(dt,1))&&![5,6].includes(wd(d
 const TS_CURVES0={0:{18:.25,19:.42,20:.62,21:.82,22:1},1:{18:.08,19:.18,20:.41,21:.64,22:.80},2:{18:.08,19:.18,20:.41,21:.64,22:.80},3:{18:.08,19:.18,20:.41,21:.64,22:.80},4:{18:.08,19:.18,20:.41,21:.64,22:.80},5:{18:.08,19:.18,20:.40,21:.68,22:.87},6:{18:.20,19:.35,20:.55,21:.78,22:.93}};
 const TS_OPEN0={1:[16,23],2:[16,23],3:[16,23],4:[16,23],5:[16,23],6:[14,23],0:[14,22]};
 function tsSuuchi(){try{const r=localStorage.getItem('suuchi-manager-v1');return r?JSON.parse(r):null}catch(_){return null}}
-function tsCfg(){const c=set().teisu||{};return {cur:c.cur||'usual',src:c.src||'auto',weeks:Number(c.weeks)||8,min:c.min!=null&&c.min!==''?Number(c.min):2,wage:Number(c.wage)||0,manual:c.manual||{},open:{...TS_OPEN0,...(c.open||{})}}}
+function tsCfg(){const c=set().teisu||{};return {cur:c.cur||'tpl',src:c.src||'auto',weeks:Number(c.weeks)||8,min:c.min!=null&&c.min!==''?Number(c.min):2,wage:Number(c.wage)||0,manual:c.manual||{},open:{...TS_OPEN0,...(c.open||{})}}}
 function tsPut(k,v){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.teisu={...(S.settings.teisu||{}),[k]:v};saveSettings()}
 // 曜日の平均売上
 function tsSales(w,SU){const c=tsCfg();
@@ -3476,9 +3492,8 @@ function teisuPanel(){const c=tsCfg(),st=set(),SU=tsSuuchi(),order=[1,2,3,4,5,6,
     ${tsSettings(c,SU)}</section>`}
 function tsSettings(c,SU){const order=[1,2,3,4,5,6,0],lk=moneyLocked(),hs=Array.from({length:17},(_,k)=>8+k);
   const hSel=(w,j)=>`<select data-tsopen="${w}|${j}" aria-label="${WD[w]}曜の${j?'閉店':'開店'}">${hs.map(h=>`<option value="${h}"${Number(c.open[w][j])===h?' selected':''}>${h}時</option>`).join('')}</select>`;
-  return `<details style="margin-top:10px"><summary><b>診断の設定</b><span class="hint">今の定数・売上の取り方・営業時間・最低人数</span></summary>
+  return `<details style="margin-top:10px"><summary><b>診断の設定</b><span class="hint">売上の取り方・営業時間・最低人数・普段の人数にそろえる</span></summary>
     <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">
-      <label class="field"><span>今の定数の取り方</span><select data-ts="cur"><option value="usual"${c.cur==='usual'?' selected':''}>普段の入力（シフト作成で日ごとに入れた人数）</option><option value="tpl"${c.cur==='tpl'?' selected':''}>毎週の基本（上の表）</option></select></label>
       <label class="field"><span>売上の取り方</span><select data-ts="src"><option value="auto"${c.src==='auto'?' selected':''}>実績（なければ売上予算）</option><option value="actual"${c.src==='actual'?' selected':''}>実績だけ</option><option value="budget"${c.src==='budget'?' selected':''}>売上予算だけ</option></select></label>
       <label class="field"><span>実績の期間</span><select data-ts="weeks">${[4,8,12,26].map(n=>`<option value="${n}"${c.weeks===n?' selected':''}>直近${n}週</option>`).join('')}</select></label>
       <label class="field"><span>営業中の最低人数</span><input type="number" min="0" step="0.5" data-ts="min" value="${c.min}" style="width:80px"></label>
@@ -3488,8 +3503,8 @@ function tsSettings(c,SU){const order=[1,2,3,4,5,6,0],lk=moneyLocked(),hs=Array.
       <tr><th>開店</th>${order.map(w=>`<td>${hSel(w,0)}</td>`).join('')}</tr><tr><th>閉店</th>${order.map(w=>`<td>${hSel(w,1)}</td>`).join('')}</tr>
       ${lk?'':`<tr><th style="white-space:nowrap">売上の手入力</th>${order.map(w=>`<td><input type="number" min="0" step="1000" inputmode="numeric" data-tsman="${w}" value="${Number(c.manual[w])||''}" placeholder="自動" style="width:84px"></td>`).join('')}</tr>`}</tbody></table></div>
     <p class="hint" style="margin:0">手入力した曜日はその金額を使います（空欄に戻すと自動）。</p>
-    <p class="hint" style="margin:8px 0 0">普段の入力＝シフト作成で日ごとに入れた理想人数の、直近8週・同じ曜日で一番多い数字（祝日・祝前日は除く）。入力がない曜日は毎週の基本を使います。</p>
-    <div class="bar"><button class="btn" data-act="tsUsualSave">普段の人数を毎週の基本（上の表）に入れる</button></div></details>`}
+    <p class="hint" style="margin:8px 0 0">今の定数＝毎週の基本（上の表）。シフト作成の人数とリンクしています。もう一度、直近8週にシフト作成で入れた人数（同じ曜日で一番多い数字）にそろえたいときは下のボタン。</p>
+    <div class="bar"><button class="btn" data-act="tsUsualSave">普段の人数（直近8週）に毎週の基本をそろえる</button></div></details>`}
 function idealPanel(date){
   const st=set(),d=dayDoc(date),W=WD[wd(date)],t=tplOf(date),raw=S.days[date]||{},usingT=useTpl(raw,date),has=hasIdeal(d);
   const norm=o=>JSON.stringify(Object.entries(o||{}).filter(([,v])=>Number(v)>0).sort());
@@ -3504,7 +3519,7 @@ function idealPanel(date){
   const poss=st.summaryOrder.filter(p=>posInfo(p)?.kind==='work').map(p=>stepper(Number(d.posIdeal?.[p]||0),`data-act="pidl" data-f="posIdeal" data-p="${esc(p)}"`,`<span class="legend"><span style="${posStyle(p)}">${esc(p)}</span></span>`,`${p}の理想人数`)).join('');
   const hOpt=sel=>HOURS.map((H,i)=>`<option value="${i}"${i===sel?' selected':''}>${lab(i)}</option>`).join('');
   return `<details class="idealbox" id="idealDet"${(S.idealOpen??!has)?' open':''}>
-    <summary><b>理想人数</b><span class="pill ${usingT||same?'good':has?'':'warn'}">${usingT||same?`${W}曜日の基本を使用中`:has?'この日だけの人数':'未設定'}</span><span class="hint">タップで開いて、大きいボタンで入力できます</span></summary>
+    <summary><b>理想人数</b><span class="pill ${usingT||same?'good':has?'':'warn'}">${raw.idealOnly?'この日だけの人数':usingT||same?`${W}曜日の基本とリンク中`:has?(date<today?'過去の人数':'この日だけの人数'):'未設定'}</span><span class="hint">タップで開いて、大きいボタンで入力できます</span></summary>
     <div class="ib-body">
       <h3>時間帯ごとの人数</h3>
       <div class="stps">${hours}</div>
@@ -3516,6 +3531,8 @@ function idealPanel(date){
       <div class="bar ib-save"><button class="btn pri" data-act="tplSave"${has?'':' disabled'}>この日の人数を毎週の${W}曜日に使う</button>
         <button class="btn" data-act="tplSaveAll"${has?'':' disabled'}>全曜日の基本にする</button>
         ${t&&!usingT&&!same?`<button class="btn ghost" data-act="tplReset">${W}曜日の基本に戻す</button>`:''}</div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:8px 0"><input type="checkbox" data-act="idlOnly"${raw.idealOnly?' checked':''}> この日だけの人数にする（祝日・イベントの日など。毎週の${W}曜日の基本とリンクしません）</label>
+      <p class="hint" style="margin:0">${date<today?'過去の日の人数を変えても、毎週の基本は変わりません。':raw.idealOnly?'この日の人数は、この日だけに使います。':`ここで人数を変えると、マスタ → 理想人数の${W}曜日と、今日以降の${W}曜日のシフトにも同じ人数が入ります（リンク）。`}</p>
       <h3>まとめてコピー</h3>
       <div class="bar ib-save"><button class="btn" data-act="tplSaveWeek">この週の7日分を毎週の基本にする</button>
         <button class="btn" data-act="idlCopyPrev">前の週の理想人数をこの週にコピー</button></div>
@@ -3944,8 +3961,8 @@ app.addEventListener('change',e=>{
     const date=curDate(), d=ensureDay(date);
     if(f==='budget')d.budget=Number(el.value)||0;
     else if(f==='note'||f==='memo')d[f]=el.value;
-    else if(f==='ideal'){d.ideal[+el.dataset.h]=Number(el.value)||0;d.idealSet=true}
-    else if(f==='posIdeal'){d.posIdeal[el.dataset.p]=Number(el.value)||0;d.idealSet=true}
+    else if(f==='ideal'){d.ideal[+el.dataset.h]=Number(el.value)||0;d.idealSet=true;saveDay(date);if(dayToTpl(date))toast(`毎週の${WD[wd(date)]}曜日の理想人数も変えました`);return render()}
+    else if(f==='posIdeal'){d.posIdeal[el.dataset.p]=Number(el.value)||0;d.idealSet=true;saveDay(date);dayToTpl(date);return render()}
     else{const sh=d.shifts[+el.dataset.i];
       if(f==='sid')sh.sid=el.value; else if(f==='pos'){sh.pos=el.value;if(isOff(sh.pos)){if(sh.pos===PAID&&sh.paidH==null&&sh.sid)setPaidAuto(sh,curDate());sh.start=null;sh.end=null;if(!sh.req&&sh.sid&&sh.pos!==PAID)sh.req={off:true}}}
       else if(f==='paidH'){if(el.value===''){if(sh.sid)setPaidAuto(sh,curDate());else sh.paidH=null}else{sh.paidH=Math.max(0,Number(el.value));sh.paidAuto=false}}
@@ -4060,19 +4077,20 @@ app.addEventListener('click',e=>{
     S.bulkT=[s0,e0];let n=0;for(const v of Object.values(S.bulk.days))if(v.st==='on'){v.start=s0;v.end=e0;n++}if(!n)toast('先に「出勤」の日を選んでください');return render()}
   if(a==='bSave'){bulkSave();return render()}
   if(a==='tplSave'||a==='tplSaveAll'){const date=curDate(),d=dayDoc(date),t={ideal:(d.ideal||Array(24).fill(0)).map(Number),posIdeal:Object.fromEntries(Object.entries(d.posIdeal||{}).map(([k,v])=>[k,Number(v)||0]))};
-    S.settings=S.settings||clone(DEFAULT_SETTINGS);const T={...(S.settings.idealTpl||{})};
+    for(const w of (a==='tplSave'?[wd(date)]:[0,1,2,3,4,5,6]))tplFreeze(w);S.settings=S.settings||clone(DEFAULT_SETTINGS);const T={...(S.settings.idealTpl||{})};
     if(a==='tplSave')T[wd(date)]=t;else for(let i=0;i<7;i++)T[i]=clone(t);
-    S.settings.idealTpl=T;saveSettings();
-    // この週で、まだ自分で理想人数を入れていない日にも反映
+    S.settings.idealTpl=T;saveSettings();for(const w of (a==='tplSave'?[wd(date)]:[0,1,2,3,4,5,6]))tplLink(w);
     toast(a==='tplSave'?`毎週の${WD[wd(date)]}曜日の理想人数として登録しました`:'全曜日の理想人数として登録しました');return render()}
   if(a==='idl'||a==='pidl'){const date=curDate(),d=ensureDay(date),n=Number(b.dataset.n);
     if(a==='idl'){const h=+b.dataset.h;d.ideal[h]=Math.max(0,(Number(d.ideal[h])||0)+n)}else{const p=b.dataset.p;d.posIdeal[p]=Math.max(0,(Number(d.posIdeal[p])||0)+n)}
-    d.idealSet=true;saveDay(date);return render()}
+    d.idealSet=true;saveDay(date);dayToTpl(date);return render()}
   if(a==='tplApply'){const ds=Object.keys(S.days).filter(dt=>dt>=today&&(S.days[dt].idealSet||hasIdeal(S.days[dt])));
     if(!ds.length)return toast('今日以降に、個別の人数を入れた日はありません');
     if(!confirm(`今日以降の${ds.length}日分（${ds.slice(0,5).map(md).join('、')}${ds.length>5?' ほか':''}）の個別の理想人数を消して、毎週の基本に戻しますか？`))return;
     for(const dt of ds){const d=S.days[dt];d.ideal=Array(24).fill(0);d.posIdeal={};d.idealSet=false;saveDay(dt)}toast(`${ds.length}日分を基本の人数に戻しました`);return render()}
   if(a==='idlAll'){S.idealAll=!S.idealAll;return render()}
+  if(a==='idlOnly'){const date=curDate(),d=ensureDay(date);if(b.checked){d.idealOnly=true;d.idealSet=true;saveDay(date);toast('この日だけの人数にしました')}
+    else{delete d.idealOnly;const t=tplOf(date);if(t){d.ideal=Array(24).fill(0);d.posIdeal={};d.idealSet=false}saveDay(date);toast(`毎週の${WD[wd(date)]}曜日の人数とリンクしました`)}return render()}
   if(a==='tsW'){S.tsW=+b.dataset.w;return render()}
   if(a==='tsUsualSave'){const ws=[1,2,3,4,5,6,0].filter(w=>tsUsual(w));if(!ws.length)return toast('シフト作成で日ごとに入れた理想人数が見つかりません');
     if(!confirm(`${ws.map(w=>WD[w]).join('・')}曜日の毎週の基本を、普段の入力の人数に書き換えますか？（ポジション別の人数はそのまま）`))return;
@@ -4084,14 +4102,14 @@ app.addEventListener('click',e=>{
     toast(`${ok.map(w=>WD[w]).join('・')}曜日の定数をおすすめにしました`);return render()}
   if(a==='idlFill'){const f=+document.getElementById('ifFrom').value,t=+document.getElementById('ifTo').value,n=Math.max(0,Number(document.getElementById('ifN').value)||0);
     S.ifFrom=f;S.ifTo=t;S.ifN=n;if(t<f)return toast('「ここまで」は「ここから」より後にしてください');
-    const date=curDate(),d=ensureDay(date);for(let i=f;i<=t;i++)d.ideal[i]=n;d.idealSet=true;saveDay(date);toast(`${t-f+1}時間分を${n}人にしました`);return render()}
-  if(a==='tplSaveWeek'){S.settings=S.settings||clone(DEFAULT_SETTINGS);const T={...(S.settings.idealTpl||{})};let n=0;
+    const date=curDate(),d=ensureDay(date);for(let i=f;i<=t;i++)d.ideal[i]=n;d.idealSet=true;saveDay(date);const L=dayToTpl(date);toast(`${t-f+1}時間分を${n}人にしました${L?`（毎週の${WD[wd(date)]}曜日にも反映）`:''}`);return render()}
+  if(a==='tplSaveWeek'){for(const w of [0,1,2,3,4,5,6])tplFreeze(w);S.settings=S.settings||clone(DEFAULT_SETTINGS);const T={...(S.settings.idealTpl||{})};let n=0;
     for(const dt of weekDates(S.week)){const d=dayDoc(dt);if(!hasIdeal(d))continue;T[wd(dt)]={ideal:(d.ideal||Array(24).fill(0)).map(Number),posIdeal:Object.fromEntries(Object.entries(d.posIdeal||{}).map(([k,v])=>[k,Number(v)||0]))};n++}
     if(!n)return toast('この週にはまだ理想人数が入っていません');
-    S.settings.idealTpl=T;saveSettings();toast(`${n}日分を毎週の基本にしました。次の週からは自動で入ります`);return render()}
+    S.settings.idealTpl=T;saveSettings();for(const w of [0,1,2,3,4,5,6])tplLink(w);toast(`${n}日分を毎週の基本にしました。今日以降の同じ曜日にも入ります`);return render()}
   if(a==='idlCopyPrev'){let n=0;
     for(const dt of weekDates(S.week)){const src=dayDoc(addDays(dt,-7));if(!hasIdeal(src))continue;const d=ensureDay(dt);
-      d.ideal=(src.ideal||Array(24).fill(0)).map(Number);d.posIdeal={...(src.posIdeal||{})};d.idealSet=true;saveDay(dt);n++}
+      d.ideal=(src.ideal||Array(24).fill(0)).map(Number);d.posIdeal={...(src.posIdeal||{})};d.idealSet=true;saveDay(dt);dayToTpl(dt);n++}
     toast(n?`前の週の${n}日分をコピーしました`:'前の週に理想人数が入っていません');return render()}
   if(a==='hireW'){S.hireWeeks=Number(b.dataset.n);return render()}
   if(a==='tplReset'){const date=curDate(),d=ensureDay(date),t=tplOf(date);if(t){d.ideal=t.ideal.slice();d.posIdeal={...t.posIdeal};delete d.idealSet;saveDay(date);toast(`${WD[wd(date)]}曜日の基本に戻しました`)}return render()}
@@ -4310,7 +4328,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v101';
+  const APP_SW='v102';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
