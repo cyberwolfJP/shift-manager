@@ -2779,7 +2779,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.94'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.95'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3500,7 +3500,7 @@ function teisuPanel(){const c=tsCfg(),st=set(),SU=tsSuuchi(),order=[1,2,3,4,5,6,
   return `<section class="panel" id="teisuSec"><h2>定数の診断（売上と時給から）</h2>
     <p class="hint" style="margin:0">暫定曜日別売上 × 目標人件費率${MR}%（月間）＝ 人件費の枠。枠 ÷ 平均時給${lk?'':`（${yen(A)}・名簿${avgWage().n}人の平均）`} ＝ その曜日に使える人時。おすすめは、営業中はまず全部の時間に最低${c.min}人を置き、残りの人時を「1人増やしたときに1人あたりの売上が一番高い時間」へ1人ずつ足して出しています。足すと1人あたりの売上が目標の85%（${yen(D.prod*0.85)}）を下回る時間には足しません（1時間の上限は${D.mx}人）。1人が1時間で売るべき目安（目標の人時生産性）は ${yen(D.prod)} です。</p>
     <div class="scroll"><table class="t tpl"><thead><tr><th>曜日</th><th class="r">暫定曜日別売上</th><th class="r">人件費の枠</th><th class="r">使える人時</th><th class="r">今の定数</th><th class="r">定数どおりの人件費率</th><th>判定</th></tr></thead><tbody>${sumRows}</tbody></table></div>
-    <p class="hint" style="margin:0">この暫定曜日別売上は「集計 → 下方修正」の残りの日の売上見込みにも使います（同じ数字になります）。暫定曜日別売上は直接入れられます。空欄のときは自動の数字（実績の平均、なければ売上予算の平均）を薄く表示して、その数字で計算します。入れた数字を消すと自動に戻ります。</p>
+    <p class="hint" style="margin:0">この暫定曜日別売上は、ふだんの人数を決めるための売上です（下方修正は今月の達成率で見込みます。下方修正の画面でこの金額を使うようにも選べます）。暫定曜日別売上は直接入れられます。空欄のときは自動の数字（実績の平均、なければ売上予算の平均）を薄く表示して、その数字で計算します。入れた数字を消すと自動に戻ります。</p>
     <p class="hint" style="margin:0">「多い」は今の定数のまま全員入れると目標の${MR}%を超える曜日、「余裕」は2%以上下回る曜日（ピークに足せる人時があります）。曜日を押すと下に詳しく出ます。</p>
     <h3 style="margin:10px 0 4px">時間帯ごと（今の定数 → おすすめ）</h3>
     <div class="scroll"><table class="t tpl"><thead><tr><th>時間</th>${order.map(w=>`<th class="${w===0?'sun':w===6?'sat':''}">${WD[w]}</th>`).join('')}</tr></thead><tbody>${mtx}</tbody></table></div>
@@ -3801,12 +3801,13 @@ function farePeriod(list){const from=S.fareFrom||today.slice(0,8)+'01',to=S.fare
  普段の人件費＝同じ曜日の直近8週の人件費の平均（なければ 売上予算 × 月間目標）。残りの日はみな同じ割合で減らす */
 function usualCost(dt,asOf){const w=wd(dt);let t=0,n=0;for(let k=7;k<=8*7+42&&n<8;k+=7){const d=addDays(dt,-k);if(d>asOf)continue;const C=calcDay(d);if(C.cost>0){t+=C.cost;n++}}
   return n?{v:t/n,n}:{v:(Number(dayDoc(dt).budget)||0)*Number(set().monthRate??24)/100,n:0}}
+const rvMode=R=>R.mode==='budget'?'budget':R.mode==='teisu'&&R.v3?'teisu':'ratio';
 function reviseCalc(ym){const R=(set().revise||{})[ym];if(!R||!(Number(R.sales)>0)||R.rate==null||R.rate==='')return null;
   const ds=monthDays(ym),asOf=R.asOf&&R.asOf.slice(0,7)===ym?R.asOf:addDays(today,-1),MR=Number(set().monthRate??24)/100;
   const done=ds.filter(d=>d<=asOf),rest=ds.filter(d=>d>asOf),bud=d=>Number(dayDoc(d).budget)||0;
   const budDone=done.reduce((a,d)=>a+bud(d),0),budRest=rest.reduce((a,d)=>a+bud(d),0),sales=Number(R.sales),rate=Number(R.rate)/100;
-  // 残りの日の売上：teisu＝理想人数（定数の診断）の暫定曜日別売上と同じ数字（初期）、ratio＝予算×今の達成率、budget＝予算どおり
-  const mode=R.mode==='budget'?'budget':R.mode==='ratio'&&R.v2?'ratio':'teisu',SU=mode==='teisu'?tsSuuchi():null;
+  // 残りの日の売上：ratio＝予算×今の達成率（初期）、teisu＝理想人数（定数の診断）の暫定曜日別売上、budget＝予算どおり
+  const mode=rvMode(R),SU=mode==='teisu'?tsSuuchi():null;
   const ratio=budDone?sales/budDone:1,useRatio=mode==='ratio',k0=useRatio?ratio:1,daySales=d=>mode==='teisu'?tsSales(wd(d),SU).v:bud(d)*k0;
   const costDone=sales*rate,salesRest=rest.reduce((a,d)=>a+daySales(d),0),fore=sales+salesRest,allowed=fore*MR,left=allowed-costDone;
   const pa=staffList().filter(x=>x.kind!=='社員').map(x=>Number(x.wage)||0).filter(v=>v>0),paW=pa.length?pa.reduce((a,b)=>a+b,0)/pa.length:1100;
@@ -3826,7 +3827,7 @@ function vRevise(){const ym=S.rym||today.slice(0,7);S.rym=ym;const st=set(),R=(s
       <label class="field"><span>この日までの実績</span><input type="date" id="rvAsOf" value="${asOf}"></label>
       <label class="field"><span>総売上（実績）</span><input type="number" id="rvSales" inputmode="numeric" value="${R.sales??''}" placeholder="例 3200000" style="width:150px"></label>
       <label class="field"><span>社員込み人件費率（実績・%）</span><input type="number" id="rvRate" step="0.1" value="${R.rate??''}" placeholder="例 26.5" style="width:110px"></label>
-      <label class="field"><span>残りの日の売上</span><select id="rvMode">${(()=>{const md0=R.mode==='budget'?'budget':R.mode==='ratio'&&R.v2?'ratio':'teisu';return [['teisu','理想人数の売上見込み（曜日別）と同じ'],['ratio','売上予算 × 今の達成率'],['budget','売上予算どおり']].map(([v,l])=>`<option value="${v}"${md0===v?' selected':''}>${l}</option>`).join('')})()}</select></label>
+      <label class="field"><span>残りの日の売上</span><select id="rvMode">${(()=>{const md0=rvMode(R);return [['ratio','売上予算 × 今の達成率（おすすめ）'],['teisu','理想人数（定数の診断）の暫定曜日別売上'],['budget','売上予算どおり']].map(([v,l])=>`<option value="${v}"${md0===v?' selected':''}>${l}</option>`).join('')})()}</select></label>
       <button class="btn pri" data-act="rvSave">計算して使う</button>${V?'<button class="btn sm ghost" data-act="rvClear">やめる</button>':''}</div>`}</section>`;
   if(lk||!V)return form+(lk?'':'<p class="hint">実績の総売上と人件費率を入れて「計算して使う」を押すと、シフト作成の日付の横にも、その日の人件費の上限が出るようになります。</p>');
   const pc=v=>v==null?'—':(v*100).toFixed(1)+'%',ok=V.left>0;
@@ -4043,7 +4044,7 @@ app.addEventListener('click',e=>{
   if(a==='rym'){const [y,m]=S.rym.split('-').map(Number),d=new Date(y,m-1+Number(b.dataset.n),1);S.rym=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;return render()}
   if(a==='rvSave'){const g=id=>document.getElementById(id)?.value,sales=Number(g('rvSales')),rate=g('rvRate'),asOf=g('rvAsOf');if(!(sales>0)||rate===''||rate==null)return toast('総売上と人件費率を入れてください');
     if(asOf&&asOf.slice(0,7)!==S.rym)return toast(`「この日までの実績」は${+S.rym.slice(5)}月の日付にしてください`);
-    S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.revise={...(S.settings.revise||{}),[S.rym]:{asOf,sales,rate:Number(rate),mode:g('rvMode'),v2:1}};saveSettings();toast('下方修正を計算しました');return render()}
+    S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.revise={...(S.settings.revise||{}),[S.rym]:{asOf,sales,rate:Number(rate),mode:g('rvMode'),v3:1}};saveSettings();toast('下方修正を計算しました');return render()}
   if(a==='rvClear'){S.settings=S.settings||clone(DEFAULT_SETTINGS);const r={...(S.settings.revise||{})};delete r[S.rym];S.settings.revise=r;saveSettings();toast('下方修正をやめました');return render()}
   if(a==='fareQuick'){S.fareFrom=b.dataset.a;S.fareTo=b.dataset.b;return render()}
   if(a==='fareCopy'){const from=S.fareFrom||today.slice(0,8)+'01',to=S.fareTo&&S.fareTo>=from?S.fareTo:monthDays(from.slice(0,7)).slice(-1)[0],R=farePeriodData(staffList(true).filter(s=>s.kind!=='社員'),from,to);
@@ -4355,7 +4356,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v106';
+  const APP_SW='v107';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
