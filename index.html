@@ -2783,7 +2783,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.97'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'1.98'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -3157,7 +3157,7 @@ function vBudget(){const st=set(),ym=S.bym||ymOf(S.week),ds=monthDays(ym),y=+ym.
   const nav=`<div class="weeknav"><button class="btn sm" data-act="bym" data-n="-1" aria-label="前の月">‹</button><span class="lbl">${y}年${m}月</span><button class="btn sm" data-act="bym" data-n="1" aria-label="次の月">›</button><button class="btn sm ghost" data-act="bymNow">今月</button></div>`;
   if(moneyLocked())return `<section class="panel"><div class="bar"><h2>売上予算（日ごと）</h2>${nav}</div><div class="empty">売上予算は隠れています。上の「閲覧用パスワードで表示」で解除すると入力できます。</div></section>`;
   const tot=ds.reduce((a,d)=>a+budOf(d),0),filled=ds.filter(d=>budOf(d)>0).length,rN=ds.filter(d=>rbudOf(d)>0).length,effTot=ds.reduce((a,d)=>a+effBud(S.days[d]||{}),0);
-  const RS=recentSales(S.rsWeeks||4),rsKeep=S.rsKeep!==false,rest=ds.filter(d=>d>=today&&!dayLocked(d));
+  const RS=recentSales(4),rsKeep=S.rsKeep!==false,rest=ds.filter(d=>d>=today&&!dayLocked(d)),rsMan=Object.fromEntries(Object.entries(st.rsSales||{}).map(([k,v])=>[k,Number(v)||0]));
   let cost=0,costDays=0;for(const d of ds){const C=calcDay(d);if(C.cost>0){cost+=C.cost;costDays++}}
   const W=st.budgetWeights||DEFAULT_SETTINGS.budgetWeights,order=[1,2,3,4,5,6,0];
   const lead=(wd(ds[0])+6)%7;let cells='';for(let i=0;i<lead;i++)cells+='<div class="bcell blank"></div>';
@@ -3175,16 +3175,14 @@ function vBudget(){const st=set(),ym=S.bym||ymOf(S.week),ds=monthDays(ym),y=+ym.
       <label class="radio"><input type="radio" name="budMode" data-budmode="rev"${useRev()?' checked':''}> 下方修正予算（入れた日だけ）</label>
       <span class="hint">この月の下方修正：${rN}日 ${rN?`・使う予算の合計 ${yen(effTot)}（もともとより ${effTot<tot?'−'+yen(tot-effTot):'+'+yen(effTot-tot)}）`:''}</span>
 ${rN?'<button class="btn sm ghost" data-act="rbClear">この月の下方修正を消す</button>':''}</div>
-    <details class="rvbox" id="rsDet"${S.rsOpen!==false?' open':''}><summary><b>直近の売上から下方修正予算を出す</b> <span class="muted" style="font-size:12px">数値マネージャーの日別の売上（同じiPad）を、曜日ごとに平均します</span></summary>
-      ${RS.has?`<div class="bar" style="gap:8px;flex-wrap:wrap;margin-top:6px"><label class="field" style="margin:0"><span>直近</span><select data-rsweeks="1">${[2,4,6,8].map(n=>`<option value="${n}"${(S.rsWeeks||4)===n?' selected':''}>${n}週間</option>`).join('')}</select></label>
-          <label style="font-size:13px"><input type="checkbox" data-rskeep="1"${rsKeep?' checked':''}> 売上予算より高くなる日は入れない</label>
-          <button class="btn pri sm" data-act="rsFill"${rest.length?'':' disabled'}>今日以降の${rest.length}日に入れる</button></div>
-        <div class="scroll"><table class="t"><thead><tr><th></th>${order.map(w=>`<th class="r">${WD[w]}</th>`).join('')}</tr></thead><tbody>
-          <tr><td>直近の売上（平均）</td>${order.map(w=>`<td class="num">${RS.avg[w]?yen(Math.round(RS.avg[w]/1000)*1000):'—'}<div class="muted" style="font-size:10px">${RS.n[w]}日</div></td>`).join('')}</tr>
-          <tr><td>この月の売上予算（平均）</td>${order.map((w,i)=>`<td class="num">${wdAvg[i]?yen(wdAvg[i]):'—'}</td>`).join('')}</tr>
-          <tr><td>予算との比</td>${order.map((w,i)=>`<td class="num ${RS.avg[w]&&wdAvg[i]?(RS.avg[w]<wdAvg[i]?'cell-bad':'cell-good'):''}">${RS.avg[w]&&wdAvg[i]?Math.round(RS.avg[w]/wdAvg[i]*100)+'%':'—'}</td>`).join('')}</tr></tbody></table></div>
-        <p class="hint" style="margin:0">祝日・祝前日の実績は平均から外しています（5日以上あれば最高と最低も外します）。祝日やイベントの日は、入れたあとにカレンダーで直してください。確定した日には入れません。</p>`
-      :`<p class="hint" style="margin:6px 0 0">${RS.SU?`直近${S.rsWeeks||4}週間の売上の実績がまだありません。数値マネージャーで日別の売上を入れると使えます。`:'このiPadの数値マネージャーに売上の実績が見つかりません。数値マネージャーで日別の売上を入れると、ここで使えます。'}</p>`}</details>
+    <details class="rvbox" id="rsDet"${S.rsOpen!==false?' open':''}><summary><b>直近の売上から下方修正予算を出す</b> <span class="muted" style="font-size:12px">曜日ごとの直近の売上を入れて「今後に反映」</span></summary>
+      <div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th></th>${order.map(w=>`<th class="r">${WD[w]}</th>`).join('')}</tr></thead><tbody>
+        <tr><td><b>直近の売上</b></td>${order.map(w=>`<td class="num"><input type="number" step="1000" min="0" inputmode="numeric" data-rsman="${w}" value="${rsMan[w]||''}" placeholder="${RS.avg[w]?Math.round(RS.avg[w]/1000)*1000:''}" style="width:96px" aria-label="${WD[w]}曜日の直近の売上"></td>`).join('')}</tr>
+        <tr><td>この月の売上予算（平均）</td>${order.map((w,i)=>`<td class="num">${wdAvg[i]?yen(wdAvg[i]):'—'}</td>`).join('')}</tr>
+        <tr><td>予算との比</td>${order.map((w,i)=>`<td class="num ${rsMan[w]&&wdAvg[i]?(rsMan[w]<wdAvg[i]?'cell-bad':'cell-good'):''}">${rsMan[w]&&wdAvg[i]?Math.round(rsMan[w]/wdAvg[i]*100)+'%':'—'}</td>`).join('')}</tr></tbody></table></div>
+      <div class="bar" style="gap:8px;flex-wrap:wrap"><label style="font-size:13px"><input type="checkbox" data-rskeep="1"${rsKeep?' checked':''}> 売上予算より高くなる日は入れない</label>
+        <button class="btn pri" data-act="rsFill"${rest.length&&Object.values(rsMan).some(v=>v>0)?'':' disabled'}>今後に反映（今日以降の${rest.length}日）</button></div>
+      <p class="hint" style="margin:0">入れた曜日の金額を、今日以降の各日の「下方修正」に入れます（過ぎた日・確定した日はそのまま）。反映したあとも、カレンダーの各日の「下方修正」で1日ずつ直せます。祝日やイベントの日は日ごとに直してください。${RS.has?'薄い数字は数値マネージャーの直近4週の平均です（参考）。':''}</p></details>
     <div class="kpis"><div class="kpi"><span class="k">月間の売上目標</span><span class="v">${G?yen(G):'—'}</span></div><div class="kpi"><span class="k">日別予算の合計</span><span class="v">${yen(tot)}</span>${G?`<span class="muted" style="font-size:11px">目標の${Math.round(tot/G*100)}%</span>`:''}</div>
       <div class="kpi"><span class="k">入力済み</span><span class="v">${filled}／${ds.length}日</span></div>
       <div class="kpi"><span class="k">人件費の枠（×${MR}%）</span><span class="v">${yen(effTot*MR/100)}</span>${useRev()&&rN?'<span class="muted" style="font-size:11px">下方修正予算で計算</span>':''}</div>
@@ -3998,7 +3996,7 @@ app.addEventListener('change',e=>{
   if(el.dataset.mgoal){const dt=el.dataset.mgoal+'-01';newDay(dt).goal=Math.max(0,Math.round(Number(el.value)||0));saveDay(dt);toast('月間の売上目標を保存しました');el.blur();return render()}
   if(el.dataset.bud){setBudget(el.dataset.bud,el.value);return render()}
   if(el.dataset.rbud){setRBudget(el.dataset.rbud,el.value);return render()}
-  if(el.dataset.rsweeks){S.rsWeeks=Number(el.value)||4;return render()}
+  if(el.dataset.rsman!=null){S.settings=S.settings||clone(DEFAULT_SETTINGS);const M={...(S.settings.rsSales||{})},v=Math.max(0,Math.round(Number(el.value)||0));if(v)M[el.dataset.rsman]=v;else delete M[el.dataset.rsman];S.settings.rsSales=M;saveSettings();return render()}
   if(el.dataset.rskeep){S.rsKeep=el.checked;return render()}
   if(el.dataset.budmode){S.settings=S.settings||clone(DEFAULT_SETTINGS);S.settings.budMode=el.dataset.budmode;saveSettings();toast(el.dataset.budmode==='orig'?'シフトはもともとの予算で計算します':'下方修正予算を入れた日は、その金額でシフトを計算します');return render()}
   if(el.dataset.bnote){const dt=el.dataset.bnote;newDay(dt).note=el.value.slice(0,30);saveDay(dt);return render()}
@@ -4078,8 +4076,8 @@ app.addEventListener('click',e=>{
   if(a==='zRead'){const t=document.getElementById('zText')?.value||'';S.zText=t;const r=zParse(t);if(!r.length)return toast('「名前　2026/12/24」の形の行が見つかりません');S.zImp=r;toast(`${r.length}行を読み取りました（${r.filter(x=>x.sid).length}人を名簿に結びつけました）`);return render()}
   if(a==='zApply'){let n=0;for(const r of S.zImp||[]){if(!r.sid)continue;const st=S.staff[r.sid];if(!st||!st.limit28)continue;st.zairyu=r.date;if(!st.fullName)st.fullName=r.name.replace(/\s+/g,' ');saveStaff(st.id);n++}S.zImp=null;S.zText='';toast(`${n}人の在留カード期限を入れました`);return render()}
   if(a==='rbFill'){const V=reviseCalc(S.bym);if(!V)return;let n=0;for(const x of V.days){if(dayLocked(x.dt))continue;setRBudget(x.dt,Math.round(x.sales/1000)*1000);n++}toast(`${n}日に下方修正予算を入れました`);return render()}
-  if(a==='rsFill'){const RS=recentSales(S.rsWeeks||4),keep=S.rsKeep!==false;let n=0,sk=0;for(const d of monthDays(S.bym)){if(d<today||dayLocked(d))continue;const v=Math.round((RS.avg[wd(d)]||0)/1000)*1000;if(!v){sk++;continue}if(keep&&budOf(d)>0&&v>=budOf(d)){if(rbudOf(d))setRBudget(d,0);sk++;continue}setRBudget(d,v);n++}
-    toast(`${n}日に下方修正予算を入れました${sk?`（${sk}日は${keep?'予算以上か実績なし':'実績なし'}で入れていません）`:''}`);return render()}
+  if(a==='rsFill'){const M=set().rsSales||{},keep=S.rsKeep!==false;let n=0,sk=0;for(const d of monthDays(S.bym)){if(d<today||dayLocked(d))continue;const v=Math.round((Number(M[wd(d)])||0)/1000)*1000;if(!v){sk++;continue}if(keep&&budOf(d)>0&&v>=budOf(d)){if(rbudOf(d))setRBudget(d,0);sk++;continue}setRBudget(d,v);n++}
+    toast(`${n}日に下方修正予算を反映しました${sk?`（${sk}日は${keep?'予算以上か未入力の曜日':'未入力の曜日'}で入れていません）`:''}`);return render()}
   if(a==='rbClear'){if(!confirm('この月の下方修正予算を全部消しますか？（もともとの予算はそのままです）'))return;for(const d of monthDays(S.bym))if(rbudOf(d))setRBudget(d,0);toast('下方修正予算を消しました');return render()}
   if(a==='rym'){const [y,m]=S.rym.split('-').map(Number),d=new Date(y,m-1+Number(b.dataset.n),1);S.rym=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;return render()}
   if(a==='rvSave'){const g=id=>document.getElementById(id)?.value,sales=Number(g('rvSales')),rate=g('rvRate'),asOf=g('rvAsOf');if(!(sales>0)||rate===''||rate==null)return toast('総売上と人件費率を入れてください');
@@ -4396,7 +4394,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v109';
+  const APP_SW='v110';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
