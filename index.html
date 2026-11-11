@@ -941,6 +941,8 @@ function weekRateInfo(date){const st=set(),MR=Number(st.monthRate??24),wk=monday
     if(C.cost>0){others+=C.cost;actCost+=C.cost;act++}else{others+=b*MR/100;estCost+=b*MR/100;est++}}
   const allow=cap-others,rate=budW>0?Math.max(0,Math.round(allow/budW*1000)/10):MR;
   const R={rate,MR,cap,others,allow,budW,act,est,actCost,estCost,noBud,ym,days:n};rateCache.set(key,R);return R}
+// 今週の目標が月間目標からずれる理由を、ひとことで（ほかの日の人件費が、月間目標どおりより少ない＝余り／多い＝使いすぎ）
+function rateShift(R){const atMR=R.cap-R.budW*R.MR/100,saved=atMR-R.others;return {saved,txt:Math.abs(R.rate-R.MR)<0.05?`月間目標どおり ${R.MR}%`:saved>0?`ほかの日の人件費が月間目標より ${yen(Math.round(saved))} 少なく済む見込み → その分を今週に回して ${R.rate}% まで使えます`:`ほかの日の人件費が月間目標より ${yen(Math.round(-saved))} 多い見込み → 今週は ${R.rate}% に抑えて月で${R.MR}%に戻します`}}
 function rateWhy(R){if(moneyLocked())return '金額が隠れているあいだは月間目標をそのまま使います。';
   return `${+R.ym.slice(5)}月の人件費の枠 ${yen(R.cap)}（売上予算×${R.MR}%）から、ほかの日の分 ${yen(R.others)}（シフト済み${R.act}日 ${yen(R.actCost)}・未作成${R.est}日は予算×${R.MR}%で ${yen(R.estCost)}）を引いた ${yen(R.allow)} を、この週の売上予算 ${yen(R.budW)} で割っています。${R.noBud?`売上予算が未入力の日が${R.noBud}日あります（枠に入りません）。`:''}`}
 const targetRateOf=date=>set().rateMode==='weekday'?Number((set().targetRate||{})[wd(date)]??22):weekRateInfo(date).rate;
@@ -1797,7 +1799,7 @@ function vShift(){
       ${ocLabel(date)}<span class="muted" style="font-size:12px">${(()=>{const I=idealCostOf(date);return `理想人件費 ${yen(I)}／比較 <b class="num ${C.cost-I>0?'cell-bad':'cell-good'}">${C.cost?yen(C.cost-I):'—'}</b>`})()}</span></div>
     ${(()=>{const tr=targetRateOf(date),cap=C.budget*tr/100,over=C.cost-cap;
       const RI=set().rateMode==='weekday'?null:weekRateInfo(date);
-      return `<div class="autobar"><b>目標人件費率 ${tr}%</b>${RI?`<span class="hint" title="${esc(rateWhy(RI))}">（月間${RI.MR}%から今週を調整${RI.rate>RI.MR+0.05?'：前後で余裕あり':RI.rate<RI.MR-0.05?'：ほかの週で使いすぎの分を取り戻す':''}）</span>`:''}${C.budget?`<span class="num">上限 ${yen(cap)}</span><span class="pill ${over>0?'bad':'good'}">${over>0?`${yen(over)} 超過`:`あと${yen(-over)} 余裕`}</span>`:'<span class="hint">売上予算を入れると上限が出ます</span>'}
+      return `<div class="autobar"><b>目標人件費率 ${tr}%</b>${RI?`<span class="hint" title="${esc(rateWhy(RI))}">（月間${RI.MR}% → 今週${RI.rate}%：${esc(rateShift(RI).txt.replace(/^.*→ /,''))}${Math.abs(RI.rate-RI.MR)>=0.05?`。${rateShift(RI).saved>0?'ほかの日で余った分':'ほかの日で使いすぎた分'} ${yen(Math.abs(Math.round(rateShift(RI).saved)))}`:''}）</span>`:''}${C.budget?`<span class="num">上限 ${yen(cap)}</span><span class="pill ${over>0?'bad':'good'}">${over>0?`${yen(over)} 超過`:`あと${yen(-over)} 余裕`}</span>`:'<span class="hint">売上予算を入れると上限が出ます</span>'}
         <button class="btn sm" data-act="adjDay"${C.budget&&over>0?'':' disabled'}>この日を目標に合わせる</button>
         <span class="hint">理想人数を下回らない範囲で、人が多い時間帯の端だけを30分ずつ短くします。社員は変えません。</span></div>`})()}
     ${(()=>{const ts=tasksOn(date),es=entriesOf(date),pd=paidOn(date);if(!ts.length&&!es.length&&!pd.length)return '';
@@ -2136,9 +2138,15 @@ function drawReport(week,comment){
   kp.forEach(([k,v,s],i)=>{const x=M+i*(kw+20);const bad=k==='人件費率'&&W.rate!=null&&W.target!=null&&W.rate>W.target+0.0005;
     c.fillStyle=bad?'#f8dcd8':'#f1eee8';c.fillRect(x,ky,kw,kh);T(c,k,x+24,ky+44,26,{col:'#6b655a',b:1,max:kw-48});T(c,v,x+24,ky+112,56,{b:1,max:kw-48,col:bad?'#b3261e':'#1d1b16'});
     if(s){const g=GOOD[k],col=g==null?'#6b655a':g?'#2f7a4a':'#b3261e';T(c,s,x+24,ky+176,24,{col,b:g!=null,max:kw-48})}});
+  // 目標人件費率の説明（月間目標 → 今週の目標、なぜずれるか）
+  let tgH=0;if(set().rateMode!=='weekday'){const RI=weekRateInfo(week),RS=rateShift(RI),ty0=ky+kh+30;tgH=136;
+    c.fillStyle='#eef3f8';c.fillRect(M,ty0,W0-2*M,tgH-16);c.fillStyle='#3d6a99';c.fillRect(M,ty0,14,tgH-16);
+    T(c,`目標人件費率　月間 ${RI.MR}% → 今週 ${RI.rate}%`,M+40,ty0+34,30,{b:1,col:'#1f3f63'});
+    T(c,RS.txt,M+40,ty0+72,26,{b:1,col:'#1d1b16',max:W0-2*M-80});
+    T(c,`内訳：${+RI.ym.slice(5)}月の枠 ${yen(Math.round(RI.cap))}（売上予算×${RI.MR}%）− ほかの日 ${yen(Math.round(RI.others))}（シフト済み${RI.act}日・未作成${RI.est}日）＝ 今週使える ${yen(Math.round(RI.allow))}　÷ 今週の売上予算 ${yen(Math.round(RI.budW))} ＝ ${RI.rate}%`,M+40,ty0+108,22,{col:'#4a5a6a',max:W0-2*M-80})}
   // 下方修正予算を使っている週は、目立つ帯で知らせる
   const RVd=useRev()?W.days.filter(d=>rbudOf(d.dt)>0):[];let bandH=0;
-  if(RVd.length){const ob=W.days.reduce((a,d)=>a+budOf(d.dt),0),nb=W.bud,by=ky+kh+34;bandH=170;
+  if(RVd.length){const ob=W.days.reduce((a,d)=>a+budOf(d.dt),0),nb=W.bud,by=ky+kh+34+tgH;bandH=170;
     c.fillStyle='#fdf0d5';c.fillRect(M,by,W0-2*M,bandH-20);c.fillStyle='#c77700';c.fillRect(M,by,14,bandH-20);
     T(c,'▼ 下方修正予算でシフトを作成しています',M+40,by+42,34,{b:1,col:'#8a4b00'});
     T(c,`週の売上予算　${yen(ob)} → ${yen(nb)}（${ob?((nb/ob-1)*100).toFixed(1)+'%':'—'}・${nb<ob?'−'+yen(ob-nb):'+'+yen(nb-ob)}）　下方修正 ${RVd.length}日`,M+40,by+92,30,{b:1,col:'#1d1b16',max:W0-2*M-80});
@@ -2147,7 +2155,7 @@ function drawReport(week,comment){
   // 日別の表
   const cols=[['日付',190,'l'],['備考',260,'l'],['売上予算',230,'r'],['人件費',230,'r'],['人件費率',170,'r'],['目標',120,'r'],['差（上限比）',220,'r'],['P/A人件費',220,'r'],['労働h',140,'r'],['人時生産性',190,'r'],['出勤',120,'r'],['うち社員',140,'r'],['不足人時',160,'r']];
   const tw=cols.reduce((a,x)=>a+x[1],0),sc=(W0-2*M)/tw;cols.forEach(x=>x[1]*=sc);
-  let ty=ky+kh+50+bandH;const rh=bandH?74:78;
+  let ty=ky+kh+50+bandH+tgH;const rh=bandH?70:74;
   c.fillStyle='#ebe7de';c.fillRect(M,ty,W0-2*M,rh);let x=M;cols.forEach(([h,w,a])=>{T(c,h,a==='r'?x+w-16:x+16,ty+rh/2,26,{b:1,al:a==='r'?'right':'left'});x+=w});ty+=rh;
   const rows=W.days.map(d=>{const cap=d.C.budget*d.t/100,diff=d.C.cost-cap;return [`${md(d.dt)}（${WD[wd(d.dt)]}）`,d.note,d.C.budget?yen(d.C.budget)+(useRev()&&rbudOf(d.dt)>0?' ▼':''):'—',d.C.cost?yen(d.C.cost):'—',pc(d.C.rate),d.t+'%',d.C.budget&&d.C.cost?(diff>0?'+':'')+yen(diff).replace('¥-','-¥'):'—',d.C.pa?yen(d.C.pa):'—',d.C.labor?n1(d.C.labor):'—',d.C.prod?Math.round(d.C.prod).toLocaleString():'—',d.people?d.people+'人':'—',d.people?d.emp+'人':'—',d.shortH==null?'—':n1(d.shortH),diff>0&&d.C.budget,d.dt]});
   const totDiff=W.cost-W.cap;
@@ -2791,7 +2799,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'1.99'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'2.00'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -4402,7 +4410,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v111';
+  const APP_SW='v112';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
