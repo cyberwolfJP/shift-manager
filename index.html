@@ -155,6 +155,8 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .grid th.prep{background:var(--sunk);color:var(--muted)}.bandrow th{font-size:11px;padding:2px 0}.bandp{background:var(--sunk);color:var(--muted);font-size:11px;text-align:center}.bandb{background:var(--good-bg);color:var(--good);font-size:11px;text-align:center}.smx td.prep{opacity:.6}.smx th.prep{color:var(--muted)}
 .day .rvm{font-size:11px;font-weight:700}.day .rvm.bad{color:var(--bad)}.day .rvm.good{color:var(--good)}.rvbox{border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--surface)}.rvbox summary{cursor:pointer}.rvt tr.cur td{background:var(--sunk)}
 .bcell .rbud{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--muted)}.bcell .rbud input{font-size:12px;padding:2px 4px;min-width:0;flex:1}.bcell .rbud.on span{color:var(--warn);font-weight:700}.bcell .rbud.on input{border-color:var(--warn);background:var(--warn-bg)}.bcell input.bold-off{text-decoration:line-through;color:var(--muted)}
+.t.wk tr.memorow td{background:#fff3c4;vertical-align:top}.t.wk tr.memorow td.nm{background:#c77700;color:#fff;font-weight:800;white-space:nowrap}.t.wk tr.memorow td.memo{max-width:150px;word-break:break-all;border:2px solid #c77700;color:#5a3200;font-weight:700;font-size:13px;white-space:pre-wrap;line-height:1.45}
+.memocall{display:flex;gap:10px;align-items:flex-start;background:#fff3c4;border:2px solid #c77700;border-left-width:8px;border-radius:8px;padding:10px 14px;font-size:16px;font-weight:700;color:#5a3200;white-space:pre-wrap}.memocall b{white-space:nowrap;color:#c77700}
 .ratechip{display:inline-flex;align-items:baseline;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--sunk);white-space:nowrap}.ratechip b{font-size:17px}.ratechip small{font-size:11px;color:var(--muted)}.ratechip.good b{color:var(--good)}.ratechip.bad{background:var(--bad-bg)}.ratechip.bad b{color:var(--bad)}
 .cutbtn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px;font-size:11px;font-weight:700;padding:2px 6px;cursor:pointer}.cuttag{font-size:11px;font-weight:700;color:var(--bad);margin-right:2px}
 .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 6px}
@@ -1880,10 +1882,11 @@ function drawPrint(cv){
   // 対象者
   const ids=staffList(true).filter(s=>dates.some(dt=>(dayDoc(dt).shifts||[]).some(sh=>sh.sid===s.id&&(calcShift(sh).on||sh.pos===PAID||(isEmp(s)&&isOff(sh.pos)))))).sort((a,b)=>staffRank(a)-staffRank(b));
   const nEmp=ids.filter(isEmp).length;
-  const memos=dates.map(dt=>[dayDoc(dt).note,dayDoc(dt).memo].filter(Boolean).join(' / '));
+  // メモ（指示・連絡）は見出しのすぐ下に黄色の帯で目立たせる
+  const memos=dates.map(dt=>String(dayDoc(dt).memo||'').trim());
   const hasMemo=memos.some(Boolean);
   const shorts=dates.map(dt=>recOf(dt).slice().sort((a,b)=>a.from-b.from).map(r=>`${tLabel(r.from)}–${tLabel(r.to)} ${r.pos?short(r.pos):'問わず'}${Math.max(1,Number(r.n)||1)}名`)),hasShort=(dates.some(dt=>(dayDoc(dt).shifts||[]).length));
-  const top=M+160,nameW=270,dayW=(W-2*M-nameW)/7,headH=120,footH=64,memoH=hasMemo?140:0;const dayW0=(W-2*M-nameW)/7,recW=shorts.map(L=>{const o=[];for(const t of L)o.push(...wrap(t,dayW0-28,24));return o}),shortH=hasShort?Math.min(260,44+Math.max(1,...recW.map(x=>x.length))*32):0;
+  const top=M+160,nameW=270,dayW=(W-2*M-nameW)/7,headH=120,footH=64,memoW0=(W-2*M-nameW)/7,memoL=memos.map(t=>t?wrap(t,memoW0-36,28):[]),memoH=hasMemo?Math.min(260,40+Math.max(1,...memoL.map(x=>Math.min(6,x.length)))*36):0;const dayW0=(W-2*M-nameW)/7,recW=shorts.map(L=>{const o=[];for(const t of L)o.push(...wrap(t,dayW0-28,24));return o}),shortH=hasShort?Math.min(260,44+Math.max(1,...recW.map(x=>x.length))*32):0;
   const avail=H-M-top-headH-footH-memoH-shortH;
   const rowH=Math.max(44,Math.min(112,avail/Math.max(ids.length,1)));
   const X=i=>M+nameW+dayW*i;
@@ -1896,7 +1899,10 @@ function drawPrint(cv){
     const n=dayDoc(dt).note;if(n){const s=fit(n,dayW-20,26,1);ctx.font=font(s,1);ctx.fillStyle='#b3261e';ctx.fillText(n,X(i)+dayW/2,top+92)}});
   ctx.fillStyle='#1d1b16';ctx.font=font(30,1);ctx.textAlign='center';ctx.fillText('名前',M+nameW/2,top+headH/2);
   // 行
-  ids.forEach((s,r)=>{const y=top+headH+rowH*r;
+  if(hasMemo){const y0=top+headH;ctx.fillStyle='#c77700';ctx.fillRect(M,y0,nameW,memoH);ctx.fillStyle='#fff';ctx.font=font(34,1);ctx.textAlign='center';ctx.fillText('📌 連絡',M+nameW/2,y0+memoH/2);
+    dates.forEach((dt,i)=>{const L=memoL[i];if(!L.length)return;ctx.fillStyle='#fff3c4';ctx.fillRect(X(i)+2,y0+2,dayW-4,memoH-4);ctx.strokeStyle='#c77700';ctx.lineWidth=4;ctx.strokeRect(X(i)+5,y0+5,dayW-10,memoH-10);
+      ctx.textAlign='left';ctx.fillStyle='#5a3200';L.slice(0,Math.floor((memoH-24)/36)).forEach((ln,k)=>{ctx.font=font(28,1);ctx.fillText(ln,X(i)+18,y0+36+k*36)})})}
+  ids.forEach((s,r)=>{const y=top+headH+memoH+rowH*r;
     if(isEmp(s)){ctx.fillStyle='#e3ecf6';ctx.fillRect(M,y,nameW,rowH)}else if(r%2){ctx.fillStyle='#faf8f4';ctx.fillRect(M,y,W-2*M,rowH)}
     ctx.fillStyle='#1d1b16';ctx.textAlign='left';const ns=fit(s.name,nameW-28,Math.min(38,rowH*0.42),1);ctx.font=font(ns,1);ctx.fillText(s.name,M+16,y+rowH/2);
     if(isNew(s)){const tw=ctx.measureText(s.name).width,bx=Math.min(M+24+tw,M+nameW-60),bh=Math.min(30,rowH*0.5);ctx.fillStyle='#2f7a4a';ctx.fillRect(bx,y+rowH/2-bh/2,54,bh);ctx.fillStyle='#fff';ctx.font=font(Math.min(20,bh*0.7),1);ctx.fillText('新人',bx+6,y+rowH/2)}
@@ -1918,7 +1924,7 @@ function drawPrint(cv){
         ctx.fillStyle='#1d1b16';rr(ctx,cx+pad,l2-bh/2,bw,bh,6);ctx.fill();ctx.fillStyle='#fff';ctx.textAlign='center';const bfs=fit(bt,bw-12,fs2,1);ctx.font=font(bfs,1);ctx.fillText(bt,cx+dayW/2,l2)}
       else{ctx.fillStyle='#6b655a';ctx.textAlign='left';ctx.font=font(fs2*0.9);ctx.fillText('休憩なし',cx+pad+4,l2)}});
   });
-  const yEnd=top+headH+rowH*ids.length;
+  const yEnd=top+headH+memoH+rowH*ids.length;
   // 出勤人数
   ctx.fillStyle='#ebe7de';ctx.fillRect(M,yEnd,W-2*M,footH);ctx.fillStyle='#1d1b16';ctx.font=font(28,1);ctx.textAlign='center';
   ctx.fillText('出勤人数',M+nameW/2,yEnd+footH/2);
@@ -1930,17 +1936,13 @@ function drawPrint(cv){
       ctx.fillStyle='#fde3df';ctx.fillRect(X(i)+2,y0+2,dayW-4,shortH-4);ctx.strokeStyle='#b3261e';ctx.lineWidth=3;ctx.strokeRect(X(i)+4,y0+4,dayW-8,shortH-8);
       const lines=recW[i];ctx.fillStyle='#b3261e';
       lines.slice(0,Math.floor((shortH-20)/32)).forEach((ln,k)=>{ctx.font=font(24,1);ctx.fillText(ln,X(i)+14,y0+30+k*32)})})}
-  // メモ
-  if(hasMemo){const y0=yEnd+footH+shortH;ctx.font=font(28,1);ctx.fillText('メモ',M+nameW/2,y0+memoH/2);
-    dates.forEach((dt,i)=>{if(!memos[i])return;ctx.textAlign='left';ctx.fillStyle='#1d1b16';
-      wrap(memos[i],dayW-24,22).slice(0,4).forEach((ln,k)=>{ctx.font=font(22);ctx.fillText(ln,X(i)+12,y0+24+k*30)})})}
   // 罫線
-  const yB=yEnd+footH+shortH+memoH;ctx.strokeStyle='#8a8478';ctx.lineWidth=2;ctx.strokeRect(M,top,W-2*M,yB-top);
+  const yB=yEnd+footH+shortH;ctx.strokeStyle='#8a8478';ctx.lineWidth=2;ctx.strokeRect(M,top,W-2*M,yB-top);
   ctx.beginPath();for(let i=0;i<7;i++){ctx.moveTo(X(i),top);ctx.lineTo(X(i),yB)}
-  for(const y of [top+headH,yEnd,yEnd+footH,yEnd+footH+shortH]){ctx.moveTo(M,y);ctx.lineTo(W-M,y)}ctx.stroke();
-  ctx.strokeStyle='#d6d0c3';ctx.lineWidth=1;ctx.beginPath();for(let r=1;r<ids.length;r++){const y=top+headH+rowH*r;ctx.moveTo(M,y);ctx.lineTo(W-M,y)}ctx.stroke();
-  if(nEmp&&nEmp<ids.length){const y=top+headH+rowH*nEmp;ctx.strokeStyle='#1f3a5c';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(M,y);ctx.lineTo(W-M,y);ctx.stroke()}
-  if(!ids.length){ctx.fillStyle='#6b655a';ctx.textAlign='center';ctx.font=font(36);ctx.fillText('この週のシフトはまだありません',W/2,top+headH+80)}
+  for(const y of [top+headH,top+headH+memoH,yEnd,yEnd+footH,yEnd+footH+shortH]){ctx.moveTo(M,y);ctx.lineTo(W-M,y)}ctx.stroke();
+  ctx.strokeStyle='#d6d0c3';ctx.lineWidth=1;ctx.beginPath();for(let r=1;r<ids.length;r++){const y=top+headH+memoH+rowH*r;ctx.moveTo(M,y);ctx.lineTo(W-M,y)}ctx.stroke();
+  if(nEmp&&nEmp<ids.length){const y=top+headH+memoH+rowH*nEmp;ctx.strokeStyle='#1f3a5c';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(M,y);ctx.lineTo(W-M,y);ctx.stroke()}
+  if(!ids.length){ctx.fillStyle='#6b655a';ctx.textAlign='center';ctx.font=font(36);ctx.fillText('この週のシフトはまだありません',W/2,top+headH+memoH+80)}
 }
 function jpegPdf(jpeg,w,h){
   const enc=new TextEncoder(),parts=[],off=[];let len=0;
@@ -2621,7 +2623,7 @@ function vFinal(){
       return `<td class="sh" style="${posStyle(sh.pos)}"><div class="tm">${tLabel(sh.start)}–${tLabel(sh.end)}</div>${sh.pos?`<span class="ps">${esc(sh.pos)}${isHelp(sh.pos)&&sh.helpTo?`→${esc(sh.helpTo)}`:''}</span>`:''}</td>`}).join('')}</tr>`}).join('');
     const cnt=dates.map(dt=>(dayDoc(dt).shifts||[]).filter(sh=>calcShift(sh).on).length);
     body=ids.length?`<div class="scroll"><table class="t wk"><thead><tr><th class="nm" style="position:sticky;left:0;z-index:2">名前</th>${dates.map(dt=>{const w=wd(dt),n=dayDoc(dt).note;return `<th><span class="w ${w===6?'w-sat':w===0?'w-sun':w===5?'w-fri':''}" style="display:inline-block;min-width:1.6em;text-align:center;border-radius:3px">${WD[w]}</span> ${md(dt)}${n?`<div style="font-weight:400">${esc(n)}</div>`:''}</th>`}).join('')}</tr></thead>
-      <tbody>${rows}</tbody><tfoot><tr><td class="nm">出勤人数</td>${cnt.map(c=>`<td class="num">${c}人</td>`).join('')}</tr>
+      <tbody>${dates.some(dt=>String(dayDoc(dt).memo||'').trim())?`<tr class="memorow"><td class="nm">📌 連絡</td>${dates.map(dt=>{const m=String(dayDoc(dt).memo||'').trim();return m?`<td class="memo">${esc(m)}</td>`:'<td></td>'}).join('')}</tr>`:''}${rows}</tbody><tfoot><tr><td class="nm">出勤人数</td>${cnt.map(c=>`<td class="num">${c}人</td>`).join('')}</tr>
       <tr><td class="nm">不足</td>${dates.map(dt=>{const R=shortages(dt);return `<td style="font-size:11px;vertical-align:top;${R.ready&&R.items.length?'color:var(--bad)':''}">${!R.ready?'<span class="muted">—</span>':!R.items.length?'<span class="cell-good">なし</span>':R.items.filter(x=>x.kind==='pos').map(x=>`<div>${esc(short(x.pos))} ${tLabel(x.from)}–${tLabel(x.to)}</div>`).join('')+(R.totalH?`<div><b>全体 ${n1(R.totalH)}人時</b></div>`:'')}</td>`}).join('')}</tr></tfoot></table></div>`:
       '<div class="empty">この週のシフトはまだありません。</div>';
   }else{
@@ -2677,7 +2679,7 @@ function dayGantt(date,forPrint){
       const cov=`<div class="g-cov"><div class="g-name" style="font-size:11px;color:var(--muted)">在店人数</div><div class="bars">${slots.map(s=>`<i class="${s.n<s.i?'short':''}" style="height:${s.n/mx*100}%" title="${s.n}人${s.i?'／理想'+s.i:''}"></i>`).join('')}</div><div class="g-time">最大${mx}人</div></div>`;
   return `
         <div class="bar"><h2>${parse(date).getFullYear()}/${md(date)}（${WD[wd(date)]}）</h2>${d.note?`<span class="pill warn">${esc(d.note)}</span>`:''}<span class="muted">出勤 ${on.length}人</span></div>
-        ${d.memo?`<p style="margin:0;font-weight:700">メモ：${esc(d.memo)}</p>`:''}
+        ${d.memo?`<div class="memocall"><b>📌 連絡</b><span>${esc(d.memo)}</span></div>`:''}
         <div class="scroll" style="padding:10px;border:0"><div class="gantt">${head}${rows}${cov}</div></div>
         ${(()=>{const L=recLines(date);return L.length?`<div class="recbox"><b>募集</b>${L.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:'<div class="recbox ok"><b>募集</b><span>不足なし</span></div>'})()}
         ${off.length?`<p class="hint">休み：${off.map(sh=>`${esc(S.staff[sh.sid].name)}（${esc(sh.pos)}）`).join('、')}</p>`:''}`;
@@ -2805,7 +2807,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'2.01'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'2.02'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -4416,7 +4418,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v113';
+  const APP_SW='v114';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
