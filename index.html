@@ -156,6 +156,7 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .day .rvm{font-size:11px;font-weight:700}.day .rvm.bad{color:var(--bad)}.day .rvm.good{color:var(--good)}.rvbox{border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--surface)}.rvbox summary{cursor:pointer}.rvt tr.cur td{background:var(--sunk)}
 .bcell .rbud{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--muted)}.bcell .rbud input{font-size:12px;padding:2px 4px;min-width:0;flex:1}.bcell .rbud.on span{color:var(--warn);font-weight:700}.bcell .rbud.on input{border-color:var(--warn);background:var(--warn-bg)}.bcell input.bold-off{text-decoration:line-through;color:var(--muted)}
 .t.wk tr.memorow td{background:#fff3c4;vertical-align:top}.t.wk tr.memorow td.nm{background:#c77700;color:#fff;font-weight:800;white-space:nowrap}.t.wk tr.memorow td.memo{max-width:150px;word-break:break-all;border:2px solid #c77700;color:#5a3200;font-weight:700;font-size:13px;white-space:pre-wrap;line-height:1.45}
+.hmt tr.lvsel td{outline:2px solid var(--fg);outline-offset:-2px}
 .memocall{display:flex;gap:10px;align-items:flex-start;background:#fff3c4;border:2px solid #c77700;border-left-width:8px;border-radius:8px;padding:10px 14px;font-size:16px;font-weight:700;color:#5a3200;white-space:pre-wrap}.memocall b{white-space:nowrap;color:#c77700}
 .ratechip{display:inline-flex;align-items:baseline;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--sunk);white-space:nowrap}.ratechip b{font-size:17px}.ratechip small{font-size:11px;color:var(--muted)}.ratechip.good b{color:var(--good)}.ratechip.bad{background:var(--bad-bg)}.ratechip.bad b{color:var(--bad)}
 .cutbtn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px;font-size:11px;font-weight:700;padding:2px 6px;cursor:pointer}.cuttag{font-size:11px;font-weight:700;color:var(--bad);margin-right:2px}
@@ -1172,6 +1173,38 @@ function hireDiag(weeks){
   const weeksData=new Set(ready.map(dt=>monday(dt))).size;
   return {weeks,weeksData,hireH,hirePersons,start,end,ready:ready.length,skipped,nDays,W,needs,depth,profiles,avgW,cost,budget,s28,tight,share28:hAll?h28/hAll:0,pa};
 }
+
+/* ---------- もし辞めたら（退職シミュレーション）----------
+ 期間のシフトから、選んだ人のシフトを抜いて、曜日ごとに「通常営業の時間の不足（理想人数との差）」がどれだけ増えるかを出す */
+function leaveSim(weeks,ex){const end=addDays(S.week,6),start=addDays(S.week,-7*(weeks-1)),out={};
+  for(const w of WD_ORDER)out[w]={n:0,h:0,before:0,after:0,pos:{},days:0};
+  for(let dt=start;dt<=end;dt=addDays(dt,1)){const d=dayDoc(dt);if(!(d.shifts||[]).length||!(d.ideal||[]).some(v=>Number(v)>0))continue;const w=wd(dt),o=out[w];o.n++;
+    const ideal=(d.ideal||[]).map(Number),bz=bizFrom(dt),lack=dd=>{const {n}=slotState(dd);let L=0;for(let k=0;k<48;k++){const h=8+Math.floor(k/2);if(8+k/2<bz)continue;L+=Math.max(0,Math.ceil(ideal[h-8]||0)-n[k])/2}return L};
+    const mine=(d.shifts||[]).filter(sh=>ex.includes(sh.sid)&&calcShift(sh).on);if(mine.length)o.days++;
+    for(const sh of mine){o.h+=calcShift(sh).labor;if(sh.pos)o.pos[sh.pos]=(o.pos[sh.pos]||0)+1}
+    o.before+=lack(d);o.after+=lack({...d,shifts:(d.shifts||[]).filter(sh=>!ex.includes(sh.sid))})}
+  return out}
+// 誰がどの曜日を支えているか（曜日ごとの1日平均の勤務時間と、その曜日の全体に占める割合）
+function leaveMap(weeks){const end=addDays(S.week,6),start=addDays(S.week,-7*(weeks-1)),T={},cnt={},tot={};
+  for(let dt=start;dt<=end;dt=addDays(dt,1)){const d=dayDoc(dt);if(!(d.shifts||[]).length)continue;const w=wd(dt);cnt[w]=(cnt[w]||0)+1;
+    for(const sh of d.shifts||[]){const c=calcShift(sh);if(!c.on||c.help||!S.staff[sh.sid])continue;T[sh.sid]=T[sh.sid]||{};T[sh.sid][w]=(T[sh.sid][w]||0)+c.labor;tot[w]=(tot[w]||0)+c.labor}}
+  return {T,cnt,tot}}
+function leaveHtml(weeks){const ex=(S.hireEx||[]).filter(id=>S.staff[id]),M=leaveMap(weeks);
+  const list=staffList().filter(x=>M.T[x.id]).map(x=>{const r=WD_ORDER.map(w=>M.cnt[w]?(M.T[x.id][w]||0)/M.cnt[w]:0);return {x,r,wk:r.reduce((a,b)=>a+b,0)}}).sort((a,b)=>b.wk-a.wk);
+  if(!list.length)return '';
+  const share=(x,w)=>M.tot[w]?(M.T[x.id][w]||0)/M.tot[w]:0;
+  const map=`<div class="scroll"><table class="t hmt"><thead><tr><th>スタッフ（押すと選べます）</th>${WD_ORDER.map(w=>`<th class="r">${WD[w]}</th>`).join('')}<th class="r">週</th></tr></thead><tbody>
+    ${list.map(o=>`<tr class="${ex.includes(o.x.id)?'lvsel':''}"><td><button class="mini" data-act="lvPick" data-id="${o.x.id}">${ex.includes(o.x.id)?'✓ ':''}${esc(o.x.name)}</button></td>${WD_ORDER.map((w,i)=>{const sh=share(o.x,w),cls=sh>=0.2?'h3':sh>=0.12?'h2':sh>0.03?'h1':sh>0?'h0':'';return `<td class="hm ${cls}" title="${WD[w]}曜：1日平均${n1(o.r[i])}h（その曜日の勤務時間の${Math.round(sh*100)}%）">${o.r[i]>=0.05?n1(o.r[i]):''}</td>`}).join('')}<td class="num">${n1(o.wk)}h</td></tr>`).join('')}</tbody></table></div>
+    <div class="legend" style="font-size:11px"><span class="muted">数字はその曜日の1日平均の勤務時間。色はその曜日の全員の勤務時間に占める割合（濃いほど、その人が抜けると響く）</span></div>`;
+  let sim='<p class="hint" style="margin:6px 0 0">上の表で名前を押すと、その人が辞めた場合に何曜日の人数が足りなくなるかを出します（何人でも選べます）。</p>';
+  if(ex.length){const L=leaveSim(weeks,ex),rows=WD_ORDER.filter(w=>L[w].n).map(w=>{const o=L[w],b=o.before/o.n,a=o.after/o.n,inc=a-b,lost=o.h/o.n,pos=Object.entries(o.pos).sort((x,y)=>y[1]-x[1]).slice(0,2).map(p=>p[0]);return {w,o,b,a,inc,lost,pos,lv:inc>=3?'bad':inc>=1?'warn':'good'}});
+    const worst=rows.slice().sort((x,y)=>y.inc-x.inc).filter(r=>r.inc>=0.5).slice(0,3);
+    sim=`<div class="hire-verdict ${worst.length&&worst[0].inc>=3?'go':'ok'}" style="margin-top:8px"><b style="font-size:16px">${ex.map(id=>esc(S.staff[id].name)).join('・')}さんが辞めると</b>
+      <div>${worst.length?`特に手薄になる曜日：${worst.map(r=>`<b>${WD[r.w]}曜</b>（不足が1日平均 +${n1(r.inc)}人時）`).join('、')}`:'どの曜日も、理想人数に対する不足はほとんど増えません'}</div></div>
+      <div class="scroll"><table class="t"><thead><tr><th>曜日</th><th class="r">抜ける勤務（1日平均）</th><th class="r">入っていた日</th><th>主なポジション</th><th class="r">不足（今）</th><th class="r">不足（辞めたら）</th><th class="r">増える不足</th><th>影響</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td><b>${WD[r.w]}</b></td><td class="num">${n1(r.lost)}h</td><td class="num">${r.o.days}/${r.o.n}日</td><td>${r.pos.map(p=>`<span class="legend"><span style="${posStyle(p)}">${esc(p)}</span></span>`).join(' ')||'—'}</td><td class="num">${n1(r.b)}人時</td><td class="num">${n1(r.a)}人時</td><td class="num ${r.inc>=1?'cell-bad':''}"><b>+${n1(r.inc)}人時</b></td><td><span class="pill ${r.lv}">${r.lv==='bad'?'大きい':r.lv==='warn'?'やや大きい':'小さい'}</span></td></tr>`).join('')}</tbody></table></div>
+      <p class="hint" style="margin:0">不足は、通常営業の時間に理想人数より足りない人時の1日平均です（理想人数が入っている日だけで計算）。抜ける勤務が多くても、もともと人が余っている曜日は不足が増えません。<button class="btn sm ghost" data-act="lvClear">選び直す</button></p>`}
+  return `<section class="panel"><div class="bar"><h2>もし辞めたら（退職シミュレーション）</h2><span class="hint">期間のシフトから、その人が抜けたときに何曜日が手薄になるかを見ます</span></div>${map}${sim}</section>`}
 function vHire(){
   const weeks=S.hireWeeks||4,D=hireDiag(weeks),st=set();
   const seg=`<div class="seg" role="group" aria-label="期間">${[4,8,12].map(k=>`<button data-act="hireW" data-n="${k}" aria-pressed="${weeks===k}">${k}週間</button>`).join('')}</div>`;
@@ -1217,6 +1250,7 @@ function vHire(){
     return `<tr><td><span class="legend"><span style="${posStyle(d.p)}">${esc(d.p)}</span></span></td><td class="num">${d.lead}</td><td class="num">${d.ok}<span class="muted">（うちアルバイト${d.okPA}）</span></td><td class="num">${d.learn}</td><td class="num">${d.unset}</td><td><span class="pill ${risk[0]}">${risk[1]}</span></td></tr>`}).join('');
   const t28=D.s28.length?`<p style="margin:0;font-size:13px">留学生（28時間）${D.s28.length}人のうち、この期間に上限まで3時間を切った人：${D.tight.length?D.tight.map(x=>esc(x.name)).join('、'):'なし'}。アルバイトの時間の${Math.round(D.share28*100)}%が28時間の上限がある人です。</p>`:'';
   return `<section class="panel">${head}${top}</section>
+  ${leaveHtml(weeks)}
   <section class="panel"><div class="bar"><h2>曜日×ポジションの不足</h2></div>${heat}</section>
   <section class="panel"><div class="bar"><h2>提案</h2><span class="hint">いつも足りない時間（期間の半分以上の同じ曜日で不足）を、多い順に並べています</span></div>${prof}<h3 style="font-size:15px;color:var(--fg)">曜日・時間ごとの対応</h3><div style="display:grid;gap:8px">${ask}</div></section>
   <section class="panel"><div class="bar"><h2>ポジションごとの人材の厚み</h2><span class="hint">マスタ → スキルのレベルから。社員を含む在籍者</span></div>
@@ -2807,7 +2841,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'2.02'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'2.03'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -4201,6 +4235,8 @@ app.addEventListener('click',e=>{
     for(const dt of weekDates(S.week)){const src=dayDoc(addDays(dt,-7));if(!hasIdeal(src))continue;const d=ensureDay(dt);
       d.ideal=(src.ideal||Array(24).fill(0)).map(Number);d.posIdeal={...(src.posIdeal||{})};d.idealSet=true;saveDay(dt);dayToTpl(dt);n++}
     toast(n?`前の週の${n}日分をコピーしました`:'前の週に理想人数が入っていません');return render()}
+  if(a==='lvPick'){const id=b.dataset.id,L=(S.hireEx||[]).slice(),i=L.indexOf(id);if(i>=0)L.splice(i,1);else L.push(id);S.hireEx=L;return render()}
+  if(a==='lvClear'){S.hireEx=[];return render()}
   if(a==='hireW'){S.hireWeeks=Number(b.dataset.n);return render()}
   if(a==='tplReset'){const date=curDate(),d=ensureDay(date),t=tplOf(date);if(t){d.ideal=t.ideal.slice();d.posIdeal={...t.posIdeal};delete d.idealSet;saveDay(date);toast(`${WD[wd(date)]}曜日の基本に戻しました`)}return render()}
   if(a==='bSaveNext'){if(!bulkSave())return render();const emp0=S.staff[S.bulk.sid]?.kind==='社員',l=staffList().filter(x=>(x.kind==='社員')===emp0);const all=l.length?l:staffList(),i=all.findIndex(x=>x.id===S.bulk.sid),wd7=weekDates(S.week),hasE=sid=>wd7.some(dt=>(dayDoc(dt).shifts||[]).some(x=>x.sid===sid&&!x.gen));
@@ -4418,7 +4454,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v114';
+  const APP_SW='v115';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
