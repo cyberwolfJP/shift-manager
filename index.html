@@ -156,6 +156,7 @@ thead th{background:var(--sunk);font-weight:700;font-size:11px;color:var(--muted
 .day .rvm{font-size:11px;font-weight:700}.day .rvm.bad{color:var(--bad)}.day .rvm.good{color:var(--good)}.rvbox{border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--surface)}.rvbox summary{cursor:pointer}.rvt tr.cur td{background:var(--sunk)}
 .bcell .rbud{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--muted)}.bcell .rbud input{font-size:12px;padding:2px 4px;min-width:0;flex:1}.bcell .rbud.on span{color:var(--warn);font-weight:700}.bcell .rbud.on input{border-color:var(--warn);background:var(--warn-bg)}.bcell input.bold-off{text-decoration:line-through;color:var(--muted)}
 .t.wk tr.memorow td{background:#fff3c4;vertical-align:top}.t.wk tr.memorow td.nm{background:#c77700;color:#fff;font-weight:800;white-space:nowrap}.t.wk tr.memorow td.memo{max-width:150px;word-break:break-all;border:2px solid #c77700;color:#5a3200;font-weight:700;font-size:13px;white-space:pre-wrap;line-height:1.45}
+.hplan{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-top:8px}.hp{background:var(--surface);border:2px solid var(--bad);border-radius:10px;padding:8px 12px;display:grid;gap:4px}.hp-n{font-weight:800;color:var(--bad)}.hp-d{display:flex;gap:4px}.hp-w{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--bad);color:#fff;font-weight:800;font-size:15px}.hp-w.w-sat{background:#1f4f8a}.hp-w.w-sun{background:#b3261e}.hp-t{font-size:13px;font-weight:700}.hp-m{font-size:12px;color:var(--muted)}
 .hmt tr.lvsel td{outline:2px solid var(--fg);outline-offset:-2px}
 .memocall{display:flex;gap:10px;align-items:flex-start;background:#fff3c4;border:2px solid #c77700;border-left-width:8px;border-radius:8px;padding:10px 14px;font-size:16px;font-weight:700;color:#5a3200;white-space:pre-wrap}.memocall b{white-space:nowrap;color:#c77700}
 .ratechip{display:inline-flex;align-items:baseline;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--sunk);white-space:nowrap}.ratechip b{font-size:17px}.ratechip small{font-size:11px;color:var(--muted)}.ratechip.good b{color:var(--good)}.ratechip.bad{background:var(--bad-bg)}.ratechip.bad b{color:var(--bad)}
@@ -1165,13 +1166,25 @@ function hireDiag(weeks){
   const profiles=Object.values(prof).map(P=>{const D=depth.find(d=>d.p===P.pos)||{};const okN=D.unset>D.ok?D.guessOk:D.ok;
     P.level=okN<=2?'経験者が望ましい':'未経験でも可（一人前の人と組んで育成）';return P}).sort((a,b)=>b.h-a.h);
   // 採用人数の目安：1人あたり週16時間（週4日×4時間）として、足りない時間の合計から
-  const hireH=profiles.reduce((a,P)=>a+P.h,0),hirePersons=hireH>=3?Math.max(1,Math.round(hireH/16)):0;
+  const hireH0=profiles.reduce((a,P)=>a+P.h,0);
+  // 採用計画：曜日ごとに「あと何人・何時〜何時・どのポジション」をまとめ、1人あたり週4日までで人に割り振る
+  const dem={};for(const n of needs){if(n.solvable)continue;const o=dem[n.w]=dem[n.w]||{w:n.w,all:0,posP:{},from:99,to:0,pos:new Set()};
+    if(n.pos==='全体')o.all=Math.max(o.all,n.people);else{o.posP[n.pos]=Math.max(o.posP[n.pos]||0,n.people);o.pos.add(n.pos)}o.from=Math.min(o.from,n.from);o.to=Math.max(o.to,n.to)}
+  const demand=Object.values(dem).map(o=>({...o,people:Math.max(o.all,Object.values(o.posP).reduce((a,b)=>a+b,0)),pos:[...o.pos]})).filter(o=>o.people>0);
+  const MAXD=4,hires=[];
+  if(hireH0>=3){const maxP=Math.max(0,...demand.map(o=>o.people));
+    for(let k=1;k<=maxP;k++){const ds=WD_ORDER.map(w=>demand.find(o=>o.w===w&&o.people>=k)).filter(Boolean);if(!ds.length)continue;
+      const parts=Math.ceil(ds.length/MAXD),size=Math.ceil(ds.length/parts);
+      for(let p=0;p<parts;p++){const days=ds.slice(p*size,(p+1)*size);if(!days.length)continue;
+        const h=days.reduce((a,o)=>{const L=o.to-o.from;return a+L-breakHours(L)},0);
+        hires.push({days,h,pos:[...new Set(days.flatMap(o=>o.pos))]})}}}
+  const hireH=hireH0,hirePersons=hires.length;
   const wages=pa.map(x=>Number(x.wage)||0).filter(v=>v>0),avgW=wages.length?wages.reduce((a,b)=>a+b,0)/wages.length:0;
   let cost=0,budget=0;for(const dt of ready){const C=calcDay(dt);cost+=C.cost;budget+=C.budget}
   const s28=pa.filter(x=>x.limit28),tight=s28.filter(x=>cap(x)!=null&&cap(x)<3);
   const h28=s28.reduce((a,x)=>a+wkH(x.id),0),hAll=pa.reduce((a,x)=>a+wkH(x.id),0);
   const weeksData=new Set(ready.map(dt=>monday(dt))).size;
-  return {weeks,weeksData,hireH,hirePersons,start,end,ready:ready.length,skipped,nDays,W,needs,depth,profiles,avgW,cost,budget,s28,tight,share28:hAll?h28/hAll:0,pa};
+  return {weeks,weeksData,hireH,hirePersons,hires,demand,start,end,ready:ready.length,skipped,nDays,W,needs,depth,profiles,avgW,cost,budget,s28,tight,share28:hAll?h28/hAll:0,pa};
 }
 
 /* ---------- もし辞めたら（退職シミュレーション）----------
@@ -1215,7 +1228,11 @@ function vHire(){
   const askN=D.needs.filter(n=>n.pos!=='全体'&&n.solvable).length,hireP=D.hirePersons,hireH=D.hireH;
   const addMonth=hireH*D.avgW*4.33,wkCost=D.cost/weeks,wkBud=D.budget/weeks;
   const rateNow=wkBud?wkCost/wkBud*100:null,rateAfter=wkBud?(wkCost+hireH*D.avgW)/wkBud*100:null;
-  const verdict=hireP?`<b style="font-size:18px">採用をおすすめします：${hireP}人ほど（週${n1(hireH)}時間分）</b><div>できてほしいポジション：${D.profiles.map(p=>`${esc(p.pos)}（${p.slots.map(n=>WD[n.w]).join('・')}）`).join('、')}</div>${askN?`<div>ほかに${askN}件は、今いるスタッフに声をかければ埋められそうです（下の「提案」）。</div>`:''}`
+  const tlh=(a,b)=>`${tLabel(a)}〜${tLabel(b)}`;
+  const plan=hireP?`<div class="hplan">${D.hires.map((h,i)=>`<div class="hp"><div class="hp-n">${i+1}人目</div><div class="hp-d">${h.days.map(o=>`<span class="hp-w ${o.w===6?'w-sat':o.w===0?'w-sun':''}">${WD[o.w]}</span>`).join('')}</div>
+      <div class="hp-t">${new Set(h.days.map(o=>o.from+'-'+o.to)).size===1?`どの日も ${tlh(h.days[0].from,h.days[0].to)}`:h.days.map(o=>`${WD[o.w]} ${tlh(o.from,o.to)}`).join('　')}</div><div class="hp-m">週${h.days.length}日・約${n1(h.h)}時間${h.pos.length?`・${h.pos.map(esc).join('／')}ができる人`:'・ポジションは問わない'}</div></div>`).join('')}</div>
+    <div class="scroll"><table class="t" style="margin-top:6px"><thead><tr><th></th>${WD_ORDER.map(w=>`<th class="r">${WD[w]}</th>`).join('')}</tr></thead><tbody><tr><td>あと何人</td>${WD_ORDER.map(w=>{const o=D.demand.find(x=>x.w===w);return `<td class="num ${o?'cell-bad':''}">${o?`<b>${o.people}人</b><div style="font-size:10px">${tlh(o.from,o.to)}</div>`:'<span class="muted">0</span>'}</td>`}).join('')}</tr></tbody></table></div>`:'';
+  const verdict=hireP?`<b style="font-size:18px">採用：${hireP}人（${[...new Set(D.hires.flatMap(h=>h.days.map(o=>o.w)))].sort((a,b)=>WD_ORDER.indexOf(a)-WD_ORDER.indexOf(b)).map(w=>WD[w]).join('・')}曜に入れる人）</b>${plan}${askN?`<div>ほかに${askN}件は、今いるスタッフに声をかければ埋められそうです（下の「提案」）。</div>`:''}`
     :D.hireH>0?`<b style="font-size:18px">今は採用しなくても大丈夫です</b><div>埋まらない不足は週${n1(D.hireH)}時間ほどと小さいので、シフトの組み方で調整できます${askN?`。ほかの${askN}件は今いるスタッフへの声かけで埋められそうです`:''}。</div>`
     :askN?'<b style="font-size:18px">今は採用しなくても大丈夫です</b><div>足りない時間は、今いるスタッフへの声かけで埋められそうです。</div>'
     :'<b style="font-size:18px">今は採用しなくても大丈夫です</b><div>いつも足りない時間帯は見つかりませんでした。</div>';
@@ -2841,7 +2858,7 @@ function vHelp(){
     </ol>
     <h3>データについて</h3>
     <p style="margin:0">${window.LOCAL_MODE?'データはこの端末のブラウザに保存されます。ページを更新しても消えません。ブラウザの閲覧データを削除すると消えるので、月に1回「マスタ → 設定 → バックアップを書き出す」をしてください。別の端末に移すときも、このバックアップを取り込みます。':'データはクラウド（Firebase）に保存され、スマホとPCで同じ内容が見られます。念のため月に1回バックアップを書き出してください。'}</p>
-    <p class="hint" style="margin:0">バージョン ${'2.03'}</p></section>`;
+    <p class="hint" style="margin:0">バージョン ${'2.04'}</p></section>`;
 }
 
 /* --- 有給 --- */
@@ -4454,7 +4471,7 @@ try{document.fonts?.ready.then(()=>{if(S.tab==="final"&&S.finalMode==="print")re
     window.addEventListener('localdb-error',()=>{toast('この端末の保存容量がいっぱいです。マスタ → 設定 からバックアップを書き出してください');status('err')})}
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   // 新しいバージョンが出ていたら、画面の上にお知らせを出す（アプリを開いたまま・ホーム画面から戻ったとき）
-  const APP_SW='v115';
+  const APP_SW='v116';
   const checkUpdate=()=>{if(location.protocol!=='https:'||navigator.onLine===false)return;
     fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/VERSION\s*=\s*'([^']+)'/.exec(t||'');
       if(m&&m[1]!==APP_SW&&!document.getElementById('updBar')){const d=document.createElement('div');d.id='updBar';d.className='updbar';
